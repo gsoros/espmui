@@ -6,10 +6,10 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(EspmUiApp());
 }
 
-class MyApp extends StatelessWidget {
+class EspmUiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -17,27 +17,56 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.red,
       ),
-      home: MyHomePage(title: 'Devices'),
+      darkTheme: ThemeData.dark().copyWith(
+        primaryColor: Colors.red,
+        colorScheme: ColorScheme.fromSwatch(
+          primarySwatch: Colors.red,
+        ),
+      ),
+      themeMode: ThemeMode.system,
+      debugShowCheckedModeBanner: false,
+      home: EspmPage(title: 'ESPM UI'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+class EspmPage extends StatefulWidget {
+  EspmPage({Key key, this.title}) : super(key: key);
 
   final String title;
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  EspmPageState createState() => EspmPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class EspmPageState extends State<EspmPage> {
+  final String defaultTitle = "ESPM Devices";
+  String title;
   StreamSubscription<BluetoothState> adapterListener;
   StreamSubscription<ScanResult> scanListener;
+  StreamSubscription<PeripheralConnectionState> deviceListener;
   BleManager bleManager = BleManager();
   bool initDone = false;
   bool scanning = false;
-  Map<String, AvailableDevice> availableDevices = {};
+  Map<String, Peripheral> availablePeripherals = {};
+  Peripheral _selected;
+  PeripheralConnectionState _connectionState;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!initDone) _init();
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title == null ? defaultTitle : title),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: _contentsView(),
+        ),
+      ),
+    );
+  }
 
   void _init() async {
     await _checkPermissions();
@@ -71,7 +100,7 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() {
         scanning = false;
       });
-      if (availableDevices.isEmpty) print("No devices found");
+      if (availablePeripherals.isEmpty) print("No devices found");
     });
     setState(() {
       scanning = true;
@@ -80,61 +109,119 @@ class _MyHomePageState extends State<MyHomePage> {
       uuids: ["55bebab5-1857-4b14-a07b-d4879edad159"],
     ).listen((scanResult) {
       setState(() {
-        availableDevices[scanResult.peripheral.identifier] =
-            AvailableDevice(scanResult.peripheral, scanResult.rssi);
+        availablePeripherals[scanResult.peripheral.identifier] =
+            scanResult.peripheral;
       });
       print(
           "Device found: ${scanResult.peripheral.name} (${scanResult.peripheral.identifier})");
     });
   }
 
-  List<Widget> _deviceList() {
-    List<Widget> widgets = [];
-    if (!scanning && availableDevices.isEmpty)
+  List<Widget> _deviceScanView() {
+    List<Widget> widgets = [Text("deviceScanView")];
+    setState(() {
+      title = defaultTitle;
+    });
+    if (!scanning && availablePeripherals.isEmpty)
       widgets.add(Text("No devices found"));
     else
-      availableDevices.forEach((id, device) {
+      availablePeripherals.forEach((id, peripheral) {
         widgets.add(ElevatedButton(
-            onPressed: device.connect,
+            onPressed: () {
+              _select(peripheral);
+              _connect(peripheral);
+            },
             child: Text(
-              device.peripheral.name + " " + device.rssi.toString(),
+              peripheral.name,
             )));
       });
     if (scanning)
-      widgets.add(Text("Scanning..."));
+      widgets.add(ElevatedButton(onPressed: null, child: Text("Scanning...")));
     else
       widgets.add(ElevatedButton(onPressed: _scan, child: Text("Scan")));
     return widgets;
   }
 
-  void _connectDevice(Peripheral peripheral) {
-    peripheral
+  List<Widget> _deviceView() {
+    List<Widget> widgets = [Text("deviceView")];
+    if (_connectionState != PeripheralConnectionState.connected) {
+      widgets.add(ElevatedButton(
+          onPressed: () {
+            _connect(_selected);
+          },
+          child: Text(
+            "Connect",
+          )));
+      return widgets;
+    }
+    widgets.add(ElevatedButton(
+        onPressed: () {
+          _disconnect(_selected);
+          _select(null);
+          _scan();
+        },
+        child: Text("Disconnect")));
+    return widgets;
+  }
+
+  List<Widget> _contentsView() {
+    if (_selected != null) return _deviceView();
+    return _deviceScanView();
+  }
+
+  void _select(Peripheral peripheral) {
+    print("Selected ${peripheral != null ? peripheral.name : "null"}");
+    setState(() {
+      _selected = peripheral;
+    });
+    _updateTitle();
+  }
+
+  void _setConnectionState(PeripheralConnectionState state) {
+    print("State $state");
+    setState(() {
+      _connectionState = state;
+    });
+    _updateTitle();
+  }
+
+  void _updateTitle() {
+    String device = _selected != null ? _selected.name : "...";
+    String state = _connectionState != null
+        ? _connectionState
+            .toString()
+            .substring(_connectionState.toString().lastIndexOf(".") + 1)
+        : "...";
+    setState(() {
+      title = "Device $device $state";
+    });
+  }
+
+  void _connect(Peripheral peripheral) async {
+    deviceListener = peripheral
         .observeConnectionState(
       emitCurrentValue: true,
-      completeOnDisconnect: true,
+      completeOnDisconnect: false,
     )
         .listen((connectionState) {
       print("Peripheral ${peripheral.identifier}: $connectionState");
+      _setConnectionState(connectionState);
     });
-    peripheral.connect();
-    //bool connected = await peripheral.isConnected();
-    //await peripheral.disconnectOrCancelConnection();
+    if (!await peripheral.isConnected()) {
+      print("Connecting to ${peripheral.name}");
+      try {
+        await peripheral.connect();
+      } catch (e) {
+        print(e.toString());
+      }
+    } else
+      print("Not connecting to ${peripheral.name}, already connected");
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (!initDone) _init();
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: _deviceList(),
-        ),
-      ),
-    );
+  void _disconnect(Peripheral peripheral) async {
+    await peripheral.disconnectOrCancelConnection();
+    await deviceListener.cancel();
+    _setConnectionState(null);
   }
 
   Future<void> _checkPermissions() async {
@@ -158,26 +245,5 @@ class _MyHomePageState extends State<MyHomePage> {
         print("Adapter not powered on");
       }
     });
-  }
-}
-
-class AvailableDevice {
-  final Peripheral peripheral;
-  final int rssi;
-
-  const AvailableDevice(this.peripheral, this.rssi);
-
-  void connect() {
-    peripheral
-        .observeConnectionState(
-      emitCurrentValue: true,
-      completeOnDisconnect: true,
-    )
-        .listen((connectionState) {
-      print("Peripheral ${peripheral.identifier}: $connectionState");
-    });
-    peripheral.connect();
-    //bool connected = await peripheral.isConnected();
-    //await peripheral.disconnectOrCancelConnection();
   }
 }
