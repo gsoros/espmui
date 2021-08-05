@@ -13,23 +13,36 @@ class DeviceList {
     return _devices.containsKey(identifier);
   }
 
-  // if a device with the same identifier already exists, updates rssi and lastSeen, and returns false
-  // otherwise adds device and returns true
-  bool addOrUpdate(Device device) {
-    Device existing = byIdentifier(device.peripheral.identifier);
-    if (existing != null) {
-      existing.rssi = device.rssi;
-      if (existing.lastSeen < device.lastSeen)
-        existing.lastSeen = device.lastSeen;
-      return false;
-    }
-    _devices[device.peripheral.identifier] = device;
-    return true;
+  // if a device with the same identifier already exists, updates rssi and lastSeen
+  // otherwise adds device
+  void addOrUpdate(Device device) {
+    _devices.update(
+      device.identifier,
+      (existing) {
+        print("[DeviceList] updating ${device.name} rssi=${device.rssi}");
+        existing.rssi = device.rssi;
+        if (existing.lastSeen < device.lastSeen)
+          existing.lastSeen = device.lastSeen;
+        return existing;
+      },
+      ifAbsent: () {
+        print("[DeviceList] adding ${device.name} rssi=${device.rssi}");
+        return device;
+      },
+    );
   }
 
   Device byIdentifier(String identifier) {
     if (containsIdentifier(identifier)) return _devices[identifier];
     return null;
+  }
+
+  void dispose() {
+    Device device = _devices.remove(_devices.keys.first);
+    while (null != device) {
+      device.dispose();
+      device = _devices.remove(_devices.keys.first);
+    }
   }
 
   int get length => _devices.length;
@@ -71,31 +84,33 @@ class ScannerState extends State<Scanner> {
   }
 
   void _init() async {
+    print("[ScannerState] _init()");
     await _checkPermissions();
     await _checkAdapter();
     await bleManager.createClient();
     scanningSubscription = scanningStreamController.stream.listen(
       (value) {
         scanning = value;
-        print("scanningSubscription: $value");
+        print("[scanningSubscription] $value");
       },
     );
     availableDevicesSubscription =
         availableDevicesStreamController.stream.listen(
       (device) {
-        bool isNew = availableDevices.addOrUpdate(device);
-        print("availableDevicesSubscription: " +
-            device.peripheral.identifier +
-            " new=$isNew");
+        bool isNew = !availableDevices.containsIdentifier(device.identifier);
+        availableDevices.addOrUpdate(device);
+        print("[availableDevicesSubscription] " +
+            device.identifier +
+            " new=$isNew rssi=${device.rssi}");
       },
     );
     startScan();
-    print("ScannerState init done");
+    print("[ScannerState] _init() done");
   }
 
   @override
   void dispose() {
-    print("ScannerState dispose");
+    print("[ScannerState] dispose");
     bluetoothStateSubscription.cancel();
     scanResultSubscription.cancel();
     bleManager.destroyClient();
@@ -103,12 +118,14 @@ class ScannerState extends State<Scanner> {
     scanningSubscription.cancel();
     availableDevicesStreamController.close();
     availableDevicesSubscription.cancel();
+    availableDevices.dispose();
+    if (_selected != null) _selected.dispose();
     super.dispose();
   }
 
   void startScan() {
     if (scanning) {
-      print("Already scanning");
+      print("[ScannerState] startScan() already scanning");
       return;
     }
     Timer(
@@ -117,7 +134,7 @@ class ScannerState extends State<Scanner> {
         await scanResultSubscription.cancel();
         await bleManager.stopPeripheralScan();
         scanningStreamController.sink.add(false);
-        if (availableDevices.isEmpty) print("No devices found");
+        if (availableDevices.isEmpty) print("[ScannerState] No devices found");
       },
     );
     scanningStreamController.add(true);
@@ -127,12 +144,12 @@ class ScannerState extends State<Scanner> {
       (scanResult) {
         availableDevicesStreamController.sink.add(
           Device(
-            scanResult.peripheral,
+            peripheral: scanResult.peripheral,
             rssi: scanResult.rssi,
             lastSeen: DateTime.now().millisecondsSinceEpoch / 1000,
           ),
         );
-        print("Device found: " +
+        print("[ScannerState] Device found: " +
             scanResult.peripheral.name +
             " " +
             scanResult.peripheral.identifier);
@@ -141,9 +158,9 @@ class ScannerState extends State<Scanner> {
   }
 
   void select(Device device) {
-    print("Selected " +
-        (device.peripheral != null ? device.peripheral.name : "null"));
-    if (_selected != null) _selected.dispose();
+    print("[ScannerState] Selected " +
+        (device.peripheral != null ? device.name : "null"));
+    if (_selected != null) _selected.disconnect();
     setState(
       () {
         _selected = device;
@@ -153,24 +170,26 @@ class ScannerState extends State<Scanner> {
 
   Future<void> _checkPermissions() async {
     if (!Platform.isAndroid) return;
-    print("Checking permissions");
+    print("[ScannerState] Checking permissions");
     if (!await Permission.location.request().isGranted) {
-      print("No location permission");
-      return Future.error(Exception("Location permission not granted"));
+      print("[ScannerState] No location permission");
+      return Future.error(
+          Exception("[ScannerState] Location permission not granted"));
     }
     if (!await Permission.bluetooth.request().isGranted) {
-      print("No blootueth permission");
-      return Future.error(Exception("Bluetooth permission not granted"));
+      print("[ScannerState] No blootueth permission");
+      return Future.error(
+          Exception("[ScannerState] Bluetooth permission not granted"));
     }
   }
 
   Future<void> _checkAdapter() async {
     bluetoothStateSubscription = bleManager.observeBluetoothState().listen(
       (btState) {
-        print(btState);
+        print("[ScannerState] " + btState.toString());
         if (btState != BluetoothState.POWERED_ON) {
           if (Platform.isAndroid) bleManager.enableRadio();
-          print("Adapter not powered on");
+          print("[ScannerState] Adapter not powered on");
         }
       },
     );
@@ -268,9 +287,11 @@ class ScannerState extends State<Scanner> {
       builder: (BuildContext context, AsyncSnapshot<Device> snapshot) {
         if (availableDevices.length < 1)
           return Center(child: Text("No devices found"));
+        print("[_deviceList()] rebuilding");
         List<Widget> items = [];
         availableDevices.forEach(
           (id, device) {
+            print("[_deviceList()] adding ${device.name} ${device.rssi}");
             items.add(_deviceListItem(device));
           },
         );
@@ -298,7 +319,7 @@ class ScannerState extends State<Scanner> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  device.peripheral.name,
+                  device.name,
                   style: TextStyle(fontSize: 18),
                 ),
                 Text(
@@ -315,7 +336,7 @@ class ScannerState extends State<Scanner> {
                 context,
                 MaterialPageRoute(
                   builder: (context) {
-                    return device.screen();
+                    return device;
                   },
                 ),
               );
