@@ -43,6 +43,9 @@ abstract class Char {
         else
           controller.sink.add(value);
       },
+      onError: (e) {
+        print("$tag subscription error: ${e.toString()}");
+      },
     );
   }
 

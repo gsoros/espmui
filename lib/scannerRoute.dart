@@ -69,7 +69,11 @@ class ScannerRouteState extends State<ScannerRoute> {
   final GlobalKey<ScannerRouteState> _scannerStateKey =
       GlobalKey<ScannerRouteState>();
 
+  //BluetoothState currentBluetoothState;
   StreamSubscription<BluetoothState> bluetoothStateSubscription;
+  //final StreamController<BluetoothState> bluetoothStateController =
+  //    StreamController<BluetoothState>.broadcast();
+
   StreamSubscription<ScanResult> scanResultSubscription;
 
   // scanning
@@ -129,9 +133,13 @@ class ScannerRouteState extends State<ScannerRoute> {
     super.dispose();
   }
 
-  void startScan() {
+  void startScan() async {
     if (scanning) {
       print("[ScannerState] startScan() already scanning");
+      return;
+    }
+    if (await bleManager.bluetoothState() != BluetoothState.POWERED_ON) {
+      print("[ScannerState] startScan() adapter not powered on");
       return;
     }
     Timer(
@@ -191,12 +199,17 @@ class ScannerRouteState extends State<ScannerRoute> {
   Future<void> _checkAdapter() {
     try {
       bluetoothStateSubscription =
-          bleManager.observeBluetoothState().handleError((e) {
-        print("$tag _checkAdapter() handleE: " + e.toString());
-      }).listen(
+          bleManager.observeBluetoothState().handleError(
+        (e) {
+          print("$tag _checkAdapter() handleE: " + e.toString());
+        },
+      ).listen(
         (btState) async {
           print("$tag " + btState.toString());
-          if (btState != BluetoothState.POWERED_ON) {
+          if (btState == BluetoothState.POWERED_ON) {
+            print("$tag Adapter powered on, starting scan");
+            startScan();
+          } else {
             print("$tag Adapter not powered on");
             if (Platform.isAndroid) await bleManager.enableRadio();
           }

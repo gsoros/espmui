@@ -22,7 +22,7 @@ class DeviceRoute extends StatefulWidget {
 }
 
 class DeviceRouteState extends State<DeviceRoute> {
-  final String tag = "[DevicePageState]";
+  final String tag = "[DeviceRouteState]";
   Device device;
 
   DeviceRouteState(this.device) {
@@ -145,8 +145,9 @@ class DeviceRouteState extends State<DeviceRoute> {
             stream: device.battery.controller.stream,
             initialData: device.battery.currentValue,
             builder: (BuildContext context, AsyncSnapshot<Uint8List> snapshot) {
+              int val = snapshot.data.length > 0 ? snapshot.data.first : 0;
               return Text(
-                "Battery: ${snapshot.data.first.toString()}%",
+                "Battery: ${val.toString()}%",
               );
             },
           ),
