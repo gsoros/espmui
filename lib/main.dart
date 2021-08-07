@@ -1,7 +1,7 @@
 // @dart=2.9
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
-import 'scanner.dart';
+import 'scannerRoute.dart';
 
 void main() {
   runApp(EspmUiApp());
@@ -25,7 +25,7 @@ class EspmUiApp extends StatelessWidget {
       ),
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
-      home: Scanner(bleManager: bleManager),
+      home: ScannerRoute(bleManager: bleManager),
     );
   }
 }

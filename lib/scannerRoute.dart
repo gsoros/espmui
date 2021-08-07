@@ -4,9 +4,11 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'deviceRoute.dart';
 import 'device.dart';
 
 class DeviceList {
+  final String tag = "[DeviceList]";
   Map<String, Device> _devices = {};
 
   bool containsIdentifier(String identifier) {
@@ -19,14 +21,14 @@ class DeviceList {
     _devices.update(
       device.identifier,
       (existing) {
-        print("[DeviceList] updating ${device.name} rssi=${device.rssi}");
+        print("$tag updating ${device.name} rssi=${device.rssi}");
         existing.rssi = device.rssi;
         if (existing.lastSeen < device.lastSeen)
           existing.lastSeen = device.lastSeen;
         return existing;
       },
       ifAbsent: () {
-        print("[DeviceList] adding ${device.name} rssi=${device.rssi}");
+        print("$tag adding ${device.name} rssi=${device.rssi}");
         return device;
       },
     );
@@ -50,18 +52,22 @@ class DeviceList {
   void forEach(void Function(String, Device) f) => _devices.forEach(f);
 }
 
-class Scanner extends StatefulWidget {
+class ScannerRoute extends StatefulWidget {
   final BleManager bleManager;
 
-  Scanner({Key key, this.bleManager}) : super(key: key);
+  ScannerRoute({Key key, this.bleManager}) : super(key: key);
 
   @override
-  ScannerState createState() => ScannerState(bleManager);
+  ScannerRouteState createState() => ScannerRouteState(bleManager);
 }
 
-class ScannerState extends State<Scanner> {
+class ScannerRouteState extends State<ScannerRoute> {
+  final String tag = "[ScannerState]";
+  final String apiServiceUUID = "55bebab5-1857-4b14-a07b-d4879edad159";
   final BleManager bleManager;
   final String defaultTitle = "Devices";
+  final GlobalKey<ScannerRouteState> _scannerStateKey =
+      GlobalKey<ScannerRouteState>();
 
   StreamSubscription<BluetoothState> bluetoothStateSubscription;
   StreamSubscription<ScanResult> scanResultSubscription;
@@ -74,24 +80,24 @@ class ScannerState extends State<Scanner> {
 
   // devices
   DeviceList availableDevices = DeviceList();
+  Device _selected;
   final StreamController<Device> availableDevicesStreamController =
       StreamController<Device>.broadcast();
   StreamSubscription availableDevicesSubscription;
-  Device _selected;
 
-  ScannerState(this.bleManager) {
+  ScannerRouteState(this.bleManager) {
     _init();
   }
 
   void _init() async {
-    print("[ScannerState] _init()");
+    print("$tag _init()");
     await _checkPermissions();
     await _checkAdapter();
     await bleManager.createClient();
     scanningSubscription = scanningStreamController.stream.listen(
       (value) {
         scanning = value;
-        print("[scanningSubscription] $value");
+        print("$tag scanningSubscription: $value");
       },
     );
     availableDevicesSubscription =
@@ -99,18 +105,18 @@ class ScannerState extends State<Scanner> {
       (device) {
         bool isNew = !availableDevices.containsIdentifier(device.identifier);
         availableDevices.addOrUpdate(device);
-        print("[availableDevicesSubscription] " +
+        print("$tag availableDevicesSubscription: " +
             device.identifier +
             " new=$isNew rssi=${device.rssi}");
       },
     );
     startScan();
-    print("[ScannerState] _init() done");
+    print("$tag _init() done");
   }
 
   @override
   void dispose() {
-    print("[ScannerState] dispose");
+    print("$tag dispose()");
     bluetoothStateSubscription.cancel();
     scanResultSubscription.cancel();
     bleManager.destroyClient();
@@ -139,17 +145,17 @@ class ScannerState extends State<Scanner> {
     );
     scanningStreamController.add(true);
     scanResultSubscription = bleManager.startPeripheralScan(
-      uuids: ["55bebab5-1857-4b14-a07b-d4879edad159"],
+      uuids: [apiServiceUUID],
     ).listen(
       (scanResult) {
         availableDevicesStreamController.sink.add(
           Device(
-            peripheral: scanResult.peripheral,
+            scanResult.peripheral,
             rssi: scanResult.rssi,
             lastSeen: DateTime.now().millisecondsSinceEpoch / 1000,
           ),
         );
-        print("[ScannerState] Device found: " +
+        print("$tag Device found: " +
             scanResult.peripheral.name +
             " " +
             scanResult.peripheral.identifier);
@@ -158,41 +164,48 @@ class ScannerState extends State<Scanner> {
   }
 
   void select(Device device) {
-    print("[ScannerState] Selected " +
-        (device.peripheral != null ? device.name : "null"));
-    if (_selected != null) _selected.disconnect();
-    setState(
-      () {
-        _selected = device;
-      },
-    );
+    print(
+        "$tag Selected " + (device.peripheral != null ? device.name : "null"));
+    if (_selected != null && _selected.identifier != device.identifier)
+      _selected.disconnect();
+    //setState(() {
+    _selected = device;
+    //});
+    print("$tag select() calling connect()");
+    device.connect();
   }
 
   Future<void> _checkPermissions() async {
     if (!Platform.isAndroid) return;
-    print("[ScannerState] Checking permissions");
+    print("$tag Checking permissions");
     if (!await Permission.location.request().isGranted) {
-      print("[ScannerState] No location permission");
-      return Future.error(
-          Exception("[ScannerState] Location permission not granted"));
+      print("$tag No location permission");
+      return Future.error(Exception("$tag Location permission not granted"));
     }
     if (!await Permission.bluetooth.request().isGranted) {
-      print("[ScannerState] No blootueth permission");
-      return Future.error(
-          Exception("[ScannerState] Bluetooth permission not granted"));
+      print("$tag No blootueth permission");
+      return Future.error(Exception("$tag Bluetooth permission not granted"));
     }
   }
 
-  Future<void> _checkAdapter() async {
-    bluetoothStateSubscription = bleManager.observeBluetoothState().listen(
-      (btState) {
-        print("[ScannerState] " + btState.toString());
-        if (btState != BluetoothState.POWERED_ON) {
-          if (Platform.isAndroid) bleManager.enableRadio();
-          print("[ScannerState] Adapter not powered on");
-        }
-      },
-    );
+  Future<void> _checkAdapter() {
+    try {
+      bluetoothStateSubscription =
+          bleManager.observeBluetoothState().handleError((e) {
+        print("$tag _checkAdapter() handleE: " + e.toString());
+      }).listen(
+        (btState) async {
+          print("$tag " + btState.toString());
+          if (btState != BluetoothState.POWERED_ON) {
+            print("$tag Adapter not powered on");
+            if (Platform.isAndroid) await bleManager.enableRadio();
+          }
+        },
+      );
+    } catch (e) {
+      print("$tag _checkAdapter() catchE: " + e.toString());
+    }
+    return Future.value(null);
   }
 
   @override
@@ -285,18 +298,26 @@ class ScannerState extends State<Scanner> {
       stream: availableDevicesStreamController.stream,
       //initialData: availableDevices,
       builder: (BuildContext context, AsyncSnapshot<Device> snapshot) {
-        if (availableDevices.length < 1)
-          return Center(child: Text("No devices found"));
         print("[_deviceList()] rebuilding");
         List<Widget> items = [];
+        if (availableDevices.length < 1)
+          items.add(Center(child: Text("No devices found")));
         availableDevices.forEach(
           (id, device) {
             print("[_deviceList()] adding ${device.name} ${device.rssi}");
             items.add(_deviceListItem(device));
           },
         );
-        return ListView(
-          children: items,
+        return RefreshIndicator(
+          key: _scannerStateKey,
+          onRefresh: () {
+            startScan();
+            return Future.value(null);
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: items,
+          ),
         );
       },
     );
@@ -330,19 +351,21 @@ class ScannerState extends State<Scanner> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              select(device);
-              Navigator.push(
+            onPressed: () async {
+              //select(device);
+              //print("[_deviceListItem] onPressed() calling connect()");
+              //device.connect();
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) {
-                    return device;
+                    //select(device);
+                    return DeviceRoute(device);
                   },
                 ),
               );
-              device.connect();
             },
-            child: Text("Connect"),
+            child: Icon(Icons.arrow_forward),
           ),
         ],
       ),
