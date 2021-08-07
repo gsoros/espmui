@@ -140,14 +140,14 @@ class DeviceRouteState extends State<DeviceRoute> {
   Widget _deviceProperties() {
     return Container(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          StreamBuilder<Uint8List>(
+          StreamBuilder<int>(
             stream: device.battery.controller.stream,
             initialData: device.battery.currentValue,
-            builder: (BuildContext context, AsyncSnapshot<Uint8List> snapshot) {
-              int val = snapshot.data.length > 0 ? snapshot.data.first : 0;
+            builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
               return Text(
-                "Battery: ${val.toString()}%",
+                "Battery: ${snapshot.data.toString()}%",
               );
             },
           ),
@@ -157,6 +157,15 @@ class DeviceRouteState extends State<DeviceRoute> {
             builder: (BuildContext context, AsyncSnapshot<Uint8List> snapshot) {
               return Text(
                 "Power: ${snapshot.data.toString()}",
+              );
+            },
+          ),
+          StreamBuilder<String>(
+            stream: device.api.controller.stream,
+            initialData: device.api.currentValue,
+            builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
+              return Text(
+                "Api: ${snapshot.data}",
               );
             },
           ),

@@ -3,7 +3,7 @@
 import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
-import 'char.dart';
+import 'bleCharacteristic.dart';
 
 class Device {
   final String tag = "[Device]";
@@ -19,16 +19,18 @@ class Device {
       StreamController<PeripheralConnectionState>.broadcast();
   StreamSubscription<PeripheralConnectionState> connectionStateSubscription;
 
-  BatteryChar battery;
-  PowerChar power;
+  BatteryCharacteristic battery;
+  PowerCharacteristic power;
+  ApiCharacteristic api;
 
   String get name => peripheral.name;
   String get identifier => peripheral.identifier;
 
   Device(this.peripheral, {this.rssi, this.lastSeen}) {
     print("[Device] construct");
-    battery = BatteryChar(peripheral);
-    power = PowerChar(peripheral);
+    battery = BatteryCharacteristic(peripheral);
+    power = PowerCharacteristic(peripheral);
+    api = ApiCharacteristic(peripheral);
   }
 
   void dispose() async {
@@ -37,6 +39,7 @@ class Device {
     await connectionStateStreamController.close();
     battery.dispose();
     power.dispose();
+    api.dispose();
   }
 
   void connect() async {
@@ -73,6 +76,7 @@ class Device {
       await peripheral.discoverAllServicesAndCharacteristics();
       battery.subscribe();
       power.subscribe();
+      api.subscribe();
     } catch (e) {
       print("$tag Error: ${e.toString()}");
     }
