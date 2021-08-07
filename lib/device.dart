@@ -19,27 +19,27 @@ class Device {
       StreamController<PeripheralConnectionState>.broadcast();
   StreamSubscription<PeripheralConnectionState> connectionStateSubscription;
 
-  BatteryCharacteristic battery;
-  PowerCharacteristic power;
-  ApiCharacteristic api;
+  Map<String, BleCharacteristic> characteristics = {};
 
   String get name => peripheral.name;
   String get identifier => peripheral.identifier;
 
   Device(this.peripheral, {this.rssi, this.lastSeen}) {
     print("[Device] construct");
-    battery = BatteryCharacteristic(peripheral);
-    power = PowerCharacteristic(peripheral);
-    api = ApiCharacteristic(peripheral);
+    characteristics = {
+      "battery": BatteryCharacteristic(peripheral),
+      "power": PowerCharacteristic(peripheral),
+      "api": ApiCharacteristic(peripheral),
+    };
   }
 
   void dispose() async {
     print("$tag $name dispose");
     disconnect();
     await connectionStateStreamController.close();
-    battery.dispose();
-    power.dispose();
-    api.dispose();
+    characteristics.forEach((k, char) {
+      char.dispose();
+    });
   }
 
   void connect() async {
@@ -74,9 +74,9 @@ class Device {
       print("$tag Not connecting to $name, already connected");
     try {
       await peripheral.discoverAllServicesAndCharacteristics();
-      battery.subscribe();
-      power.subscribe();
-      api.subscribe();
+      characteristics.forEach((k, char) {
+        char.subscribe();
+      });
     } catch (e) {
       print("$tag Error: ${e.toString()}");
     }
@@ -86,8 +86,9 @@ class Device {
     print("$tag disconnect() $name");
     try {
       await peripheral.disconnectOrCancelConnection();
-      battery.unsubscribe();
-      power.unsubscribe();
+      characteristics.forEach((k, char) {
+        char.unsubscribe();
+      });
       if (connectionStateSubscription != null)
         await connectionStateSubscription.cancel().catchError((e) {
           print("$tag disconnect() catchE: ${e.toString()}");
@@ -95,5 +96,13 @@ class Device {
     } catch (e) {
       print("$tag disconnect() Error: ${e.toString()}");
     }
+  }
+
+  BleCharacteristic characteristic(String id) {
+    if (!characteristics.containsKey(id)) {
+      print("$tag characteristic $id not found");
+      return null;
+    }
+    return characteristics[id];
   }
 }
