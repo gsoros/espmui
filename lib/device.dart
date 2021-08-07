@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
-
 import 'bleCharacteristic.dart';
 
 class Device {
@@ -42,7 +41,7 @@ class Device {
     });
   }
 
-  void connect() async {
+  Future<void> connect() async {
     connectionStateSubscription = peripheral
         .observeConnectionState(
       emitCurrentValue: false,
@@ -57,6 +56,8 @@ class Device {
           print("$tag _connectionStateSubscription stream is closed");
         else
           connectionStateStreamController.sink.add(state);
+        if (state == PeripheralConnectionState.connected)
+          subscribeCharacteristics();
       },
     );
     if (!await peripheral.isConnected()) {
@@ -70,25 +71,41 @@ class Device {
       } catch (e) {
         print("$tag peripheral.connect() error: ${e.toString()}");
       }
-    } else
+    } else {
       print("$tag Not connecting to $name, already connected");
+      if (connectionStateStreamController.isClosed)
+        print("$tag _connectionStateSubscription stream is closed");
+      else {
+        connectionStateStreamController.sink
+            .add(PeripheralConnectionState.connected);
+        subscribeCharacteristics();
+      }
+    }
+    return Future.value(null);
+  }
+
+  void subscribeCharacteristics() async {
     try {
       await peripheral.discoverAllServicesAndCharacteristics();
       characteristics.forEach((k, char) {
         char.subscribe();
       });
     } catch (e) {
-      print("$tag Error: ${e.toString()}");
+      print("$tag subscribeCharacteristics error: ${e.toString()}");
     }
+  }
+
+  void unsubscribeCharacteristics() {
+    characteristics.forEach((k, char) {
+      char.unsubscribe();
+    });
   }
 
   void disconnect() async {
     print("$tag disconnect() $name");
     try {
+      unsubscribeCharacteristics();
       await peripheral.disconnectOrCancelConnection();
-      characteristics.forEach((k, char) {
-        char.unsubscribe();
-      });
       if (connectionStateSubscription != null)
         await connectionStateSubscription.cancel().catchError((e) {
           print("$tag disconnect() catchE: ${e.toString()}");

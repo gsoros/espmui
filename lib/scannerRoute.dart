@@ -172,15 +172,14 @@ class ScannerRouteState extends State<ScannerRoute> {
   }
 
   void select(Device device) {
-    print(
-        "$tag Selected " + (device.peripheral != null ? device.name : "null"));
+    print("$tag Selected " + device.name);
     if (_selected != null && _selected.identifier != device.identifier)
       _selected.disconnect();
     //setState(() {
     _selected = device;
     //});
-    print("$tag select() calling connect()");
-    device.connect();
+    //print("$tag select() calling connect()");
+    //device.connect();
   }
 
   Future<void> _checkPermissions() async {
@@ -209,9 +208,16 @@ class ScannerRouteState extends State<ScannerRoute> {
           if (btState == BluetoothState.POWERED_ON) {
             print("$tag Adapter powered on, starting scan");
             startScan();
+            if (_selected != null) {
+              print("$tag Adapter powered on, connecting to ${_selected.name}");
+              _selected.connect();
+            }
           } else {
             print("$tag Adapter not powered on");
-            if (Platform.isAndroid) await bleManager.enableRadio();
+            if (Platform.isAndroid) {
+              await bleManager.cancelTransaction("autoEnableBT");
+              await bleManager.enableRadio(transactionId: "autoEnableBT");
+            }
           }
         },
       );
@@ -365,9 +371,9 @@ class ScannerRouteState extends State<ScannerRoute> {
           ),
           ElevatedButton(
             onPressed: () async {
-              //select(device);
-              //print("[_deviceListItem] onPressed() calling connect()");
-              //device.connect();
+              select(device);
+              print("[_deviceListItem] onPressed() calling connect()");
+              await device.connect();
               await Navigator.push(
                 context,
                 MaterialPageRoute(

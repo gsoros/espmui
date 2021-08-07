@@ -1,7 +1,5 @@
 // @dart=2.9
 import 'dart:typed_data';
-
-//import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
@@ -37,8 +35,16 @@ abstract class BleCharacteristic<T> {
     }
     _characteristic =
         await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
-    lastValue = fromUint8List(await _characteristic.read());
+    if (!_characteristic.isReadable)
+      print("$tag Error: cannot read");
+    else
+      lastValue = fromUint8List(await _characteristic.read());
     print("$tag Initial value: ${lastValue.toString()}");
+    _controller.sink.add(lastValue);
+    if (!_characteristic.isIndicatable && !_characteristic.isNotifiable) {
+      print("$tag Error: cannot subscribe");
+      return;
+    }
     _rawStream = _characteristic.monitor().asBroadcastStream();
     _subscription = _rawStream.listen(
       (value) {
@@ -67,8 +73,8 @@ abstract class BleCharacteristic<T> {
 
 class BatteryCharacteristic extends BleCharacteristic<int> {
   final String tag = "[BatteryCharacteristic]";
-  final String serviceUUID = "0000180F-0000-1000-8000-00805F9B34FB";
-  final String characteristicUUID = "00002A19-0000-1000-8000-00805F9B34FB";
+  final String serviceUUID = "0000180f-0000-1000-8000-00805f9b34fb";
+  final String characteristicUUID = "00002a19-0000-1000-8000-00805f9b34fb";
 
   BatteryCharacteristic(Peripheral peripheral) : super(peripheral);
 
@@ -78,8 +84,8 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
 
 class PowerCharacteristic extends BleCharacteristic<Uint8List> {
   final String tag = "[PowerCharacteristic]";
-  final String serviceUUID = "00001818-0000-1000-8000-00805F9B34FB";
-  final String characteristicUUID = "00002A63-0000-1000-8000-00805F9B34FB";
+  final String serviceUUID = "00001818-0000-1000-8000-00805f9b34fb";
+  final String characteristicUUID = "00002a63-0000-1000-8000-00805f9b34fb";
 
   PowerCharacteristic(Peripheral peripheral) : super(peripheral);
 

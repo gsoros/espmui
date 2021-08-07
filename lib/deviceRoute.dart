@@ -1,6 +1,5 @@
 // @dart=2.9
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
@@ -44,8 +43,8 @@ class DeviceRouteState extends State<DeviceRoute> {
 
   @override
   Widget build(BuildContext context) {
-    print("$tag build() calling device.connect()");
-    device.connect();
+    //print("$tag build() calling device.connect()");
+    //device.connect();
     return WillPopScope(
       onWillPop: _onBackPressed,
       child: Scaffold(
