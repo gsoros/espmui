@@ -34,31 +34,40 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "subscribe() peripheral is null");
       return;
     }
-    _characteristic =
-        await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
+    _characteristic = await _peripheral
+        .readCharacteristic(serviceUUID, characteristicUUID)
+        .catchError((e) {
+      bleError(tag, "readCharacteristic()", e);
+      return Future.value(null);
+    });
+    if (_characteristic == null) {
+      bleError(tag, "characteristic is null");
+      return;
+    }
     if (!_characteristic.isReadable)
-      bleError(tag, "cannot read");
+      bleError(tag, "characteristic not readable");
     else
-      lastValue = fromUint8List(await _characteristic.read());
+      lastValue = fromUint8List(await _characteristic.read().catchError((e) {
+        bleError(tag, "read()", e);
+        return Uint8List.fromList([]);
+      }));
     print("$tag Initial value: ${lastValue.toString()}");
     _controller.sink.add(lastValue);
     if (!_characteristic.isIndicatable && !_characteristic.isNotifiable) {
-      bleError(tag, "cannot subscribe");
+      bleError(tag, "characteristic neither indicatable nor notifiable");
       return;
     }
-    _rawStream = _characteristic.monitor().asBroadcastStream();
+    _rawStream = _characteristic
+        .monitor()
+        .handleError((e) => bleError(tag, "_rawStream", e))
+        .asBroadcastStream();
     _subscription = _rawStream.listen(
       (value) {
         print("$tag " + value.toString());
         lastValue = fromUint8List(value);
-        if (_controller.isClosed)
-          bleError(tag, "stream is closed");
-        else
-          _controller.sink.add(lastValue);
+        streamSendIfNotClosed(_controller, lastValue);
       },
-      onError: (e) {
-        bleError(tag, "subscription", e);
-      },
+      onError: (e) => bleError(tag, "subscription", e),
     );
   }
 

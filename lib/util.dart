@@ -28,8 +28,17 @@ void bleError(String tag, String message, [dynamic error]) {
           case BleErrorCode.deviceDisconnected:
             info += ": deviceDisconnected";
             break;
+          case BleErrorCode.deviceAlreadyConnected:
+            info += ": deviceAlreadyConnected";
+            break;
           case BleErrorCode.deviceNotConnected:
             info += ": deviceNotConnected";
+            break;
+          case BleErrorCode.serviceNotFound:
+            info += ": serviceNotFound";
+            break;
+          case BleErrorCode.characteristicNotFound:
+            info += ": characteristicNotFound";
             break;
           case BleErrorCode.locationServicesDisabled:
             info += ": locationServicesDisabled";

@@ -7,7 +7,7 @@ import 'device.dart';
 import 'bleCharacteristic.dart';
 
 class DeviceRoute extends StatefulWidget {
-  final String tag = "[DevicePage]";
+  final String tag = "[DeviceRoute]";
   final Device device;
 
   DeviceRoute(this.device) {
