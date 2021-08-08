@@ -2,6 +2,7 @@
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'util.dart';
 
 abstract class BleCharacteristic<T> {
   final String tag = "[Characteristic]";
@@ -19,7 +20,7 @@ abstract class BleCharacteristic<T> {
   BleCharacteristic(this._peripheral) {
     lastValue = fromUint8List(Uint8List.fromList([]));
     if (_peripheral == null) {
-      print("$tag construct error: peripheral is null");
+      bleError(tag, "construct: peripheral is null");
       return;
     }
     print("$tag construct " + _peripheral.identifier);
@@ -30,19 +31,19 @@ abstract class BleCharacteristic<T> {
   void subscribe() async {
     print("$tag subscribe()");
     if (_peripheral == null) {
-      print("$tag subscribe() error: peripheral is null");
+      bleError(tag, "subscribe() peripheral is null");
       return;
     }
     _characteristic =
         await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
     if (!_characteristic.isReadable)
-      print("$tag Error: cannot read");
+      bleError(tag, "cannot read");
     else
       lastValue = fromUint8List(await _characteristic.read());
     print("$tag Initial value: ${lastValue.toString()}");
     _controller.sink.add(lastValue);
     if (!_characteristic.isIndicatable && !_characteristic.isNotifiable) {
-      print("$tag Error: cannot subscribe");
+      bleError(tag, "cannot subscribe");
       return;
     }
     _rawStream = _characteristic.monitor().asBroadcastStream();
@@ -51,12 +52,12 @@ abstract class BleCharacteristic<T> {
         print("$tag " + value.toString());
         lastValue = fromUint8List(value);
         if (_controller.isClosed)
-          print("$tag Error: stream is closed");
+          bleError(tag, "stream is closed");
         else
           _controller.sink.add(lastValue);
       },
       onError: (e) {
-        print("$tag subscription error: ${e.toString()}");
+        bleError(tag, "subscription", e);
       },
     );
   }

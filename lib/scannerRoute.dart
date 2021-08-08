@@ -6,6 +6,7 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'deviceRoute.dart';
 import 'device.dart';
+import 'util.dart';
 
 class DeviceList {
   final String tag = "[DeviceList]";
@@ -147,7 +148,7 @@ class ScannerRouteState extends State<ScannerRoute> {
       return;
     }
     if (await bleManager.bluetoothState() != BluetoothState.POWERED_ON) {
-      print("$tag startScan() adapter not powered on");
+      bleError(tag, "startScan() adapter not powered on");
       return;
     }
     Timer(
@@ -171,6 +172,7 @@ class ScannerRouteState extends State<ScannerRoute> {
             availableDevicesStreamController.sink.add(device);
             print("$tag Device found: ${device.name} ${device.identifier}");
           },
+          onError: (e) => bleError(tag, "scanResultSubscription", e),
         );
   }
 
@@ -189,50 +191,43 @@ class ScannerRouteState extends State<ScannerRoute> {
     if (!Platform.isAndroid) return;
     print("$tag Checking permissions");
     if (!await Permission.location.request().isGranted) {
-      print("$tag No location permission");
+      bleError(tag, "No location permission");
       return Future.error(Exception("$tag Location permission not granted"));
     }
     if (!await Permission.bluetooth.request().isGranted) {
-      print("$tag No blootueth permission");
+      bleError(tag, "No blootueth permission");
       return Future.error(Exception("$tag Bluetooth permission not granted"));
     }
   }
 
   Future<void> _checkAdapter() async {
-    try {
-      bluetoothStateSubscription =
-          bleManager.observeBluetoothState().handleError(
-        (e) {
-          print("$tag _checkAdapter() handleE: " + e.toString());
-        },
-      ).listen(
-        (btState) async {
-          print("$tag " + btState.toString());
-          if (btState == BluetoothState.POWERED_ON) {
-            print("$tag Adapter powered on, starting scan");
-            startScan();
-            if (_selected != null) {
-              print("$tag Adapter powered on, connecting to ${_selected.name}");
-              _selected.connect();
-            }
-          } else {
-            print("$tag Adapter not powered on");
-            if (Platform.isAndroid) {
-              //await bleManager.cancelTransaction("autoEnableBT");
-              await bleManager
-                  .enableRadio(transactionId: "autoEnableBT")
-                  .catchError((e) {
-                print("$tag enableRadio() error: ${e.toString()}");
-                if (e.errorCode.value == BleErrorCode.operationCancelled)
-                  print("$tag Above error is operationCancelled");
-              });
-            }
+    bluetoothStateSubscription = bleManager
+        .observeBluetoothState()
+        .handleError(
+          (e) => bleError(tag, "observeBluetoothState()", e),
+        )
+        .listen(
+      (btState) async {
+        print("$tag " + btState.toString());
+        if (btState == BluetoothState.POWERED_ON) {
+          print("$tag Adapter powered on, starting scan");
+          startScan();
+          if (_selected != null) {
+            print("$tag Adapter powered on, connecting to ${_selected.name}");
+            _selected.connect();
           }
-        },
-      );
-    } catch (e) {
-      print("$tag _checkAdapter() catchE: " + e.toString());
-    }
+        } else {
+          bleError(tag, "Adapter not powered on");
+          if (Platform.isAndroid) {
+            //await bleManager.cancelTransaction("autoEnableBT");
+            await bleManager
+                .enableRadio(transactionId: "autoEnableBT")
+                .catchError((e) => bleError(tag, "enableRadio()", e));
+          }
+        }
+      },
+      onError: (e) => bleError(tag, "bluetoothStateSubscription", e),
+    );
     return Future.value(null);
   }
 

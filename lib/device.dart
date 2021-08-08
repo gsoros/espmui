@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'bleCharacteristic.dart';
+import 'util.dart';
 
 class Device {
   final String tag = "[Device]";
@@ -42,6 +43,8 @@ class Device {
   }
 
   Future<void> connect() async {
+    PeripheralConnectionState connectedState =
+        PeripheralConnectionState.connected;
     connectionStateSubscription = peripheral
         .observeConnectionState(
       emitCurrentValue: false,
@@ -52,54 +55,39 @@ class Device {
       (state) {
         connectionState = state;
         print("$tag _connectionStateSubscription $name $state");
-        if (connectionStateStreamController.isClosed)
-          print("$tag _connectionStateSubscription stream is closed");
-        else
-          connectionStateStreamController.sink.add(state);
-        if (state == PeripheralConnectionState.connected)
-          subscribeCharacteristics();
+        streamSendIfNotClosed(connectionStateStreamController, state);
+        if (state == connectedState) subscribeCharacteristics();
       },
+      onError: (e) => bleError(tag, "connectionStateSubscription", e),
     );
     if (!await peripheral.isConnected()) {
       print("$tag Connecting to ${peripheral.name}");
-      try {
-        await peripheral
-            .connect(
-          refreshGatt: true,
-        )
-            .catchError(
-          (e) {
-            print("$tag peripheral.connect() catchE: ${e.toString()}");
-            if (e.errorCode.value == BleErrorCode.deviceDisconnected)
-              print(
-                  "$tag peripheral.connect() above error is deviceDisconnected");
-          },
-        );
-      } catch (e) {
-        print("$tag peripheral.connect() error: ${e.toString()}");
-      }
+      await peripheral
+          .connect(
+            refreshGatt: true,
+          )
+          .catchError(
+            (e) => bleError(tag, "peripheral.connect()", e),
+          );
     } else {
       print("$tag Not connecting to $name, already connected");
-      if (connectionStateStreamController.isClosed)
-        print("$tag _connectionStateSubscription stream is closed");
-      else {
-        connectionStateStreamController.sink
-            .add(PeripheralConnectionState.connected);
-        subscribeCharacteristics();
-      }
+      connectionState = connectedState;
+      streamSendIfNotClosed(
+        connectionStateStreamController,
+        connectedState,
+      );
+      subscribeCharacteristics();
     }
     return Future.value(null);
   }
 
   void subscribeCharacteristics() async {
-    try {
-      await peripheral.discoverAllServicesAndCharacteristics();
-      characteristics.forEach((k, char) {
-        char.subscribe();
-      });
-    } catch (e) {
-      print("$tag subscribeCharacteristics error: ${e.toString()}");
-    }
+    await peripheral
+        .discoverAllServicesAndCharacteristics()
+        .catchError((e) => bleError(tag, "discoverBlaBla()", e));
+    characteristics.forEach((k, char) {
+      char.subscribe();
+    });
   }
 
   void unsubscribeCharacteristics() {
@@ -111,27 +99,22 @@ class Device {
   void disconnect() async {
     print("$tag disconnect() $name");
     if (!await peripheral.isConnected()) {
-      print("$tag disconnect() not connected");
+      bleError(tag, "disconnect(): not connected");
       return;
     }
-    try {
-      unsubscribeCharacteristics();
-      await peripheral.disconnectOrCancelConnection();
-      if (connectionStateSubscription != null)
-        await connectionStateSubscription.cancel().catchError((e) {
-          print("$tag disconnect() catchE: ${e.toString()}");
-        });
-    } catch (e) {
-      print(
-          "$tag disconnect() Error: code(${e.errorCode.value}) ${e.toString()}");
-      if (e.errorCode.value == BleErrorCode.deviceNotConnected)
-        print("$tag Above error is 'deviceNotConnected'");
-    }
+    unsubscribeCharacteristics();
+    await peripheral
+        .disconnectOrCancelConnection()
+        .catchError((e) => bleError(tag, "peripheral.discBlaBla()", e));
+    if (connectionStateSubscription != null)
+      await connectionStateSubscription
+          .cancel()
+          .catchError((e) => bleError(tag, "connStateSub.cancel()", e));
   }
 
   BleCharacteristic characteristic(String id) {
     if (!characteristics.containsKey(id)) {
-      print("$tag characteristic $id not found");
+      bleError(tag, "characteristic $id not found");
       return null;
     }
     return characteristics[id];
