@@ -70,6 +70,9 @@ class Device {
             .catchError(
           (e) {
             print("$tag peripheral.connect() catchE: ${e.toString()}");
+            if (e.errorCode.value == BleErrorCode.deviceDisconnected)
+              print(
+                  "$tag peripheral.connect() above error is deviceDisconnected");
           },
         );
       } catch (e) {
@@ -107,6 +110,10 @@ class Device {
 
   void disconnect() async {
     print("$tag disconnect() $name");
+    if (!await peripheral.isConnected()) {
+      print("$tag disconnect() not connected");
+      return;
+    }
     try {
       unsubscribeCharacteristics();
       await peripheral.disconnectOrCancelConnection();
