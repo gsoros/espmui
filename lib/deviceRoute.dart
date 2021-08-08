@@ -24,16 +24,25 @@ class DeviceRoute extends StatefulWidget {
 class DeviceRouteState extends State<DeviceRoute> {
   final String tag = "[DeviceRouteState]";
   Device device;
+  TextEditingController _apiCommandController;
 
   DeviceRouteState(this.device) {
     print("$tag construct");
   }
 
   @override
+  void initState() {
+    print("$tag initState");
+    super.initState();
+    _apiCommandController = TextEditingController();
+  }
+
+  @override
   void dispose() async {
     print("$tag ${device.name} dispose");
-    super.dispose();
     device.disconnect();
+    _apiCommandController.dispose();
+    super.dispose();
   }
 
   Future<bool> _onBackPressed() {
@@ -170,6 +179,13 @@ class DeviceRouteState extends State<DeviceRoute> {
               return Text(
                 "Api: ${snapshot.data}",
               );
+            },
+          ),
+          TextField(
+            controller: _apiCommandController,
+            onSubmitted: (String command) async {
+              print('$tag writing "$command" to api');
+              await api.write(command);
             },
           ),
         ],

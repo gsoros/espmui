@@ -1,4 +1,5 @@
 // @dart=2.9
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
@@ -27,6 +28,41 @@ abstract class BleCharacteristic<T> {
   }
 
   T fromUint8List(Uint8List list);
+  Uint8List toUint8List(T value);
+
+  // read value from characteristic and set lastValue
+  Future<T> read() async {
+    if (!_characteristic.isReadable) {
+      bleError(tag, "read() characteristic not readable");
+      return fromUint8List(Uint8List.fromList([]));
+    }
+    lastValue = fromUint8List(await _characteristic.read().catchError((e) {
+      bleError(tag, "read()", e);
+      return Uint8List.fromList([]);
+    }));
+    return lastValue;
+  }
+
+  Future<void> write(
+    T value, {
+    bool withResponse = false,
+    String transactionId,
+  }) {
+    if (!_characteristic.isWritableWithoutResponse &&
+        !_characteristic.isWritableWithResponse) {
+      bleError(tag, "write() characteristic not writable");
+      return null;
+    }
+    if (withResponse && !_characteristic.isWritableWithResponse) {
+      bleError(tag, "write() characteristic not writableWithResponse");
+      return null;
+    }
+    return _characteristic.write(
+      toUint8List(value),
+      withResponse,
+      transactionId: transactionId,
+    );
+  }
 
   void subscribe() async {
     print("$tag subscribe()");
@@ -44,15 +80,9 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "characteristic is null");
       return;
     }
-    if (!_characteristic.isReadable)
-      bleError(tag, "characteristic not readable");
-    else
-      lastValue = fromUint8List(await _characteristic.read().catchError((e) {
-        bleError(tag, "read()", e);
-        return Uint8List.fromList([]);
-      }));
-    print("$tag Initial value: ${lastValue.toString()}");
-    _controller.sink.add(lastValue);
+    await read();
+    print("$tag subscribe() initial value: $lastValue");
+    streamSendIfNotClosed(_controller, lastValue);
     if (!_characteristic.isIndicatable && !_characteristic.isNotifiable) {
       bleError(tag, "characteristic neither indicatable nor notifiable");
       return;
@@ -62,13 +92,17 @@ abstract class BleCharacteristic<T> {
         .handleError((e) => bleError(tag, "_rawStream", e))
         .asBroadcastStream();
     _subscription = _rawStream.listen(
-      (value) {
-        print("$tag " + value.toString());
-        lastValue = fromUint8List(value);
+      (value) async {
+        lastValue = await onNotify(fromUint8List(value));
+        print("$tag " + lastValue.toString());
         streamSendIfNotClosed(_controller, lastValue);
       },
       onError: (e) => bleError(tag, "subscription", e),
     );
+  }
+
+  Future<T> onNotify(T value) {
+    return Future.value(value);
   }
 
   void unsubscribe() async {
@@ -90,6 +124,14 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
 
   @override
   int fromUint8List(Uint8List list) => list.isEmpty ? 0 : list.first;
+
+  @override
+  Uint8List toUint8List(int value) {
+    if (value < 0)
+      bleError(tag, "toUint8List() negative value");
+    else if (255 < value) bleError(tag, "toUint8List() $value clipped");
+    return Uint8List.fromList([value]);
+  }
 }
 
 class PowerCharacteristic extends BleCharacteristic<Uint8List> {
@@ -101,6 +143,11 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
 
   @override
   Uint8List fromUint8List(Uint8List list) => list;
+
+  @override
+  Uint8List toUint8List(Uint8List value) {
+    return value;
+  }
 }
 
 class ApiCharacteristic extends BleCharacteristic<String> {
@@ -112,4 +159,21 @@ class ApiCharacteristic extends BleCharacteristic<String> {
 
   @override
   String fromUint8List(Uint8List list) => String.fromCharCodes(list);
+
+  @override
+  Uint8List toUint8List(String value) {
+    Uint8List list = Uint8List.fromList([]);
+    try {
+      list = ascii.encode(value);
+    } catch (e) {
+      print("$tag error: failed to ascii encode '$value': $e");
+    }
+    return list;
+  }
+
+  @override
+  Future<String> onNotify(String value) {
+    // read full value as the notification is limited to 20 bytes
+    return read();
+  }
 }
