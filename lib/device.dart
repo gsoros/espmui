@@ -63,7 +63,11 @@ class Device {
     if (!await peripheral.isConnected()) {
       print("$tag Connecting to ${peripheral.name}");
       try {
-        await peripheral.connect().catchError(
+        await peripheral
+            .connect(
+          refreshGatt: true,
+        )
+            .catchError(
           (e) {
             print("$tag peripheral.connect() catchE: ${e.toString()}");
           },
@@ -111,7 +115,10 @@ class Device {
           print("$tag disconnect() catchE: ${e.toString()}");
         });
     } catch (e) {
-      print("$tag disconnect() Error: ${e.toString()}");
+      print(
+          "$tag disconnect() Error: code(${e.errorCode.value}) ${e.toString()}");
+      if (e.errorCode.value == BleErrorCode.deviceNotConnected)
+        print("$tag Above error is 'deviceNotConnected'");
     }
   }
 

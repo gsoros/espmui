@@ -16,22 +16,30 @@ class DeviceList {
   }
 
   // if a device with the same identifier already exists, updates rssi and lastSeen
-  // otherwise adds device
-  void addOrUpdate(Device device) {
+  // otherwise adds new device
+  // returns the new or updated device
+  Device addOrUpdate(ScanResult scanResult) {
+    double now = DateTime.now().millisecondsSinceEpoch / 1000;
     _devices.update(
-      device.identifier,
+      scanResult.peripheral.identifier,
       (existing) {
-        print("$tag updating ${device.name} rssi=${device.rssi}");
-        existing.rssi = device.rssi;
-        if (existing.lastSeen < device.lastSeen)
-          existing.lastSeen = device.lastSeen;
+        print(
+            "$tag updating ${scanResult.peripheral.name} rssi=${scanResult.rssi}");
+        existing.rssi = scanResult.rssi;
+        existing.lastSeen = now;
         return existing;
       },
       ifAbsent: () {
-        print("$tag adding ${device.name} rssi=${device.rssi}");
-        return device;
+        print(
+            "$tag adding ${scanResult.peripheral.name} rssi=${scanResult.rssi}");
+        return Device(
+          scanResult.peripheral,
+          rssi: scanResult.rssi,
+          lastSeen: now,
+        );
       },
     );
+    return _devices[scanResult.peripheral.identifier];
   }
 
   Device byIdentifier(String identifier) {
@@ -69,11 +77,11 @@ class ScannerRouteState extends State<ScannerRoute> {
   final GlobalKey<ScannerRouteState> _scannerStateKey =
       GlobalKey<ScannerRouteState>();
 
-  //BluetoothState currentBluetoothState;
   StreamSubscription<BluetoothState> bluetoothStateSubscription;
   //final StreamController<BluetoothState> bluetoothStateController =
   //    StreamController<BluetoothState>.broadcast();
 
+  // scanResult
   StreamSubscription<ScanResult> scanResultSubscription;
 
   // scanning
@@ -96,8 +104,8 @@ class ScannerRouteState extends State<ScannerRoute> {
   void _init() async {
     print("$tag _init()");
     await _checkPermissions();
-    await _checkAdapter();
     await bleManager.createClient();
+    await _checkAdapter();
     scanningSubscription = scanningStreamController.stream.listen(
       (value) {
         scanning = value;
@@ -108,7 +116,7 @@ class ScannerRouteState extends State<ScannerRoute> {
         availableDevicesStreamController.stream.listen(
       (device) {
         bool isNew = !availableDevices.containsIdentifier(device.identifier);
-        availableDevices.addOrUpdate(device);
+        //availableDevices.addOrUpdate(device);
         print("$tag availableDevicesSubscription: " +
             device.identifier +
             " new=$isNew rssi=${device.rssi}");
@@ -119,15 +127,15 @@ class ScannerRouteState extends State<ScannerRoute> {
   }
 
   @override
-  void dispose() {
+  void dispose() async {
     print("$tag dispose()");
-    bluetoothStateSubscription.cancel();
-    scanResultSubscription.cancel();
-    bleManager.destroyClient();
-    scanningStreamController.close();
-    scanningSubscription.cancel();
-    availableDevicesStreamController.close();
-    availableDevicesSubscription.cancel();
+    await bluetoothStateSubscription.cancel();
+    await scanResultSubscription.cancel();
+    await scanningStreamController.close();
+    await scanningSubscription.cancel();
+    await availableDevicesStreamController.close();
+    await availableDevicesSubscription.cancel();
+    await bleManager.destroyClient();
     availableDevices.dispose();
     if (_selected != null) _selected.dispose();
     super.dispose();
@@ -135,11 +143,11 @@ class ScannerRouteState extends State<ScannerRoute> {
 
   void startScan() async {
     if (scanning) {
-      print("[ScannerState] startScan() already scanning");
+      print("$tag startScan() already scanning");
       return;
     }
     if (await bleManager.bluetoothState() != BluetoothState.POWERED_ON) {
-      print("[ScannerState] startScan() adapter not powered on");
+      print("$tag startScan() adapter not powered on");
       return;
     }
     Timer(
@@ -148,27 +156,22 @@ class ScannerRouteState extends State<ScannerRoute> {
         await scanResultSubscription.cancel();
         await bleManager.stopPeripheralScan();
         scanningStreamController.sink.add(false);
-        if (availableDevices.isEmpty) print("[ScannerState] No devices found");
+        if (availableDevices.isEmpty) print("$tag No devices found");
       },
     );
     scanningStreamController.add(true);
-    scanResultSubscription = bleManager.startPeripheralScan(
-      uuids: [apiServiceUUID],
-    ).listen(
-      (scanResult) {
-        availableDevicesStreamController.sink.add(
-          Device(
-            scanResult.peripheral,
-            rssi: scanResult.rssi,
-            lastSeen: DateTime.now().millisecondsSinceEpoch / 1000,
-          ),
+    scanResultSubscription = bleManager
+        .startPeripheralScan(
+          uuids: [apiServiceUUID],
+        )
+        .asBroadcastStream()
+        .listen(
+          (scanResult) {
+            Device device = availableDevices.addOrUpdate(scanResult);
+            availableDevicesStreamController.sink.add(device);
+            print("$tag Device found: ${device.name} ${device.identifier}");
+          },
         );
-        print("$tag Device found: " +
-            scanResult.peripheral.name +
-            " " +
-            scanResult.peripheral.identifier);
-      },
-    );
   }
 
   void select(Device device) {
@@ -195,7 +198,7 @@ class ScannerRouteState extends State<ScannerRoute> {
     }
   }
 
-  Future<void> _checkAdapter() {
+  Future<void> _checkAdapter() async {
     try {
       bluetoothStateSubscription =
           bleManager.observeBluetoothState().handleError(
@@ -215,8 +218,14 @@ class ScannerRouteState extends State<ScannerRoute> {
           } else {
             print("$tag Adapter not powered on");
             if (Platform.isAndroid) {
-              await bleManager.cancelTransaction("autoEnableBT");
-              await bleManager.enableRadio(transactionId: "autoEnableBT");
+              //await bleManager.cancelTransaction("autoEnableBT");
+              await bleManager
+                  .enableRadio(transactionId: "autoEnableBT")
+                  .catchError((e) {
+                print("$tag enableRadio() error: ${e.toString()}");
+                if (e.errorCode.value == BleErrorCode.operationCancelled)
+                  print("$tag Above error is operationCancelled");
+              });
             }
           }
         },
@@ -317,6 +326,7 @@ class ScannerRouteState extends State<ScannerRoute> {
       stream: availableDevicesStreamController.stream,
       //initialData: availableDevices,
       builder: (BuildContext context, AsyncSnapshot<Device> snapshot) {
+        // TODO don't rebuild the whole list, just the changed items
         print("[_deviceList()] rebuilding");
         List<Widget> items = [];
         if (availableDevices.length < 1)
