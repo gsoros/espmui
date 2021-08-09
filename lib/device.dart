@@ -12,16 +12,15 @@ class Device {
   double lastSeen = 0;
 
   // connectionState
-  PeripheralConnectionState connectionState =
-      PeripheralConnectionState.disconnected;
-  final StreamController<PeripheralConnectionState>
-      connectionStateStreamController =
+  PeripheralConnectionState connectionState = PeripheralConnectionState.disconnected;
+  final StreamController<PeripheralConnectionState> connectionStateStreamController =
       StreamController<PeripheralConnectionState>.broadcast();
   StreamSubscription<PeripheralConnectionState> connectionStateSubscription;
 
   Map<String, BleCharacteristic> characteristics = {};
 
   String get name => peripheral.name;
+  set name(String name) => peripheral.name = name;
   String get identifier => peripheral.identifier;
 
   Device(this.peripheral, {this.rssi, this.lastSeen}) {
@@ -43,8 +42,7 @@ class Device {
   }
 
   Future<void> connect() async {
-    PeripheralConnectionState connectedState =
-        PeripheralConnectionState.connected;
+    PeripheralConnectionState connectedState = PeripheralConnectionState.connected;
     connectionStateSubscription = peripheral
         .observeConnectionState(
       emitCurrentValue: false,
@@ -89,9 +87,7 @@ class Device {
   }
 
   void subscribeCharacteristics() async {
-    await peripheral
-        .discoverAllServicesAndCharacteristics()
-        .catchError((e) => bleError(tag, "discoverBlaBla()", e));
+    await peripheral.discoverAllServicesAndCharacteristics().catchError((e) => bleError(tag, "discoverBlaBla()", e));
     characteristics.forEach((k, char) {
       char.subscribe();
     });
@@ -103,20 +99,16 @@ class Device {
     });
   }
 
-  void disconnect() async {
+  Future<void> disconnect() async {
     print("$tag disconnect() $name");
     if (!await peripheral.isConnected()) {
       bleError(tag, "disconnect(): not connected, but proceeding anyway");
       //return;
     }
     unsubscribeCharacteristics();
-    await peripheral
-        .disconnectOrCancelConnection()
-        .catchError((e) => bleError(tag, "peripheral.discBlaBla()", e));
+    await peripheral.disconnectOrCancelConnection().catchError((e) => bleError(tag, "peripheral.discBlaBla()", e));
     if (connectionStateSubscription != null)
-      await connectionStateSubscription
-          .cancel()
-          .catchError((e) => bleError(tag, "connStateSub.cancel()", e));
+      await connectionStateSubscription.cancel().catchError((e) => bleError(tag, "connStateSub.cancel()", e));
   }
 
   BleCharacteristic characteristic(String id) {

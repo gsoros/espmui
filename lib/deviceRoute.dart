@@ -1,5 +1,6 @@
 // @dart=2.9
 import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
@@ -78,7 +79,65 @@ class DeviceRouteState extends State<DeviceRoute> {
                 children: [
                   Row(children: [
                     Expanded(
-                      child: Text(device.name),
+                      child: Container(
+                        height: 40,
+                        alignment: Alignment.bottomLeft,
+                        child: TextButton(
+                          style: ButtonStyle(
+                            alignment: Alignment.bottomLeft,
+                            padding: MaterialStateProperty.all<EdgeInsets>(EdgeInsets.all(0)),
+                          ),
+                          onPressed: () {},
+                          onLongPress: () {
+                            print("Device name longpress");
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  title: Text("Rename device"),
+                                  content: TextField(
+                                    controller: TextEditingController()..text = device.name,
+                                    onSubmitted: (text) async {
+                                      print("$tag new device name: $text");
+                                      await device.characteristic("api").write("hostname=$text");
+                                      String reply = await device.characteristic("api").read();
+                                      String pattern = "0:OK;2:hostname=";
+                                      if (0 == reply.indexOf(pattern)) {
+                                        String hostName = reply.substring(pattern.length);
+                                        print("Device said: hostname=$hostName");
+                                        setState(() {
+                                          device.name = hostName;
+                                        });
+                                        await device.characteristic("api").write("reboot");
+                                        await device.disconnect();
+                                        sleep(Duration(milliseconds: 3000));
+                                        await device.connect();
+                                      }
+                                      Navigator.of(context).pop();
+                                    },
+                                  ),
+                                  /*
+                                  actions: <Widget>[
+                                    new ElevatedButton(
+                                      child: Text("OK"),
+                                      onPressed: () {
+                                        Navigator.of(context).pop();
+                                      },
+                                    ),
+                                  ],
+                                  */
+                                );
+                              },
+                            );
+                          },
+                          child: Text(
+                            device.name,
+                            style: Theme.of(context).textTheme.headline6,
+                            maxLines: 1,
+                            overflow: TextOverflow.clip,
+                          ),
+                        ),
+                      ),
                     ),
                   ]),
                   Row(
@@ -103,8 +162,7 @@ class DeviceRouteState extends State<DeviceRoute> {
     return StreamBuilder<PeripheralConnectionState>(
       stream: device.connectionStateStreamController.stream,
       initialData: device.connectionState,
-      builder: (BuildContext context,
-          AsyncSnapshot<PeripheralConnectionState> snapshot) {
+      builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState> snapshot) {
         String connState = snapshot.data.toString();
         print("$tag _status() connState: $connState");
         return Text(
@@ -119,29 +177,23 @@ class DeviceRouteState extends State<DeviceRoute> {
     return StreamBuilder<PeripheralConnectionState>(
       stream: device.connectionStateStreamController.stream,
       initialData: device.connectionState,
-      builder: (BuildContext context,
-          AsyncSnapshot<PeripheralConnectionState> snapshot) {
+      builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState> snapshot) {
         Function action;
         String label = "Connect";
         if (snapshot.data == PeripheralConnectionState.connected) {
           action = device.disconnect;
           label = "Disconnect";
         }
-        if (snapshot.data == PeripheralConnectionState.disconnected)
-          action = device.connect;
+        if (snapshot.data == PeripheralConnectionState.disconnected) action = device.connect;
         return ElevatedButton(
           onPressed: action,
           child: Text(label),
           style: ButtonStyle(
             backgroundColor: MaterialStateProperty.resolveWith((state) {
-              return state.contains(MaterialState.disabled)
-                  ? Colors.red.shade400
-                  : Colors.red.shade900;
+              return state.contains(MaterialState.disabled) ? Colors.red.shade400 : Colors.red.shade900;
             }),
             foregroundColor: MaterialStateProperty.resolveWith((state) {
-              return state.contains(MaterialState.disabled)
-                  ? Colors.grey
-                  : Colors.white;
+              return state.contains(MaterialState.disabled) ? Colors.grey : Colors.white;
             }),
           ),
         );

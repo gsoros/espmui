@@ -22,16 +22,14 @@ class DeviceList {
     _devices.update(
       scanResult.peripheral.identifier,
       (existing) {
-        print(
-            "$tag updating ${scanResult.peripheral.name} rssi=${scanResult.rssi}");
-        existing.peripheral.name = scanResult.peripheral.name;
+        print("$tag updating ${scanResult.peripheral.name} rssi=${scanResult.rssi}");
+        existing.name = scanResult.peripheral.name;
         existing.rssi = scanResult.rssi;
         existing.lastSeen = now;
         return existing;
       },
       ifAbsent: () {
-        print(
-            "$tag adding ${scanResult.peripheral.name} rssi=${scanResult.rssi}");
+        print("$tag adding ${scanResult.peripheral.name} rssi=${scanResult.rssi}");
         return Device(
           scanResult.peripheral,
           rssi: scanResult.rssi,
@@ -74,15 +72,13 @@ class Scanner {
 
   // scanning
   bool scanning = false;
-  final StreamController<bool> scanningStreamController =
-      StreamController<bool>.broadcast();
+  final StreamController<bool> scanningStreamController = StreamController<bool>.broadcast();
   StreamSubscription scanningSubscription;
 
   // devices
   DeviceList availableDevices = DeviceList();
   Device _selected;
-  final StreamController<Device> availableDevicesStreamController =
-      StreamController<Device>.broadcast();
+  final StreamController<Device> availableDevicesStreamController = StreamController<Device>.broadcast();
   StreamSubscription availableDevicesSubscription;
 
   Scanner(this.bleManager) {
@@ -100,14 +96,11 @@ class Scanner {
         print("$tag scanningSubscription: $value");
       },
     );
-    availableDevicesSubscription =
-        availableDevicesStreamController.stream.listen(
+    availableDevicesSubscription = availableDevicesStreamController.stream.listen(
       (device) {
         bool isNew = !availableDevices.containsIdentifier(device.identifier);
         //availableDevices.addOrUpdate(device);
-        print("$tag availableDevicesSubscription: " +
-            device.identifier +
-            " new=$isNew rssi=${device.rssi}");
+        print("$tag availableDevicesSubscription: " + device.identifier + " new=$isNew rssi=${device.rssi}");
       },
     );
     startScan();
@@ -168,8 +161,7 @@ class Scanner {
 
   void select(Device device) {
     print("$tag Selected " + device.name);
-    if (_selected != null && _selected.identifier != device.identifier)
-      _selected.disconnect();
+    if (_selected != null && _selected.identifier != device.identifier) _selected.disconnect();
     _selected = device;
     //print("$tag select() calling connect()");
     //device.connect();
@@ -212,12 +204,14 @@ class Scanner {
           }
         } else {
           bleError(tag, "Adapter not powered on");
+          /*
           if (Platform.isAndroid) {
-            //await bleManager.cancelTransaction("autoEnableBT");
+            await bleManager.cancelTransaction("autoEnableBT");
             await bleManager
                 .enableRadio(transactionId: "autoEnableBT")
                 .catchError((e) => bleError(tag, "enableRadio()", e));
           }
+          */
         }
       },
       onError: (e) => bleError(tag, "bluetoothStateSubscription", e),
