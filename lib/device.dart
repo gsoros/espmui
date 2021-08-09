@@ -106,8 +106,8 @@ class Device {
   void disconnect() async {
     print("$tag disconnect() $name");
     if (!await peripheral.isConnected()) {
-      bleError(tag, "disconnect(): not connected");
-      return;
+      bleError(tag, "disconnect(): not connected, but proceeding anyway");
+      //return;
     }
     unsubscribeCharacteristics();
     await peripheral

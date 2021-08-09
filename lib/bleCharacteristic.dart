@@ -48,14 +48,18 @@ abstract class BleCharacteristic<T> {
     bool withResponse = false,
     String transactionId,
   }) {
+    if (_characteristic == null) {
+      bleError(tag, "write() characteristic is null");
+      return Future.value(null);
+    }
     if (!_characteristic.isWritableWithoutResponse &&
         !_characteristic.isWritableWithResponse) {
       bleError(tag, "write() characteristic not writable");
-      return null;
+      return Future.value(null);
     }
     if (withResponse && !_characteristic.isWritableWithResponse) {
       bleError(tag, "write() characteristic not writableWithResponse");
-      return null;
+      return Future.value(null);
     }
     return _characteristic
         .write(
