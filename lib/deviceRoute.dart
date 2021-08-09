@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'device.dart';
 import 'bleCharacteristic.dart';
+import 'util.dart';
 
 class DeviceRoute extends StatefulWidget {
   final String tag = "[DeviceRoute]";
@@ -76,7 +77,9 @@ class DeviceRouteState extends State<DeviceRoute> {
                 crossAxisAlignment: CrossAxisAlignment.start, // Align left
                 children: [
                   Row(children: [
-                    Text(device.name),
+                    Expanded(
+                      child: Text(device.name),
+                    ),
                   ]),
                   Row(
                     children: [
@@ -185,7 +188,9 @@ class DeviceRouteState extends State<DeviceRoute> {
             controller: _apiCommandController,
             onSubmitted: (String command) async {
               print('$tag writing "$command" to api');
-              await api.write(command);
+              await api.write(command).catchError((e) {
+                bleError(tag, "write($command)", e);
+              });
             },
           ),
         ],

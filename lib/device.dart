@@ -52,11 +52,18 @@ class Device {
     )
         //.asBroadcastStream()
         .listen(
-      (state) {
+      (state) async {
         connectionState = state;
         print("$tag _connectionStateSubscription $name $state");
         streamSendIfNotClosed(connectionStateStreamController, state);
-        if (state == connectedState) subscribeCharacteristics();
+        if (state == connectedState) {
+          // api char can use values longer than 20 bytes
+          int mtu = await peripheral.requestMtu(512).catchError((e) {
+            bleError(tag, "requestMtu()", e);
+          });
+          print("$tag got MTU=$mtu");
+          subscribeCharacteristics();
+        }
       },
       onError: (e) => bleError(tag, "connectionStateSubscription", e),
     );

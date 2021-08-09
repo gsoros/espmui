@@ -16,7 +16,7 @@ class DeviceList {
     return _devices.containsKey(identifier);
   }
 
-  // if a device with the same identifier already exists, updates rssi and lastSeen
+  // if a device with the same identifier already exists, updates name, rssi and lastSeen
   // otherwise adds new device
   // returns the new or updated device
   Device addOrUpdate(ScanResult scanResult) {
@@ -26,6 +26,7 @@ class DeviceList {
       (existing) {
         print(
             "$tag updating ${scanResult.peripheral.name} rssi=${scanResult.rssi}");
+        existing.peripheral.name = scanResult.peripheral.name;
         existing.rssi = scanResult.rssi;
         existing.lastSeen = now;
         return existing;
@@ -154,13 +155,11 @@ class ScannerRouteState extends State<ScannerRoute> {
     Timer(
       Duration(seconds: 3),
       () async {
-        await scanResultSubscription.cancel();
-        await bleManager.stopPeripheralScan();
-        scanningStreamController.sink.add(false);
+        await stopScan();
         if (availableDevices.isEmpty) print("$tag No devices found");
       },
     );
-    scanningStreamController.add(true);
+    streamSendIfNotClosed(scanningStreamController, true);
     scanResultSubscription = bleManager
         .startPeripheralScan(
           uuids: [apiServiceUUID],
@@ -169,11 +168,18 @@ class ScannerRouteState extends State<ScannerRoute> {
         .listen(
           (scanResult) {
             Device device = availableDevices.addOrUpdate(scanResult);
-            availableDevicesStreamController.sink.add(device);
             print("$tag Device found: ${device.name} ${device.identifier}");
+            streamSendIfNotClosed(availableDevicesStreamController, device);
           },
           onError: (e) => bleError(tag, "scanResultSubscription", e),
         );
+  }
+
+  Future<void> stopScan() async {
+    print("$tag stopScan()");
+    await scanResultSubscription.cancel();
+    await bleManager.stopPeripheralScan();
+    streamSendIfNotClosed(scanningStreamController, false);
   }
 
   void select(Device device) {
@@ -210,8 +216,11 @@ class ScannerRouteState extends State<ScannerRoute> {
       (btState) async {
         print("$tag " + btState.toString());
         if (btState == BluetoothState.POWERED_ON) {
-          print("$tag Adapter powered on, starting scan");
-          startScan();
+          // Probably not a good idea to automatically scan, as of Android 7,
+          // starting and stopping scans more than 5 times in a window of
+          // 30 seconds will temporarily disable scanning
+          //print("$tag Adapter powered on, starting scan");
+          //startScan();
           if (_selected != null) {
             print("$tag Adapter powered on, connecting to ${_selected.name}");
             _selected.connect();
@@ -377,7 +386,9 @@ class ScannerRouteState extends State<ScannerRoute> {
           ElevatedButton(
             onPressed: () async {
               select(device);
-              print("[_deviceListItem] onPressed() calling connect()");
+              print("[_deviceListItem] onPressed(): stopScan() and connect()");
+              // Some phones have an issue with connecting while scanning
+              await stopScan();
               await device.connect();
               await Navigator.push(
                 context,

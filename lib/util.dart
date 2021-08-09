@@ -40,6 +40,9 @@ void bleError(String tag, String message, [dynamic error]) {
           case BleErrorCode.characteristicReadFailed: // 402
             info += ": characteristicReadFailed";
             break;
+          case BleErrorCode.characteristicNotifyChangeFailed: // 403
+            info += ": characteristicNotifyChangeFailed";
+            break;
           case BleErrorCode.characteristicNotFound: // 404
             info += ": characteristicNotFound";
             break;

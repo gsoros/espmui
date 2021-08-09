@@ -57,11 +57,15 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "write() characteristic not writableWithResponse");
       return null;
     }
-    return _characteristic.write(
+    return _characteristic
+        .write(
       toUint8List(value),
       withResponse,
       transactionId: transactionId,
-    );
+    )
+        .catchError((e) {
+      bleError(tag, "write($value)", e);
+    });
   }
 
   void subscribe() async {
