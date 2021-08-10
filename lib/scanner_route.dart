@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:espmui/ble.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
-import 'deviceRoute.dart';
+
+import 'device_route.dart';
 import 'device.dart';
 import 'scanner.dart';
+import 'util.dart';
 
 class ScannerRoute extends StatefulWidget {
   ScannerRoute({Key? key}) : super(key: key);
@@ -40,7 +43,7 @@ class ScannerRouteState extends State<ScannerRoute> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: bleEnabledFork(
+        title: bleByState(
           ifEnabled: _appBarTitle,
         ),
       ),
@@ -81,16 +84,16 @@ class ScannerRouteState extends State<ScannerRoute> {
 
   Widget _status() {
     return StreamBuilder<bool>(
-      stream: scanner.scanningStreamController.stream,
+      stream: scanner.scanningStream,
       initialData: scanner.scanning,
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
         String status = "";
         if (snapshot.hasData)
           status = snapshot.data!
               ? "Scanning..."
-              : scanner.availableDevices.length.toString() +
+              : scanner.devices.length.toString() +
                   " device" +
-                  (scanner.availableDevices.length == 1 ? "" : "s") +
+                  (scanner.devices.length == 1 ? "" : "s") +
                   " found";
         return Text(
           status,
@@ -102,42 +105,28 @@ class ScannerRouteState extends State<ScannerRoute> {
 
   Widget _scanButton() {
     return StreamBuilder<bool>(
-      stream: scanner.scanningStreamController.stream,
+      stream: scanner.scanningStream,
       initialData: scanner.scanning,
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
         bool scanning = snapshot.hasData ? snapshot.data! : false;
-        return ElevatedButton(
-          onPressed: scanning ? null : scanner.startScan,
-          child: Text("Scan"),
-          style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.resolveWith((state) {
-              return state.contains(MaterialState.disabled)
-                  ? Colors.red.shade400
-                  : Colors.red.shade900;
-            }),
-            foregroundColor: MaterialStateProperty.resolveWith((state) {
-              return state.contains(MaterialState.disabled)
-                  ? Colors.grey
-                  : Colors.white;
-            }),
-          ),
-        );
+        return espmuiElevatedButton("Scan",
+            action: scanning ? null : scanner.startScan);
       },
     );
   }
 
   Widget _deviceList() {
     return StreamBuilder<Device>(
-      stream: scanner.availableDevicesStreamController.stream,
+      stream: scanner.devicesController.stream,
       //initialData: availableDevices,
       builder: (BuildContext context, AsyncSnapshot<Device> snapshot) {
         // TODO don't rebuild the whole list, just the changed items
         print("[_deviceList()] rebuilding");
         List<Widget> items = [];
-        if (scanner.availableDevices.length < 1)
+        if (scanner.devices.length < 1)
           items.add(Center(child: Text("No devices found")));
-        scanner.availableDevices.forEach(
-          (id, device) {
+        scanner.devices.forEach(
+          (_, device) {
             print("[_deviceList()] adding ${device.name} ${device.rssi}");
             items.add(_deviceListItem(device));
           },
@@ -174,7 +163,7 @@ class ScannerRouteState extends State<ScannerRoute> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  device.name ?? "!!unnamed device!!",
+                  device.name ?? "Unnamed device",
                   style: TextStyle(fontSize: 18),
                 ),
                 Text(
@@ -195,7 +184,6 @@ class ScannerRouteState extends State<ScannerRoute> {
                 context,
                 MaterialPageRoute(
                   builder: (context) {
-                    //select(device);
                     return DeviceRoute(device);
                   },
                 ),

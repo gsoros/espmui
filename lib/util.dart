@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
+
+import 'package:flutter/material.dart';
 
 void streamSendIfNotClosed(StreamController stream, dynamic value) {
   if (stream.isClosed)
@@ -10,7 +11,7 @@ void streamSendIfNotClosed(StreamController stream, dynamic value) {
 
 Widget espmuiElevatedButton(String label, {Function()? action}) {
   return ElevatedButton(
-    onPressed: action!,
+    onPressed: action,
     child: Text(label),
     style: ButtonStyle(
       backgroundColor: MaterialStateProperty.resolveWith((state) {

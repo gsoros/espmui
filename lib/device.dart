@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
-import 'bleCharacteristic.dart';
+
+import 'ble_characteristic.dart';
 import 'util.dart';
 import 'ble.dart';
 
@@ -10,13 +11,12 @@ class Device {
   int rssi = 0;
   double lastSeen = 0;
 
-  // connectionState
-  PeripheralConnectionState connectionState =
-      PeripheralConnectionState.disconnected;
-  final StreamController<PeripheralConnectionState>
-      connectionStateStreamController =
+  /// Connection state
+  var state = PeripheralConnectionState.disconnected;
+  final stateController =
       StreamController<PeripheralConnectionState>.broadcast();
-  StreamSubscription<PeripheralConnectionState>? connectionStateSubscription;
+  Stream<PeripheralConnectionState> get stateStream => stateController.stream;
+  StreamSubscription<PeripheralConnectionState>? stateSubscription;
 
   Map<String, BleCharacteristic> characteristics = {};
 
@@ -36,27 +36,26 @@ class Device {
   void dispose() async {
     print("$tag $name dispose");
     disconnect();
-    await connectionStateStreamController.close();
-    characteristics.forEach((k, char) {
+    await stateController.close();
+    characteristics.forEach((_, char) {
       char.dispose();
     });
   }
 
   Future<void> connect() async {
-    PeripheralConnectionState connectedState =
-        PeripheralConnectionState.connected;
-    connectionStateSubscription = peripheral
+    final connectedState = PeripheralConnectionState.connected;
+    stateSubscription = peripheral
         .observeConnectionState(
       emitCurrentValue: false,
       completeOnDisconnect: true,
     )
         //.asBroadcastStream()
         .listen(
-      (state) async {
-        connectionState = state;
-        print("$tag _connectionStateSubscription $name $state");
-        streamSendIfNotClosed(connectionStateStreamController, state);
-        if (state == connectedState) {
+      (newState) async {
+        state = newState;
+        print("$tag _connectionStateSubscription $name $newState");
+        streamSendIfNotClosed(stateController, newState);
+        if (newState == connectedState) {
           // api char can use values longer than 20 bytes
           int mtu = await peripheral.requestMtu(512).catchError((e) {
             bleError(tag, "requestMtu()", e);
@@ -78,27 +77,26 @@ class Device {
           );
     } else {
       print("$tag Not connecting to $name, already connected");
-      connectionState = connectedState;
+      state = connectedState;
       streamSendIfNotClosed(
-        connectionStateStreamController,
+        stateController,
         connectedState,
       );
       subscribeCharacteristics();
     }
-    return Future.value(null);
   }
 
   void subscribeCharacteristics() async {
     await peripheral
         .discoverAllServicesAndCharacteristics()
         .catchError((e) => bleError(tag, "discoverBlaBla()", e));
-    characteristics.forEach((k, char) {
+    characteristics.forEach((_, char) {
       char.subscribe();
     });
   }
 
   void unsubscribeCharacteristics() {
-    characteristics.forEach((k, char) {
+    characteristics.forEach((_, char) {
       char.unsubscribe();
     });
   }
@@ -113,8 +111,8 @@ class Device {
     await peripheral
         .disconnectOrCancelConnection()
         .catchError((e) => bleError(tag, "peripheral.discBlaBla()", e));
-    if (connectionStateSubscription != null)
-      await connectionStateSubscription
+    if (stateSubscription != null)
+      await stateSubscription
           ?.cancel()
           .catchError((e) => bleError(tag, "connStateSub.cancel()", e));
   }
@@ -140,12 +138,14 @@ class DeviceList {
     return _devices.containsKey(identifier);
   }
 
+  /// Adds or updates a device from a [ScanResult]
+  ///
   /// If a device with the same identifier already exists, updates name, rssi
   /// and lastSeen, otherwise adds new device.
   /// Returns the new or updated device or null on error.
   Device? addOrUpdate(ScanResult scanResult) {
-    double now = DateTime.now().millisecondsSinceEpoch / 1000;
-    String subject = scanResult.peripheral.name.toString() +
+    final now = DateTime.now().millisecondsSinceEpoch / 1000;
+    final subject = scanResult.peripheral.name.toString() +
         " rssi=" +
         scanResult.rssi.toString();
     _devices.update(
@@ -166,7 +166,7 @@ class DeviceList {
         );
       },
     );
-    return byIdentifier(scanResult.peripheral.identifier);
+    return _devices[scanResult.peripheral.identifier];
   }
 
   Device? byIdentifier(String identifier) {
@@ -176,11 +176,8 @@ class DeviceList {
 
   void dispose() {
     print("$tag dispose");
-    Device? device = _devices.remove(_devices.keys.first);
-    while (null != device) {
-      device.dispose();
-      device = _devices.remove(_devices.keys.first);
-    }
+    _devices.forEach((_, device) => device.dispose());
+    _devices.clear();
   }
 
   int get length => _devices.length;

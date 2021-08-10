@@ -65,9 +65,11 @@ packages:
   flutter_ble_lib:
     dependency: "direct main"
     description:
-      path: "lib/FlutterBleLib"
-      relative: true
-    source: path
+      path: "."
+      ref: HEAD
+      resolved-ref: "3c1fb13473932edf305ddb57475964b4353bfdb3"
+      url: "git@github.com:gsoros/FlutterBleLib.git"
+    source: git
     version: "2.4.0"
   flutter_test:
     dependency: "direct dev"

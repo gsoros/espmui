@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 import 'util.dart';
 
 /// singleton class
@@ -17,8 +19,8 @@ class BLE {
 
   // state
   StreamSubscription<BluetoothState>? stateSubscription;
-  final StreamController<BluetoothState> stateController =
-      StreamController<BluetoothState>.broadcast();
+  final stateController = StreamController<BluetoothState>.broadcast();
+  Stream<BluetoothState> get stateStream => stateController.stream;
   BluetoothState _currentState = BluetoothState.UNKNOWN;
   bool _currentStateInitialized = false;
 
@@ -196,18 +198,20 @@ void bleError(String tag, String message, [dynamic error]) {
   print("$tag Error: $message$info");
 }
 
-Widget bleEnabledFork({
+/// Returns the result of [ifEnabled] or [ifDisabled] depending on the current
+/// state of the bluetooth adapter.
+Widget bleByState({
   required Widget Function() ifEnabled,
-  Widget Function()? ifDisabled,
+  Widget Function() ifDisabled = bleDisabledContainer,
 }) {
   BLE ble = BLE();
   return StreamBuilder<BluetoothState>(
-    stream: ble.stateController.stream,
+    stream: ble.stateStream,
     initialData: ble.currentStateSync(),
     builder: (BuildContext context, AsyncSnapshot<BluetoothState> snapshot) {
-      if (snapshot.data == BluetoothState.POWERED_ON) return ifEnabled();
-      if (ifDisabled != null) return ifDisabled();
-      return bleDisabledContainer();
+      return (snapshot.data == BluetoothState.POWERED_ON)
+          ? ifEnabled()
+          : ifDisabled();
     },
   );
 }

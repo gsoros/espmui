@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:io';
+
+import 'package:espmui/util.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+
 import 'ble.dart';
 import 'device.dart';
-import 'bleCharacteristic.dart';
+import 'ble_characteristic.dart';
 
 class DeviceRoute extends StatefulWidget {
   final String tag = "[DeviceRoute]";
@@ -56,7 +59,7 @@ class DeviceRouteState extends State<DeviceRoute> {
       onWillPop: _onBackPressed,
       child: Scaffold(
         appBar: AppBar(
-          title: bleEnabledFork(
+          title: bleByState(
             ifEnabled: _appBarTitle,
           ),
         ),
@@ -120,40 +123,68 @@ class DeviceRouteState extends State<DeviceRoute> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text("Rename device"),
-          content: TextField(
-            controller: TextEditingController()..text = device.name ?? "",
-            onSubmitted: (text) async {
-              BleCharacteristic? api = device.characteristic("api");
-              print("$tag new device name: $text");
-              await api?.write("hostname=$text");
-              String reply = await api?.read();
-              String pattern = "0:OK;2:hostname=";
-              if (0 == reply.indexOf(pattern)) {
-                String hostName = reply.substring(pattern.length);
-                print("Device said: hostname=$hostName");
-                setState(() {
-                  device.name = hostName;
-                });
-                await api?.write("reboot");
-                await device.disconnect();
-                sleep(Duration(milliseconds: 3000));
-                await device.connect();
-              }
-              Navigator.of(context).pop();
-            },
-          ),
-          /*
-          actions: <Widget>[
-            new ElevatedButton(
-              child: Text("OK"),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-          */
+        var alertDialogStatus = "";
+        setStatus(String s) {
+          print(s);
+          setState(() => alertDialogStatus = s);
+        }
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text("Rename device"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    maxLength: 31,
+                    maxLines: 1,
+                    textInputAction: TextInputAction.send,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                    controller: TextEditingController()
+                      ..text = device.name ?? "",
+                    onSubmitted: (text) async {
+                      BleCharacteristic? api = device.characteristic("api");
+                      setStatus("Sending new device name: $text");
+                      await api?.write("hostname=$text");
+                      String reply = await api?.read();
+                      String pattern = "0:OK;2:hostname=";
+                      if (0 == reply.indexOf(pattern)) {
+                        String hostName = reply.substring(pattern.length);
+                        setStatus("Device said: hostname=$hostName");
+                        setState(() {
+                          device.name = hostName;
+                        });
+                        setStatus("Sending reboot command");
+                        await api?.write("reboot");
+                        setStatus("Disconnecting");
+                        await device.disconnect();
+                        setStatus("Waiting for device to boot");
+                        sleep(Duration(milliseconds: 3000));
+                        setStatus("Connecting to device");
+                        await device.connect();
+                      }
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                  Container(
+                    height: 50,
+                    margin: EdgeInsets.only(top: 20),
+                    //decoration: BoxDecoration(border: Border.all(width: 1)),
+                    child: Text(
+                      alertDialogStatus,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -161,8 +192,8 @@ class DeviceRouteState extends State<DeviceRoute> {
 
   Widget _status() {
     return StreamBuilder<PeripheralConnectionState>(
-      stream: device.connectionStateStreamController.stream,
-      initialData: device.connectionState,
+      stream: device.stateStream,
+      initialData: device.state,
       builder: (BuildContext context,
           AsyncSnapshot<PeripheralConnectionState> snapshot) {
         String connState = snapshot.data.toString();
@@ -177,34 +208,19 @@ class DeviceRouteState extends State<DeviceRoute> {
 
   Widget _connectButton() {
     return StreamBuilder<PeripheralConnectionState>(
-      stream: device.connectionStateStreamController.stream,
-      initialData: device.connectionState,
+      stream: device.stateStream,
+      initialData: device.state,
       builder: (BuildContext context,
           AsyncSnapshot<PeripheralConnectionState> snapshot) {
-        Function()? action;
-        String label = "Connect";
+        var action;
+        var label = "Connect";
         if (snapshot.data == PeripheralConnectionState.connected) {
           action = device.disconnect;
           label = "Disconnect";
         }
         if (snapshot.data == PeripheralConnectionState.disconnected)
           action = device.connect;
-        return ElevatedButton(
-          onPressed: action,
-          child: Text(label),
-          style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.resolveWith((state) {
-              return state.contains(MaterialState.disabled)
-                  ? Colors.red.shade400
-                  : Colors.red.shade900;
-            }),
-            foregroundColor: MaterialStateProperty.resolveWith((state) {
-              return state.contains(MaterialState.disabled)
-                  ? Colors.grey
-                  : Colors.white;
-            }),
-          ),
-        );
+        return espmuiElevatedButton(label, action: action);
       },
     );
   }
