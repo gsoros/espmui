@@ -1,82 +1,25 @@
-// @dart=2.9
+import 'package:espmui/ble.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'deviceRoute.dart';
 import 'device.dart';
 import 'scanner.dart';
 
-class DeviceList {
-  final String tag = "[DeviceList]";
-  Map<String, Device> _devices = {};
-
-  bool containsIdentifier(String identifier) {
-    return _devices.containsKey(identifier);
-  }
-
-  // if a device with the same identifier already exists, updates name, rssi and lastSeen
-  // otherwise adds new device
-  // returns the new or updated device
-  Device addOrUpdate(ScanResult scanResult) {
-    double now = DateTime.now().millisecondsSinceEpoch / 1000;
-    _devices.update(
-      scanResult.peripheral.identifier,
-      (existing) {
-        print(
-            "$tag updating ${scanResult.peripheral.name} rssi=${scanResult.rssi}");
-        existing.peripheral.name = scanResult.peripheral.name;
-        existing.rssi = scanResult.rssi;
-        existing.lastSeen = now;
-        return existing;
-      },
-      ifAbsent: () {
-        print(
-            "$tag adding ${scanResult.peripheral.name} rssi=${scanResult.rssi}");
-        return Device(
-          scanResult.peripheral,
-          rssi: scanResult.rssi,
-          lastSeen: now,
-        );
-      },
-    );
-    return _devices[scanResult.peripheral.identifier];
-  }
-
-  Device byIdentifier(String identifier) {
-    if (containsIdentifier(identifier)) return _devices[identifier];
-    return null;
-  }
-
-  void dispose() {
-    Device device = _devices.remove(_devices.keys.first);
-    while (null != device) {
-      device.dispose();
-      device = _devices.remove(_devices.keys.first);
-    }
-  }
-
-  int get length => _devices.length;
-  bool get isEmpty => _devices.isEmpty;
-  void forEach(void Function(String, Device) f) => _devices.forEach(f);
-}
-
 class ScannerRoute extends StatefulWidget {
-  final Scanner scanner;
-
-  ScannerRoute({Key key, this.scanner}) : super(key: key);
+  ScannerRoute({Key? key}) : super(key: key);
 
   @override
-  ScannerRouteState createState() => ScannerRouteState(scanner);
+  ScannerRouteState createState() => ScannerRouteState();
 }
 
 class ScannerRouteState extends State<ScannerRoute> {
   final String tag = "[ScannerState]";
-  final Scanner scanner;
   final String defaultTitle = "Devices";
   final GlobalKey<ScannerRouteState> _scannerStateKey =
       GlobalKey<ScannerRouteState>();
+  Scanner get scanner => Scanner();
 
-  ScannerRouteState(this.scanner) {
+  ScannerRouteState() {
     print("$tag construct");
   }
 
@@ -96,7 +39,11 @@ class ScannerRouteState extends State<ScannerRoute> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _appBar(),
+      appBar: AppBar(
+        title: bleEnabledFork(
+          ifEnabled: _appBarTitle,
+        ),
+      ),
       body: Container(
         margin: EdgeInsets.all(6),
         child: _deviceList(),
@@ -104,32 +51,30 @@ class ScannerRouteState extends State<ScannerRoute> {
     );
   }
 
-  AppBar _appBar() {
-    return AppBar(
-      title: Container(
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, // Align left
-                children: [
-                  Row(children: [
-                    Text(defaultTitle),
-                  ]),
-                  Row(
-                    children: [
-                      _status(),
-                    ],
-                  ),
-                ],
-              ),
+  Widget _appBarTitle() {
+    return Container(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, // Align left
+              children: [
+                Row(children: [
+                  Text(defaultTitle),
+                ]),
+                Row(
+                  children: [
+                    _status(),
+                  ],
+                ),
+              ],
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end, // Align right
-              children: [_scanButton()],
-            )
-          ],
-        ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end, // Align right
+            children: [_scanButton()],
+          )
+        ],
       ),
     );
   }
@@ -139,12 +84,14 @@ class ScannerRouteState extends State<ScannerRoute> {
       stream: scanner.scanningStreamController.stream,
       initialData: scanner.scanning,
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
-        String status = snapshot.data
-            ? "Scanning..."
-            : scanner.availableDevices.length.toString() +
-                " device" +
-                (scanner.availableDevices.length == 1 ? "" : "s") +
-                " found";
+        String status = "";
+        if (snapshot.hasData)
+          status = snapshot.data!
+              ? "Scanning..."
+              : scanner.availableDevices.length.toString() +
+                  " device" +
+                  (scanner.availableDevices.length == 1 ? "" : "s") +
+                  " found";
         return Text(
           status,
           style: TextStyle(fontSize: 10),
@@ -158,8 +105,9 @@ class ScannerRouteState extends State<ScannerRoute> {
       stream: scanner.scanningStreamController.stream,
       initialData: scanner.scanning,
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
+        bool scanning = snapshot.hasData ? snapshot.data! : false;
         return ElevatedButton(
-          onPressed: snapshot.data ? null : scanner.startScan,
+          onPressed: scanning ? null : scanner.startScan,
           child: Text("Scan"),
           style: ButtonStyle(
             backgroundColor: MaterialStateProperty.resolveWith((state) {
@@ -226,7 +174,7 @@ class ScannerRouteState extends State<ScannerRoute> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  device.name,
+                  device.name ?? "!!unnamed device!!",
                   style: TextStyle(fontSize: 18),
                 ),
                 Text(
@@ -240,9 +188,9 @@ class ScannerRouteState extends State<ScannerRoute> {
             onPressed: () async {
               scanner.select(device);
               print("[_deviceListItem] onPressed(): stopScan() and connect()");
-              // Some phones have an issue with connecting while scanning
+              //Some phones have an issue with connecting while scanning
               await scanner.stopScan();
-              await device.connect();
+              device.connect();
               await Navigator.push(
                 context,
                 MaterialPageRoute(

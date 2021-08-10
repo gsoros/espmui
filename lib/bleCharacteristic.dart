@@ -1,42 +1,42 @@
-// @dart=2.9
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'util.dart';
+import 'ble.dart';
 
 abstract class BleCharacteristic<T> {
   final String tag = "[Characteristic]";
   Peripheral _peripheral;
-  String serviceUUID;
-  String characteristicUUID;
-  CharacteristicWithValue _characteristic;
-  Stream<Uint8List> _rawStream;
-  StreamSubscription<Uint8List> _subscription;
+  String serviceUUID = "";
+  String characteristicUUID = "";
+  CharacteristicWithValue? _characteristic;
+  Stream<Uint8List>? _rawStream;
+  StreamSubscription<Uint8List>? _subscription;
   StreamController<T> _controller = StreamController<T>.broadcast();
-  T lastValue;
+  T? lastValue;
 
   Stream get stream => _controller.stream;
 
   BleCharacteristic(this._peripheral) {
     lastValue = fromUint8List(Uint8List.fromList([]));
-    if (_peripheral == null) {
-      bleError(tag, "construct: peripheral is null");
-      return;
-    }
     print("$tag construct " + _peripheral.identifier);
   }
 
   T fromUint8List(Uint8List list);
   Uint8List toUint8List(T value);
 
-  // read value from characteristic and set lastValue
-  Future<T> read() async {
-    if (!_characteristic.isReadable) {
+  /// read value from characteristic and set lastValue
+  Future<T?> read() async {
+    if (null == _characteristic) {
+      bleError(tag, "read() characteristic is null");
+      return fromUint8List(Uint8List.fromList([]));
+    }
+    if (!_characteristic!.isReadable) {
       bleError(tag, "read() characteristic not readable");
       return fromUint8List(Uint8List.fromList([]));
     }
-    lastValue = fromUint8List(await _characteristic.read().catchError((e) {
+    lastValue = fromUint8List(await _characteristic!.read().catchError((e) {
       bleError(tag, "read()", e);
       return Uint8List.fromList([]);
     }));
@@ -46,22 +46,22 @@ abstract class BleCharacteristic<T> {
   Future<void> write(
     T value, {
     bool withResponse = false,
-    String transactionId,
+    String? transactionId,
   }) {
     if (_characteristic == null) {
       bleError(tag, "write() characteristic is null");
       return Future.value(null);
     }
-    if (!_characteristic.isWritableWithoutResponse &&
-        !_characteristic.isWritableWithResponse) {
+    if (!_characteristic!.isWritableWithoutResponse &&
+        !_characteristic!.isWritableWithResponse) {
       bleError(tag, "write() characteristic not writable");
       return Future.value(null);
     }
-    if (withResponse && !_characteristic.isWritableWithResponse) {
+    if (withResponse && !_characteristic!.isWritableWithResponse) {
       bleError(tag, "write() characteristic not writableWithResponse");
       return Future.value(null);
     }
-    return _characteristic
+    return _characteristic!
         .write(
       toUint8List(value),
       withResponse,
@@ -74,32 +74,38 @@ abstract class BleCharacteristic<T> {
 
   void subscribe() async {
     print("$tag subscribe()");
-    if (_peripheral == null) {
-      bleError(tag, "subscribe() peripheral is null");
-      return;
-    }
-    _characteristic = await _peripheral
-        .readCharacteristic(serviceUUID, characteristicUUID)
-        .catchError((e) {
+    /*
+    _characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID).catchError((e) {
       bleError(tag, "readCharacteristic()", e);
       return Future.value(null);
     });
+    */
+    try {
+      _characteristic =
+          await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
+    } catch (e) {
+      bleError(tag, "readCharacteristic()", e);
+      //  print("$tag readCharacteristic() serviceUUID: $serviceUUID, characteristicUUID: $characteristicUUID, $e");
+    }
     if (_characteristic == null) {
-      bleError(tag, "characteristic is null");
+      bleError(tag, "subscribe() characteristic is null");
       return;
     }
     await read();
     print("$tag subscribe() initial value: $lastValue");
     streamSendIfNotClosed(_controller, lastValue);
-    if (!_characteristic.isIndicatable && !_characteristic.isNotifiable) {
+    if (!_characteristic!.isIndicatable && !_characteristic!.isNotifiable) {
       bleError(tag, "characteristic neither indicatable nor notifiable");
       return;
     }
-    _rawStream = _characteristic
-        .monitor()
-        .handleError((e) => bleError(tag, "_rawStream", e))
-        .asBroadcastStream();
-    _subscription = _rawStream.listen(
+    _rawStream = _characteristic!.monitor().handleError((e) {
+      bleError(tag, "_rawStream", e);
+    }).asBroadcastStream();
+    if (_rawStream == null) {
+      bleError(tag, "subscribe() _rawStream is null");
+      return;
+    }
+    _subscription = _rawStream!.listen(
       (value) async {
         lastValue = await onNotify(fromUint8List(value));
         print("$tag " + lastValue.toString());
@@ -109,12 +115,12 @@ abstract class BleCharacteristic<T> {
     );
   }
 
-  Future<T> onNotify(T value) {
+  Future<T?> onNotify(T value) {
     return Future.value(value);
   }
 
   void unsubscribe() async {
-    if (_subscription != null) await _subscription.cancel();
+    await _subscription?.cancel();
   }
 
   void dispose() async {
@@ -180,7 +186,7 @@ class ApiCharacteristic extends BleCharacteristic<String> {
   }
 
   @override
-  Future<String> onNotify(String value) {
+  Future<String?> onNotify(String value) {
     // read full value as the notification is limited to 20 bytes
     return read();
   }

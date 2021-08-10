@@ -1,7 +1,4 @@
-// @dart=2.9
 import 'package:flutter/material.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
-import 'scanner.dart';
 import 'scannerRoute.dart';
 
 void main() {
@@ -9,8 +6,6 @@ void main() {
 }
 
 class EspmUiApp extends StatelessWidget {
-  final BleManager bleManager = BleManager();
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -26,7 +21,7 @@ class EspmUiApp extends StatelessWidget {
       ),
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
-      home: ScannerRoute(scanner: Scanner(bleManager)),
+      home: ScannerRoute(),
     );
   }
 }
