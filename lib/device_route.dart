@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'dart:io';
 
 import 'package:espmui/util.dart';
 import 'package:flutter/material.dart';
@@ -91,7 +90,7 @@ class DeviceRouteState extends State<DeviceRoute> {
                               EdgeInsets.all(0)),
                         ),
                         onPressed: () {},
-                        onLongPress: editDeviceName,
+                        onLongPress: _editDeviceName,
                         child: Text(
                           device.name ?? "",
                           style: Theme.of(context).textTheme.headline6,
@@ -119,75 +118,90 @@ class DeviceRouteState extends State<DeviceRoute> {
     );
   }
 
-  void editDeviceName() {
-    showDialog(
+  void _editDeviceName() async {
+    List<String> status = [];
+    var statusController = StreamController<List<String>>.broadcast();
+
+    void statusMessage(String s) {
+      print("$tag Status message: $s");
+      if (status.length > 10) status.removeAt(0);
+      status.add(s);
+      streamSendIfNotClosed(statusController, status);
+    }
+
+    Future<bool> apiDeviceName(String name) async {
+      BleCharacteristic? api = device.characteristic("api");
+      statusMessage("Sending new device name: $name");
+      await api?.write("hostname=$name");
+      String reply = await api?.read();
+      String pattern = "0:OK;2:hostname=";
+      if (0 == reply.indexOf(pattern)) {
+        String hostName = reply.substring(pattern.length);
+        statusMessage("Device said: hostname=$hostName");
+        setState(() => device.name = hostName);
+        statusMessage("Sending reboot command");
+        await api?.write("reboot");
+        statusMessage("Disconnecting");
+        await device.disconnect();
+        statusMessage("Waiting for device to boot");
+        await Future.delayed(Duration(milliseconds: 3000));
+        statusMessage("Connecting to device");
+        await device.connect();
+        return true;
+      }
+      return false;
+    }
+
+    await showDialog(
       context: context,
       builder: (BuildContext context) {
-        var alertDialogStatus = "";
-        setStatus(String s) {
-          print(s);
-          setState(() => alertDialogStatus = s);
-        }
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text("Rename device"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    maxLength: 31,
-                    maxLines: 1,
-                    textInputAction: TextInputAction.send,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(),
-                    ),
-                    controller: TextEditingController()
-                      ..text = device.name ?? "",
-                    onSubmitted: (text) async {
-                      BleCharacteristic? api = device.characteristic("api");
-                      setStatus("Sending new device name: $text");
-                      await api?.write("hostname=$text");
-                      String reply = await api?.read();
-                      String pattern = "0:OK;2:hostname=";
-                      if (0 == reply.indexOf(pattern)) {
-                        String hostName = reply.substring(pattern.length);
-                        setStatus("Device said: hostname=$hostName");
-                        setState(() {
-                          device.name = hostName;
-                        });
-                        setStatus("Sending reboot command");
-                        await api?.write("reboot");
-                        setStatus("Disconnecting");
-                        await device.disconnect();
-                        setStatus("Waiting for device to boot");
-                        sleep(Duration(milliseconds: 3000));
-                        setStatus("Connecting to device");
-                        await device.connect();
-                      }
+        return AlertDialog(
+          scrollable: true,
+          title: Text("Rename device"),
+          content: Container(
+            constraints: BoxConstraints(
+              minHeight: 250,
+            ),
+            child: Column(
+              children: [
+                TextField(
+                  maxLength: 31,
+                  maxLines: 1,
+                  textInputAction: TextInputAction.send,
+                  decoration: InputDecoration(border: OutlineInputBorder()),
+                  controller: TextEditingController()..text = device.name ?? "",
+                  onSubmitted: (text) async {
+                    if (await apiDeviceName(text)) {
+                      statusMessage("Success");
+                      await Future.delayed(Duration(milliseconds: 5000));
                       Navigator.of(context).pop();
-                    },
-                  ),
-                  Container(
-                    height: 50,
-                    margin: EdgeInsets.only(top: 20),
-                    //decoration: BoxDecoration(border: Border.all(width: 1)),
-                    child: Text(
-                      alertDialogStatus,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+                    } else
+                      statusMessage("Error");
+                  },
+                ),
+                StreamBuilder(
+                  stream: statusController.stream,
+                  builder: (context, AsyncSnapshot<List<String>> snapshot) {
+                    if (!snapshot.hasData) return Text("");
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: snapshot.data!.length,
+                      itemBuilder: (context, index) {
+                        return Text(
+                          snapshot.data![index],
+                          style: TextStyle(fontSize: 10),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
+    statusController.close();
   }
 
   Widget _status() {

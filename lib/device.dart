@@ -59,6 +59,7 @@ class Device {
           // api char can use values longer than 20 bytes
           int mtu = await peripheral.requestMtu(512).catchError((e) {
             bleError(tag, "requestMtu()", e);
+            return 0;
           });
           print("$tag got MTU=$mtu");
           subscribeCharacteristics();
