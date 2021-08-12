@@ -8,6 +8,7 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'ble.dart';
 import 'device.dart';
 import 'ble_characteristic.dart';
+import 'api.dart';
 
 class DeviceRoute extends StatefulWidget {
   final String tag = "[DeviceRoute]";
@@ -275,12 +276,21 @@ class DeviceRouteState extends State<DeviceRoute> {
             },
           ),
           TextField(
-            controller: TextEditingController()..text = "hostname",
+            controller: TextEditingController()..text = "hostName=ESPM",
             onSubmitted: (String command) async {
+              Api newApi = Api(api as ApiCharacteristic);
+              newApi.command(command, (message) {
+                print("$tag newApi: " +
+                    ((message.resultCode == 0) ? "Success" : "Error"));
+              });
+              await Future.delayed(Duration(milliseconds: 1000));
+              await newApi.destruct();
+              /*
               print('$tag writing "$command" to api');
               await api?.write(command).catchError((e) {
                 bleError(tag, "write($command)", e);
               });
+              */
             },
           ),
         ],

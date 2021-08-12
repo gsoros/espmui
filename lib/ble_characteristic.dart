@@ -15,10 +15,10 @@ abstract class BleCharacteristic<T> {
   CharacteristicWithValue? _characteristic;
   Stream<Uint8List>? _rawStream;
   StreamSubscription<Uint8List>? _subscription;
-  StreamController<T> _controller = StreamController<T>.broadcast();
+  final _controller = StreamController<T>.broadcast();
   T? lastValue;
 
-  Stream get stream => _controller.stream;
+  Stream<T> get stream => _controller.stream;
 
   BleCharacteristic(this._peripheral) {
     lastValue = fromUint8List(Uint8List.fromList([]));
@@ -76,6 +76,10 @@ abstract class BleCharacteristic<T> {
 
   void subscribe() async {
     print("$tag subscribe()");
+    if (_subscription != null) {
+      bleError(tag, "already subscribed");
+      return;
+    }
     /*
     _characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID).catchError((e) {
       bleError(tag, "readCharacteristic()", e);
@@ -121,12 +125,15 @@ abstract class BleCharacteristic<T> {
     return Future.value(value);
   }
 
-  void unsubscribe() async {
+  Future<void> unsubscribe() async {
+    if (_subscription == null) return;
+    print("$tag unsubscribe");
     await _subscription?.cancel();
+    _subscription = null;
   }
 
-  void dispose() async {
-    unsubscribe();
+  Future<void> dispose() async {
+    await unsubscribe();
     await _controller.close();
   }
 }

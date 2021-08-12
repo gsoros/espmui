@@ -63,6 +63,8 @@ class Device {
           });
           print("$tag got MTU=$mtu");
           subscribeCharacteristics();
+        } else {
+          await unsubscribeCharacteristics();
         }
       },
       onError: (e) => bleError(tag, "connectionStateSubscription", e),
@@ -96,9 +98,9 @@ class Device {
     });
   }
 
-  void unsubscribeCharacteristics() {
-    characteristics.forEach((_, char) {
-      char.unsubscribe();
+  Future<void> unsubscribeCharacteristics() async {
+    characteristics.forEach((_, char) async {
+      await char.unsubscribe();
     });
   }
 
@@ -108,7 +110,7 @@ class Device {
       bleError(tag, "disconnect(): not connected, but proceeding anyway");
       //return;
     }
-    unsubscribeCharacteristics();
+    await unsubscribeCharacteristics();
     await peripheral
         .disconnectOrCancelConnection()
         .catchError((e) => bleError(tag, "peripheral.discBlaBla()", e));
