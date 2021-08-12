@@ -118,34 +118,31 @@ class DeviceRouteState extends State<DeviceRoute> {
   }
 
   void _editDeviceName() async {
-    List<String> status = [];
-    var statusController = StreamController<List<String>>.broadcast();
-
     void statusMessage(String s) {
       print("$tag Status message: $s");
-      if (status.length > 10) status.removeAt(0);
-      status.add(s);
-      streamSendIfNotClosed(statusController, status);
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: Colors.black38,
+        content: Text(s, textAlign: TextAlign.center),
+      ));
     }
 
     Future<bool> apiDeviceName(String name) async {
       var api = device.api;
       statusMessage("Sending new device name: $name");
       String? value = await api.requestValue("hostName=$name");
-      if (value == name) {
-        statusMessage("Success setting new hostname on device: $value");
-        setState(() => device.name = value);
-        statusMessage("Sending reboot command");
-        await api.requestValue("reboot");
-        statusMessage("Disconnecting");
-        await device.disconnect();
-        statusMessage("Waiting for device to boot");
-        await Future.delayed(Duration(milliseconds: 3000));
-        statusMessage("Connecting to device");
-        await device.connect();
-        return true;
-      }
-      return false;
+      if (value != name) return false;
+      statusMessage("Success setting new hostname on device: $value");
+      setState(() => device.name = value);
+      statusMessage("Sending reboot command");
+      await api.requestValue("reboot");
+      statusMessage("Disconnecting");
+      await device.disconnect();
+      statusMessage("Waiting for device to boot");
+      await Future.delayed(Duration(milliseconds: 3000));
+      statusMessage("Connecting to device");
+      await device.connect();
+      return true;
     }
 
     await showDialog(
@@ -154,50 +151,20 @@ class DeviceRouteState extends State<DeviceRoute> {
         return AlertDialog(
           scrollable: true,
           title: Text("Rename device"),
-          content: Container(
-            constraints: BoxConstraints(
-              minHeight: 250,
-            ),
-            child: Column(
-              children: [
-                TextField(
-                  maxLength: 31,
-                  maxLines: 1,
-                  textInputAction: TextInputAction.send,
-                  decoration: InputDecoration(border: OutlineInputBorder()),
-                  controller: TextEditingController()..text = device.name ?? "",
-                  onSubmitted: (text) async {
-                    if (await apiDeviceName(text)) {
-                      statusMessage("Success");
-                      await Future.delayed(Duration(milliseconds: 5000));
-                      Navigator.of(context).pop();
-                    } else
-                      statusMessage("Error");
-                  },
-                ),
-                StreamBuilder(
-                  stream: statusController.stream,
-                  builder: (context, AsyncSnapshot<List<String>> snapshot) {
-                    if (!snapshot.hasData) return Text("");
-                    return ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: snapshot.data!.length,
-                      itemBuilder: (context, index) {
-                        return Text(
-                          snapshot.data![index],
-                          style: TextStyle(fontSize: 10),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
+          content: TextField(
+            maxLength: 31,
+            maxLines: 1,
+            textInputAction: TextInputAction.send,
+            decoration: InputDecoration(border: OutlineInputBorder()),
+            controller: TextEditingController()..text = device.name ?? "",
+            onSubmitted: (text) async {
+              Navigator.of(context).pop();
+              statusMessage(await apiDeviceName(text) ? "Success" : "Error");
+            },
           ),
         );
       },
     );
-    statusController.close();
   }
 
   Widget _status() {
@@ -273,6 +240,11 @@ class DeviceRouteState extends State<DeviceRoute> {
                     (snapshot.hasData ? snapshot.data!.toString() : ""),
               );
             },
+          ),
+          Switch(
+            value: true,
+            onChanged: (value) => print(value),
+            activeColor: Colors.red,
           ),
           StreamBuilder<String>(
             stream: apiChar.stream,
