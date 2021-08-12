@@ -10,6 +10,7 @@ enum ApiCommand {
   reboot,
   passkey,
   secureApi,
+  apiStrain,
 }
 
 enum ApiResult {

@@ -114,7 +114,7 @@ abstract class BleCharacteristic<T> {
     _subscription = _rawStream!.listen(
       (value) async {
         lastValue = await onNotify(fromUint8List(value));
-        print("$tag " + lastValue.toString());
+        //print("$tag $lastValue");
         streamSendIfNotClosed(_controller, lastValue);
       },
       onError: (e) => bleError(tag, "subscription", e),
@@ -168,9 +168,7 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
   Uint8List fromUint8List(Uint8List list) => list;
 
   @override
-  Uint8List toUint8List(Uint8List value) {
-    return value;
-  }
+  Uint8List toUint8List(Uint8List value) => value;
 }
 
 class ApiCharacteristic extends BleCharacteristic<String> {
@@ -202,4 +200,21 @@ class ApiCharacteristic extends BleCharacteristic<String> {
     // read full value as the notification is limited to 20 bytes
     return read();
   }
+}
+
+class ApiStrainCharacteristic extends BleCharacteristic<double> {
+  final String tag = "[ApiStrainCharacteristic]";
+  final String serviceUUID = "55bebab5-1857-4b14-a07b-d4879edad159";
+  final String characteristicUUID = "1d7fd29e-86bc-4640-86b5-00fa3462b480";
+
+  ApiStrainCharacteristic(Peripheral peripheral) : super(peripheral);
+
+  @override
+  double fromUint8List(Uint8List list) => list.isNotEmpty
+      ? list.buffer.asByteData().getFloat32(0, Endian.little)
+      : 0.0;
+
+  @override
+  Uint8List toUint8List(double value) =>
+      Uint8List(4)..buffer.asByteData().setFloat32(0, value, Endian.little);
 }

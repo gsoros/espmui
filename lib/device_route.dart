@@ -239,6 +239,7 @@ class DeviceRouteState extends State<DeviceRoute> {
     var battery = device.battery;
     var power = device.power;
     var api = device.api;
+    var apiStrain = device.apiStrain;
     var apiChar = device.apiCharacteristic;
 
     return Container(
@@ -263,6 +264,16 @@ class DeviceRouteState extends State<DeviceRoute> {
               );
             },
           ),
+          StreamBuilder<double>(
+            stream: apiStrain.stream,
+            initialData: apiStrain.lastValue,
+            builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
+              return Text(
+                "Strain: " +
+                    (snapshot.hasData ? snapshot.data!.toString() : ""),
+              );
+            },
+          ),
           StreamBuilder<String>(
             stream: apiChar.stream,
             initialData: apiChar.lastValue,
@@ -275,22 +286,15 @@ class DeviceRouteState extends State<DeviceRoute> {
           TextField(
             controller: TextEditingController()..text = "hostName=ESPM",
             onSubmitted: (String command) async {
+              /*
               api.sendCommand(command, onDone: (message) {
                 print("$tag api.sendCommand: " +
                     ((message.resultCode == 0) ? "Success" : "Error"));
               });
               await Future.delayed(Duration(milliseconds: 1000));
-
-              print("$tag api.requestValue start");
-              String? value = await api.requestValue(command);
-              print("$tag newApi.requestValue: $value");
-              await Future.delayed(Duration(milliseconds: 1000));
-              /*
-              print('$tag writing "$command" to api');
-              await apiChar.write(command).catchError((e) {
-                bleError(tag, "write($command)", e);
-              });
               */
+              String? value = await api.requestValue(command);
+              print("$tag api.requestValue: $value");
             },
           ),
         ],

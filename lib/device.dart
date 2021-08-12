@@ -31,6 +31,8 @@ class Device {
       characteristic("power") as PowerCharacteristic;
   ApiCharacteristic get apiCharacteristic =>
       characteristic("api") as ApiCharacteristic;
+  ApiStrainCharacteristic get apiStrain =>
+      characteristic("apiStrain") as ApiStrainCharacteristic;
 
   Device(this.peripheral, {this.rssi = 0, this.lastSeen = 0}) {
     print("[Device] construct");
@@ -38,6 +40,7 @@ class Device {
       "battery": BatteryCharacteristic(peripheral),
       "power": PowerCharacteristic(peripheral),
       "api": ApiCharacteristic(peripheral),
+      "apiStrain": ApiStrainCharacteristic(peripheral),
     };
     api = Api(apiCharacteristic);
   }
