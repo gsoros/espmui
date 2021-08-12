@@ -7,8 +7,6 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
 import 'ble.dart';
 import 'device.dart';
-import 'ble_characteristic.dart';
-import 'api.dart';
 
 class DeviceRoute extends StatefulWidget {
   final String tag = "[DeviceRoute]";
@@ -131,17 +129,14 @@ class DeviceRouteState extends State<DeviceRoute> {
     }
 
     Future<bool> apiDeviceName(String name) async {
-      BleCharacteristic? api = device.characteristic("api");
+      var api = device.api;
       statusMessage("Sending new device name: $name");
-      await api?.write("hostname=$name");
-      String reply = await api?.read();
-      String pattern = "0:OK;2:hostname=";
-      if (0 == reply.indexOf(pattern)) {
-        String hostName = reply.substring(pattern.length);
-        statusMessage("Device said: hostname=$hostName");
-        setState(() => device.name = hostName);
+      String? value = await api.requestValue("hostName=$name");
+      if (value == name) {
+        statusMessage("Success setting new hostname on device: $value");
+        setState(() => device.name = value);
         statusMessage("Sending reboot command");
-        await api?.write("reboot");
+        await api.requestValue("reboot");
         statusMessage("Disconnecting");
         await device.disconnect();
         statusMessage("Waiting for device to boot");
@@ -241,16 +236,18 @@ class DeviceRouteState extends State<DeviceRoute> {
   }
 
   Widget _deviceProperties() {
-    BleCharacteristic? battery = device.characteristic("battery");
-    BleCharacteristic? power = device.characteristic("power");
-    BleCharacteristic? api = device.characteristic("api");
+    var battery = device.battery;
+    var power = device.power;
+    var api = device.api;
+    var apiChar = device.apiCharacteristic;
+
     return Container(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           StreamBuilder<int>(
-            stream: battery?.stream as Stream<int>,
-            initialData: battery?.lastValue,
+            stream: battery.stream,
+            initialData: battery.lastValue,
             builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
               return Text(
                 "Battery: ${snapshot.data.toString()}%",
@@ -258,8 +255,8 @@ class DeviceRouteState extends State<DeviceRoute> {
             },
           ),
           StreamBuilder<Uint8List>(
-            stream: power?.stream as Stream<Uint8List>,
-            initialData: power?.lastValue,
+            stream: power.stream,
+            initialData: power.lastValue,
             builder: (BuildContext context, AsyncSnapshot<Uint8List> snapshot) {
               return Text(
                 "Power: ${snapshot.data.toString()}",
@@ -267,8 +264,8 @@ class DeviceRouteState extends State<DeviceRoute> {
             },
           ),
           StreamBuilder<String>(
-            stream: api?.stream as Stream<String>,
-            initialData: api?.lastValue,
+            stream: apiChar.stream,
+            initialData: apiChar.lastValue,
             builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
               return Text(
                 "Api: ${snapshot.data}",
@@ -278,16 +275,19 @@ class DeviceRouteState extends State<DeviceRoute> {
           TextField(
             controller: TextEditingController()..text = "hostName=ESPM",
             onSubmitted: (String command) async {
-              Api newApi = Api(api as ApiCharacteristic);
-              newApi.command(command, (message) {
-                print("$tag newApi: " +
+              api.sendCommand(command, onDone: (message) {
+                print("$tag api.sendCommand: " +
                     ((message.resultCode == 0) ? "Success" : "Error"));
               });
               await Future.delayed(Duration(milliseconds: 1000));
-              await newApi.destruct();
+
+              print("$tag api.requestValue start");
+              String? value = await api.requestValue(command);
+              print("$tag newApi.requestValue: $value");
+              await Future.delayed(Duration(milliseconds: 1000));
               /*
               print('$tag writing "$command" to api');
-              await api?.write(command).catchError((e) {
+              await apiChar.write(command).catchError((e) {
                 bleError(tag, "write($command)", e);
               });
               */

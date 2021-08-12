@@ -24,9 +24,7 @@ enum ApiResult {
   secureApiInvalid,
 }
 
-//typedef ApiMessage = Map<String, dynamic>;
-
-typedef void ApiMessageCallback(ApiMessage message);
+typedef void ApiCallback(ApiMessage message);
 
 class ApiMessage {
   final tag = "[ApiMessage]";
@@ -36,15 +34,17 @@ class ApiMessage {
 
   ApiMessage(
     String command,
-    ApiMessageCallback onDone, {
+    ApiCallback? onDone, {
     int maxAttempts = 3,
     int minDelay = 1000,
+    int maxAge = 5000,
   }) {
     set("command", command);
-    set("onDone", onDone);
+    if (onDone != null) set("onDone", onDone);
     set("createdAt", DateTime.now().millisecondsSinceEpoch);
     set("maxAttempts", maxAttempts);
     set("minDelay", minDelay);
+    set("maxAge", maxAge);
   }
 
   int? get resultCode => getInt("resultCode");
@@ -63,6 +63,7 @@ class ApiMessage {
 
   int? getInt(String key) => int.tryParse(get(key).toString());
 
+  /// Attempts to extract commandCode and commandStr from command
   void parseCommand() {
     var command = get("command");
     int eqSign = command.indexOf("=");
@@ -93,6 +94,8 @@ class ApiMessage {
 
   void destruct() {
     print("$tag destruct " + toString());
+    set("isDone", true);
+    set("info", get("info").toString() + " destructed");
   }
 
   String toString() {
@@ -174,20 +177,25 @@ class Api {
     }
     //String commandStr = commandStrWithValue.substring(0, eq);
     String value = commandStrWithValue.substring(eq + 1);
-    for (ApiMessage message in _queue)
+    int matches = 0;
+    for (ApiMessage message in _queue) {
       if (message.getInt("commandCode") == commandCode) {
+        matches++;
         message.set("resultCode", resultCode);
         message.set("resultStr", resultStr);
         message.set("value", value);
         message.set("isDone", true);
-        return;
+        // don't return on the first match, process all matching messages
       }
-    print("$tag did not find a matching queued message for the reply $reply");
+    }
+    if (matches == 0)
+      print("$tag did not find a matching queued message for the reply $reply");
   }
 
   void _onDone(ApiMessage message) {
     var onDone = message.get("onDone");
-    if (onDone is ApiMessageCallback) {
+    if (onDone == null) return;
+    if (onDone is ApiCallback) {
       message.unset("onDone");
       onDone(message);
       return;
@@ -195,17 +203,47 @@ class Api {
     print("$tag Incorrect callback type: $onDone");
   }
 
-  void command(String command, ApiMessageCallback onDone) {
+  /// Sends a command to the API.
+  ///
+  /// Command format: commandCode|commandStr[=[arg]]
+  ///
+  /// If supplied, [onDone] will be called with the [ApiMessage] containing the
+  /// [resultCode] on completion.
+  ///
+  /// Note the returned [ApiMessage] does not yet contain the reply.
+  ApiMessage sendCommand(String command, {ApiCallback? onDone}) {
     var message = ApiMessage(command, onDone);
+    print("$tag adding to queue: $message");
     _queue.add(message);
     _runQueue();
+    return message;
+  }
+
+  Future<String?> requestValue(String command) async {
+    var message = sendCommand(command);
+    // poll the message
+    await Future.doWhile(() async {
+      if (message.get("isDone") != true && message.resultCode == null) {
+        //print("$tag requestValue polling...");
+        await Future.delayed(Duration(milliseconds: queueDelayMs));
+        return true;
+      }
+      //print("$tag requestValue poll end");
+      return false;
+    });
+    var value = message.get("value");
+    return (value == null) ? null : value.toString();
   }
 
   void _runQueue() {
-    if (_running) return;
+    if (_running) {
+      print("$tag _runQueue() already running");
+      return;
+    }
     _running = true;
     if (_queue.isEmpty) {
       _stopQueueSchedule();
+      _running = false;
       return;
     }
     //print("$tag queue run");
@@ -237,13 +275,22 @@ class Api {
       message.set("isDone", true);
       return;
     }
+    int maxAge = message.getInt("maxAge") ?? 0;
+    if ((message.getInt("createdAt") ?? 0) + maxAge <= now) {
+      print("$tag max age reached: $message");
+      message.set("resultCode", -1);
+      message.set("resultStr", "ClientError");
+      message.set("info", "Maximum age reached");
+      message.set("isDone", true);
+      return;
+    }
     message.set("lastSentAt", now);
     message.set("attempts", attempts + 1);
-    _characteristic.write(
-      message.get("commandCode").toString() +
-          "=" +
-          message.get("arg").toString(),
-    );
+    String toWrite = message.get("commandCode").toString();
+    var arg = message.get("arg");
+    if (arg != null) toWrite += "=$arg";
+    //print("$tag calling char.write($toWrite)");
+    _characteristic.write(toWrite);
   }
 
   Future<void> destruct() async {

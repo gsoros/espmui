@@ -4,12 +4,14 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'ble_characteristic.dart';
 import 'util.dart';
 import 'ble.dart';
+import 'api.dart';
 
 class Device {
   final String tag = "[Device]";
   Peripheral peripheral;
   int rssi = 0;
   double lastSeen = 0;
+  late Api api;
 
   /// Connection state
   var state = PeripheralConnectionState.disconnected;
@@ -23,6 +25,12 @@ class Device {
   String? get name => peripheral.name;
   set name(String? name) => peripheral.name = name;
   String get identifier => peripheral.identifier;
+  BatteryCharacteristic get battery =>
+      characteristic("battery") as BatteryCharacteristic;
+  PowerCharacteristic get power =>
+      characteristic("power") as PowerCharacteristic;
+  ApiCharacteristic get apiCharacteristic =>
+      characteristic("api") as ApiCharacteristic;
 
   Device(this.peripheral, {this.rssi = 0, this.lastSeen = 0}) {
     print("[Device] construct");
@@ -31,6 +39,7 @@ class Device {
       "power": PowerCharacteristic(peripheral),
       "api": ApiCharacteristic(peripheral),
     };
+    api = Api(apiCharacteristic);
   }
 
   void dispose() async {

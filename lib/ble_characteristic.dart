@@ -190,6 +190,9 @@ class ApiCharacteristic extends BleCharacteristic<String> {
       list = ascii.encode(value);
     } catch (e) {
       print("$tag error: failed to ascii encode '$value': $e");
+      List<int> valid = [];
+      for (int code in value.codeUnits) if (code < 256) valid.add(code);
+      list = Uint8List.fromList(valid);
     }
     return list;
   }
