@@ -42,10 +42,9 @@ class BLE {
 
   Future<void> _checkClient() async {
     if (!await BleManager().isClientCreated()) {
-      print("$tag BleManager().isClientCreated() = false");
-      //print("$tag waiting for createClient");
-      //await BleManager().createClient();
-      //print("$tag createClient done");
+      print("$tag waiting for createClient");
+      await BleManager().createClient();
+      print("$tag createClient done");
     }
     return Future.value(null);
   }
