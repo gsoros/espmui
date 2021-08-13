@@ -201,47 +201,62 @@ void bleError(String tag, String message, [dynamic error]) {
   print("$tag Error: $message$info");
 }
 
-/// Returns the result of [ifEnabled] or [ifDisabled] depending on the current
+/// Displays [ifEnabled] or [ifDisabled] depending on the current
 /// state of the bluetooth adapter.
-Widget bleByState({
-  required Widget Function() ifEnabled,
-  Widget Function() ifDisabled = bleDisabledContainer,
-}) {
-  BLE ble = BLE();
-  return StreamBuilder<BluetoothState>(
-    stream: ble.stateStream,
-    initialData: ble.currentStateSync(),
-    builder: (BuildContext context, AsyncSnapshot<BluetoothState> snapshot) {
-      return (snapshot.data == BluetoothState.POWERED_ON)
-          ? ifEnabled()
-          : ifDisabled();
-    },
-  );
+class BleAdapterCheck extends StatelessWidget {
+  final Widget ifEnabled;
+  final Widget ifDisabled;
+
+  BleAdapterCheck(
+    this.ifEnabled, {
+    this.ifDisabled = const BleDisabled(),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    BLE ble = BLE();
+    return StreamBuilder<BluetoothState>(
+      stream: ble.stateStream,
+      initialData: ble.currentStateSync(),
+      builder: (BuildContext context, AsyncSnapshot<BluetoothState> snapshot) {
+        return (snapshot.data == BluetoothState.POWERED_ON)
+            ? ifEnabled
+            : ifDisabled;
+      },
+    );
+  }
 }
 
-Widget bleDisabledContainer() {
-  return Container(
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start, // Align left
-            children: [Text("BT is disabled")],
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end, // Align right
-          children: [
-            espmuiElevatedButton(
-              "Enable",
-              action: () {
-                print("Enable radio pressed");
-                BLE().manager.enableRadio();
-              },
+class BleDisabled extends StatelessWidget {
+  const BleDisabled();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, // Align left
+              children: [
+                Text("Bluetooth is disabled", style: TextStyle(fontSize: 13))
+              ],
             ),
-          ],
-        )
-      ],
-    ),
-  );
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end, // Align right
+            children: [
+              EspmuiElevatedButton(
+                "Enable",
+                action: () {
+                  print("Enable radio pressed");
+                  BLE().manager.enableRadio();
+                },
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
 }

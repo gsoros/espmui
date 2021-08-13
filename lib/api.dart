@@ -36,8 +36,8 @@ class ApiMessage {
   String? arg;
   ApiCallback? onDone;
   int maxAttempts = 3;
-  int minDelay = 500;
-  int maxAge = 5000;
+  int minDelayMs = 1000;
+  int maxAgeMs = 5000;
   int createdAt = 0;
   int? lastSentAt;
   int? attempts;
@@ -51,20 +51,20 @@ class ApiMessage {
     this.command,
     this.onDone, {
     int? maxAttempts,
-    int? minDelay,
-    int? maxAge,
+    int? minDelayMs,
+    int? maxAgeMs,
   }) {
     createdAt = DateTime.now().millisecondsSinceEpoch;
     this.maxAttempts = maxAttempts ?? this.maxAttempts;
-    this.minDelay = minDelay ?? this.minDelay;
-    this.maxAge = maxAge ?? this.maxAge;
+    this.minDelayMs = minDelayMs ?? this.minDelayMs;
+    this.maxAgeMs = maxAgeMs ?? this.maxAgeMs;
     if (this.maxAttempts < 1) this.maxAttempts = 1;
     if (this.maxAttempts > 10) this.maxAttempts = 10;
-    if (this.minDelay < 50) this.minDelay = 50;
-    if (this.minDelay > 10000) this.minDelay = 10000;
-    var maxAttemtsTotalTime = this.maxAttempts * this.minDelay;
-    if (this.maxAge < maxAttemtsTotalTime)
-      this.maxAge = maxAttemtsTotalTime + this.minDelay;
+    if (this.minDelayMs < 50) this.minDelayMs = 50;
+    if (this.minDelayMs > 10000) this.minDelayMs = 10000;
+    var maxAttemtsTotalTime = this.maxAttempts * this.minDelayMs;
+    if (this.maxAgeMs < maxAttemtsTotalTime)
+      this.maxAgeMs = maxAttemtsTotalTime + this.minDelayMs;
   }
 
   /// Attempts to extract commandCode and commandStr from command
@@ -92,11 +92,11 @@ class ApiMessage {
       info = "Unrecognized command";
       isDone = true;
     }
-    print("$tag parsed: " + toString());
+    //print("$tag parsed: " + toString());
   }
 
   void destruct() {
-    print("$tag destruct " + toString());
+    //print("$tag destruct " + toString());
     isDone = true;
     //info = ((info == null) ? "" : info.toString()) + " destructed";
   }
@@ -108,8 +108,8 @@ class ApiMessage {
         ((commandCode != null) ? ", commandCode='$commandCode'" : "") +
         ((onDone != null) ? ", onDone='$onDone'" : "") +
         ", maxAttempts='$maxAttempts'" +
-        ", minDelay='$minDelay'" +
-        ", maxAge='$maxAge'" +
+        ", minDelayMs='$minDelayMs'" +
+        ", maxAgeMs='$maxAgeMs'" +
         ", createdAt='$createdAt'" +
         ((lastSentAt != null) ? ", lastSentAt='$lastSentAt'" : "") +
         ((attempts != null) ? ", attempts='$attempts'" : "") +
@@ -120,6 +120,16 @@ class ApiMessage {
         ((isDone != null) ? ", isDone='$isDone'" : "") +
         ")";
   }
+
+  bool? get valueAsBool {
+    if ("1:true" == value) return true;
+    if ("0:false" == value) return false;
+    return null;
+  }
+
+  int? get valueAsInt => int.tryParse(value ?? "");
+  double? get valueAsDouble => double.tryParse(value ?? "");
+  String? get valueAsString => value;
 }
 
 class Api {
@@ -134,7 +144,7 @@ class Api {
   Timer? _timer;
   int queueDelayMs;
 
-  Api(this._characteristic, {this.queueDelayMs = 100}) {
+  Api(this._characteristic, {this.queueDelayMs = 200}) {
     _characteristic.subscribe();
     _subscription = _characteristic.stream.listen((reply) => _onNotify(reply));
   }
@@ -155,7 +165,7 @@ class Api {
 
   /// format: resultCode:resultStr;commandCode:commandStr=[value]
   void _onNotify(String reply) {
-    print("$tag received $reply");
+    //print("$tag _onNotify() $reply");
     int resultEnd = reply.indexOf(";");
     if (resultEnd < 1) {
       print("$tag Error parsing notification: $reply");
@@ -233,47 +243,60 @@ class Api {
     String command, {
     ApiCallback? onDone,
     int? maxAttempts,
-    int? minDelay,
-    int? maxAge,
+    int? minDelayMs,
+    int? maxAgeMs,
   }) {
     var message = ApiMessage(
       command,
       onDone,
       maxAttempts: maxAttempts,
-      minDelay: minDelay,
-      maxAge: maxAge,
+      minDelayMs: minDelayMs,
+      maxAgeMs: maxAgeMs,
     );
-    print("$tag adding to queue: $message");
+    // check queue for duplicate commands and remove them as this one will be newer
+    int before = _queue.length;
+    _queue.removeWhere((queued) => queued.command == message.command);
+    int removed = before - _queue.length;
+    if (removed > 0) print("$tag removed $removed duplicate messages");
+    //print("$tag adding to queue: $message");
     _queue.add(message);
     _runQueue();
     return message;
   }
 
-  Future<String?> requestValue(
+  /// Requests a value from the device API
+  Future<T?> request<T>(
     String command, {
     int? maxAttempts,
-    int? minDelay,
-    int? maxAge,
+    int? minDelayMs,
+    int? maxAgeMs,
   }) async {
     var message = sendCommand(
       command,
       maxAttempts: maxAttempts,
-      minDelay: minDelay,
-      maxAge: maxAge,
+      minDelayMs: minDelayMs,
+      maxAgeMs: maxAgeMs,
     );
 
-    /// poll the message
-    /// TODO use a Stream (each message could have an onChangeStream?)
+    /// polls the message
+    /// TODO use a Stream (each message could have an onChangedStream?)
     await Future.doWhile(() async {
       if (message.isDone != true && message.resultCode == null) {
         //print("$tag requestValue polling...");
-        await Future.delayed(Duration(milliseconds: message.minDelay));
+        // TODO milliseconds: [message.minDelay, queueDelayMs].max
+        await Future.delayed(Duration(milliseconds: message.minDelayMs));
         return true;
       }
       //print("$tag requestValue poll end");
       return false;
     });
-    return message.value.toString();
+    if (T == ApiMessage) return message as T?;
+    if (T == String) return message.valueAsString as T?;
+    if (T == double) return message.valueAsDouble as T?;
+    if (T == int) return message.valueAsInt as T?;
+    if (T == bool) return message.valueAsBool as T?;
+    print("$tag request() error: type $T is not handled");
+    return message as T?;
   }
 
   void _runQueue() {
@@ -304,7 +327,7 @@ class Api {
 
   void _send(ApiMessage message) {
     int now = DateTime.now().millisecondsSinceEpoch;
-    if (now < (message.lastSentAt ?? 0) + message.minDelay) return;
+    if (now < (message.lastSentAt ?? 0) + message.minDelayMs) return;
     int attempts = message.attempts ?? 0;
     if (message.maxAttempts <= attempts) {
       print("$tag max attmpts reached: $message");
@@ -314,7 +337,7 @@ class Api {
       message.isDone = true;
       return;
     }
-    if (message.createdAt + message.maxAge <= now) {
+    if (message.createdAt + message.maxAgeMs <= now) {
       print("$tag max age reached: $message");
       message.resultCode = -1;
       message.resultStr = "ClientError";
@@ -327,7 +350,7 @@ class Api {
     String toWrite = message.commandCode.toString();
     var arg = message.arg;
     if (arg != null) toWrite += "=$arg";
-    //print("$tag calling char.write($toWrite)");
+    //print("$tag _send() calling char.write($toWrite)");
     _characteristic.write(toWrite);
   }
 

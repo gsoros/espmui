@@ -44,9 +44,7 @@ class ScannerRouteState extends State<ScannerRoute> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: bleByState(
-          ifEnabled: _appBarTitle,
-        ),
+        title: BleAdapterCheck(_appBarTitle()),
       ),
       body: Container(
         margin: EdgeInsets.all(6),
@@ -110,7 +108,7 @@ class ScannerRouteState extends State<ScannerRoute> {
       initialData: scanner.scanning,
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
         bool scanning = snapshot.hasData ? snapshot.data! : false;
-        return espmuiElevatedButton("Scan",
+        return EspmuiElevatedButton("Scan",
             action: scanning ? null : scanner.startScan);
       },
     );
