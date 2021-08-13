@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:espmui/api.dart';
 import 'package:espmui/util.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
@@ -27,6 +28,9 @@ class DeviceRouteState extends State<DeviceRoute> {
   final String tag = "[DeviceRouteState]";
   Device device;
 
+  StreamSubscription<ApiMessage>? apiSubsciption;
+  bool? apiStrainEnabled;
+
   DeviceRouteState(this.device) {
     print("$tag construct");
   }
@@ -35,11 +39,27 @@ class DeviceRouteState extends State<DeviceRoute> {
   void initState() {
     print("$tag initState");
     super.initState();
+
+    /// listen to api messages and set matching state members
+    apiSubsciption = device.api.messageDoneStream.listen((message) {
+      print("$tag apiSubscription $message");
+      if (message.commandStr == "apiStrain" && message.resultStr == "OK") {
+        var value = message.value;
+        print("$tag intercept apiStrainEnabled=$value");
+        setState(() {
+          apiStrainEnabled = value == "1:true";
+        });
+      }
+    });
+
+    /// request initial values
+    device.api.requestValue("apiStrain", minDelay: 1000, maxAttempts: 10);
   }
 
   @override
   void dispose() async {
     print("$tag ${device.name} dispose");
+    apiSubsciption?.cancel();
     device.disconnect();
     super.dispose();
   }
@@ -223,14 +243,40 @@ class DeviceRouteState extends State<DeviceRoute> {
   }
 
   Widget _strain() {
-    return StreamBuilder<double>(
+    var strainOutput = StreamBuilder<double>(
       stream: device.apiStrain.stream,
       initialData: device.apiStrain.lastValue,
       builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
-        return Text(
-          "Strain: " + (snapshot.hasData ? snapshot.data!.toString() : ""),
-        );
+        String strain =
+            snapshot.hasData ? snapshot.data!.toStringAsFixed(2) : "0.00";
+        return Text("Strain: $strain");
       },
+    );
+
+    print("switch rebuild enabled=$apiStrainEnabled");
+    var enableSwitch = Switch(
+      value: apiStrainEnabled ?? false,
+      onChanged: (enable) async {
+        String? reply = await device.api
+            .requestValue("apiStrain=" + (enable ? "true" : "false"));
+        print("$tag reply: $reply");
+        bool success = reply == (enable ? "1:true" : "0:false");
+        print("deviceRoute Switch " +
+            (enable ? "en" : "dis") +
+            "able " +
+            (success ? "success" : "failure"));
+      },
+      activeColor: Colors.red,
+    );
+
+    return Container(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          strainOutput,
+          enableSwitch,
+        ],
+      ),
     );
   }
 
@@ -261,11 +307,6 @@ class DeviceRouteState extends State<DeviceRoute> {
       _strain(),
       _api(),
       _apiCommand(),
-      Switch(
-        value: true,
-        onChanged: (value) => print(value),
-        activeColor: Colors.red,
-      ),
     ];
 
     return GridView.builder(

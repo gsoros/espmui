@@ -49,7 +49,13 @@ abstract class BleCharacteristic<T> {
     T value, {
     bool withResponse = false,
     String? transactionId,
-  }) {
+  }) async {
+    if (!await _peripheral.isConnected().catchError((e) {
+      bleError(tag, "write() could not get connection state", e);
+    })) {
+      bleError(tag, "write() peripheral not connected");
+      return Future.value(null);
+    }
     if (_characteristic == null) {
       bleError(tag, "write() characteristic is null");
       return Future.value(null);

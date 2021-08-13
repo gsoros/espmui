@@ -85,12 +85,22 @@ class Device {
       print("$tag Connecting to $name");
       await peripheral
           .connect(
-            isAutoConnect: true,
-            refreshGatt: true,
-          )
+        //isAutoConnect: true,
+        isAutoConnect: false,
+        refreshGatt: true,
+      )
           .catchError(
-            (e) => bleError(tag, "peripheral.connect()", e),
-          );
+        (e) async {
+          bleError(tag, "peripheral.connect()", e);
+          if (e is BleError) {
+            BleError be = e;
+            if (be.errorCode.value == BleErrorCode.deviceAlreadyConnected) {
+              await disconnect();
+              //await connect();
+            }
+          }
+        },
+      );
     } else {
       print("$tag Not connecting to $name, already connected");
       state = connectedState;
