@@ -202,75 +202,82 @@ class DeviceRouteState extends State<DeviceRoute> {
     );
   }
 
-  Widget _deviceProperties() {
-    var battery = device.battery;
-    var power = device.power;
-    var api = device.api;
-    var apiStrain = device.apiStrain;
-    var apiChar = device.apiCharacteristic;
+  Widget _battery() {
+    return StreamBuilder<int>(
+      stream: device.battery.stream,
+      initialData: device.battery.lastValue,
+      builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
+        return Text("Battery: ${snapshot.data.toString()}%");
+      },
+    );
+  }
 
-    return Container(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          StreamBuilder<int>(
-            stream: battery.stream,
-            initialData: battery.lastValue,
-            builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
-              return Text(
-                "Battery: ${snapshot.data.toString()}%",
-              );
-            },
-          ),
-          StreamBuilder<Uint8List>(
-            stream: power.stream,
-            initialData: power.lastValue,
-            builder: (BuildContext context, AsyncSnapshot<Uint8List> snapshot) {
-              return Text(
-                "Power: ${snapshot.data.toString()}",
-              );
-            },
-          ),
-          StreamBuilder<double>(
-            stream: apiStrain.stream,
-            initialData: apiStrain.lastValue,
-            builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
-              return Text(
-                "Strain: " +
-                    (snapshot.hasData ? snapshot.data!.toString() : ""),
-              );
-            },
-          ),
-          Switch(
-            value: true,
-            onChanged: (value) => print(value),
-            activeColor: Colors.red,
-          ),
-          StreamBuilder<String>(
-            stream: apiChar.stream,
-            initialData: apiChar.lastValue,
-            builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
-              return Text(
-                "Api: ${snapshot.data}",
-              );
-            },
-          ),
-          TextField(
-            controller: TextEditingController()..text = "hostName=ESPM",
-            onSubmitted: (String command) async {
-              /*
-              api.sendCommand(command, onDone: (message) {
-                print("$tag api.sendCommand: " +
-                    ((message.resultCode == 0) ? "Success" : "Error"));
-              });
-              await Future.delayed(Duration(milliseconds: 1000));
-              */
-              String? value = await api.requestValue(command);
-              print("$tag api.requestValue: $value");
-            },
-          ),
-        ],
+  Widget _power() {
+    return StreamBuilder<Uint8List>(
+      stream: device.power.stream,
+      initialData: device.power.lastValue,
+      builder: (BuildContext context, AsyncSnapshot<Uint8List> snapshot) {
+        return Text("Power: ${snapshot.data.toString()}");
+      },
+    );
+  }
+
+  Widget _strain() {
+    return StreamBuilder<double>(
+      stream: device.apiStrain.stream,
+      initialData: device.apiStrain.lastValue,
+      builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
+        return Text(
+          "Strain: " + (snapshot.hasData ? snapshot.data!.toString() : ""),
+        );
+      },
+    );
+  }
+
+  Widget _api() {
+    return StreamBuilder<String>(
+      stream: device.apiCharacteristic.stream,
+      initialData: device.apiCharacteristic.lastValue,
+      builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
+        return Text("Api: ${snapshot.data}");
+      },
+    );
+  }
+
+  Widget _apiCommand() {
+    return TextField(
+      controller: TextEditingController()..text = "hostName=ESPM",
+      onSubmitted: (String command) async {
+        String? value = await device.api.requestValue(command);
+        print("$tag api.requestValue: $value");
+      },
+    );
+  }
+
+  Widget _deviceProperties() {
+    var items = [
+      _battery(),
+      _power(),
+      _strain(),
+      _api(),
+      _apiCommand(),
+      Switch(
+        value: true,
+        onChanged: (value) => print(value),
+        activeColor: Colors.red,
       ),
+    ];
+
+    return GridView.builder(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 5.0,
+        mainAxisSpacing: 5.0,
+      ),
+      itemCount: items.length,
+      itemBuilder: (BuildContext context, int index) {
+        return Card(color: Colors.black12, child: items[index]);
+      },
     );
   }
 }
