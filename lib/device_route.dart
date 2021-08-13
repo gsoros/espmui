@@ -56,9 +56,8 @@ class DeviceRouteState extends State<DeviceRoute> {
       }
     });
 
-    /// listen to api messages and set matching state members
+    /// listen to api message done events and set matching state members
     apiSubsciption = device.api.messageDoneStream.listen((message) {
-      //print("$tag apiSubscription $message");
       if (message.resultCode == ApiResult.success.index) {
         switch (message.commandStr) {
           case "hostName":
@@ -82,8 +81,14 @@ class DeviceRouteState extends State<DeviceRoute> {
       "hostName",
       "secureApi",
       "apiStrain",
-    ].forEach((key) {
-      device.api.request<String>(key, minDelayMs: 1000, maxAttempts: 10);
+    ].forEach((key) async {
+      device.api.request<String>(
+        key,
+        minDelayMs: 1000,
+        maxAttempts: 10,
+        maxAgeMs: 20000,
+      );
+      await Future.delayed(Duration(milliseconds: 150));
     });
   }
 

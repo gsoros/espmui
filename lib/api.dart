@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:espmui/util.dart';
+
 import 'ble_characteristic.dart';
 
 enum ApiCommand {
@@ -220,7 +222,7 @@ class Api {
   }
 
   void _onDone(ApiMessage message) {
-    doneController.add(message);
+    streamSendIfNotClosed(doneController, message);
     var onDone = message.onDone;
     if (onDone == null) return;
     if (onDone is ApiCallback) {
