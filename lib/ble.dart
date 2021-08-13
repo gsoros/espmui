@@ -6,6 +6,7 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'util.dart';
+import 'scanner.dart';
 
 /// singleton class
 class BLE {
@@ -111,6 +112,7 @@ class BLE {
           //  print("$tag Adapter powered on, connecting to ${_selected.name}");
           //  _selected.connect();
           //}
+          Scanner().selected?.connect();
         } else {
           bleError(tag, "Adapter not powered on");
           /*
@@ -121,6 +123,7 @@ class BLE {
                 .catchError((e) => bleError(tag, "enableRadio()", e));
           }
           */
+          Scanner().selected?.disconnect();
         }
       },
       onError: (e) => bleError(tag, "stateSubscription", e),

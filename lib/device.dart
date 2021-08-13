@@ -85,6 +85,7 @@ class Device {
       print("$tag Connecting to $name");
       await peripheral
           .connect(
+            isAutoConnect: true,
             refreshGatt: true,
           )
           .catchError(

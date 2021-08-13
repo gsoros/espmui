@@ -1,8 +1,9 @@
 import 'dart:async';
 
-import 'package:espmui/ble.dart';
 import 'package:flutter/material.dart';
+import 'package:page_transition/page_transition.dart';
 
+import 'ble.dart';
 import 'device_route.dart';
 import 'device.dart';
 import 'scanner.dart';
@@ -117,7 +118,7 @@ class ScannerRouteState extends State<ScannerRoute> {
 
   Widget _deviceList() {
     return StreamBuilder<Device>(
-      stream: scanner.devicesController.stream,
+      stream: scanner.devicesStream,
       //initialData: availableDevices,
       builder: (BuildContext context, AsyncSnapshot<Device> snapshot) {
         // TODO don't rebuild the whole list, just the changed items
@@ -147,51 +148,58 @@ class ScannerRouteState extends State<ScannerRoute> {
   }
 
   Widget _deviceListItem(Device device) {
-    return Container(
-      padding: EdgeInsets.all(10),
-      margin: EdgeInsets.fromLTRB(0, 0, 0, 6),
-      decoration: BoxDecoration(
-        color: Colors.black38,
-        borderRadius: BorderRadius.all(
-          Radius.circular(10),
+    void openDevice() async {
+      //await Navigator.push(context,
+      //    MaterialPageRoute(builder: (context) => DeviceRoute(device)));
+
+      Navigator.push(
+        context,
+        PageTransition(
+          type: PageTransitionType.rightToLeft,
+          child: DeviceRoute(device),
         ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  device.name ?? "Unnamed device",
-                  style: TextStyle(fontSize: 18),
-                ),
-                Text(
-                  "rssi: " + device.rssi.toString(),
-                  style: TextStyle(fontSize: 10),
-                ),
-              ],
+      );
+      scanner.select(device);
+      print("[_deviceListItem] openDevice(): stopScan() and connect()");
+      //Some phones have an issue with connecting while scanning
+      //await scanner.stopScan();
+      device.connect();
+    }
+
+    return InkWell(
+      onTap: openDevice,
+      child: Container(
+        padding: EdgeInsets.all(10),
+        margin: EdgeInsets.fromLTRB(0, 0, 0, 6),
+        decoration: BoxDecoration(
+          color: Colors.black38,
+          borderRadius: BorderRadius.all(
+            Radius.circular(10),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    device.name ?? "Unnamed device",
+                    style: TextStyle(fontSize: 18),
+                  ),
+                  Text(
+                    "rssi: " + device.rssi.toString(),
+                    style: TextStyle(fontSize: 10),
+                  ),
+                ],
+              ),
             ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              scanner.select(device);
-              print("[_deviceListItem] onPressed(): stopScan() and connect()");
-              //Some phones have an issue with connecting while scanning
-              await scanner.stopScan();
-              device.connect();
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) {
-                    return DeviceRoute(device);
-                  },
-                ),
-              );
-            },
-            child: Icon(Icons.arrow_forward),
-          ),
-        ],
+            ElevatedButton(
+              onPressed: openDevice,
+              child: Icon(Icons.arrow_forward),
+            ),
+          ],
+        ),
       ),
     );
   }

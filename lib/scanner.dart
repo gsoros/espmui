@@ -19,20 +19,20 @@ class Scanner {
   final String apiServiceUUID = "55bebab5-1857-4b14-a07b-d4879edad159";
 
   /// ScanResult
-  StreamSubscription<ScanResult>? scanResultSubscription;
+  StreamSubscription<ScanResult>? _scanResultSubscription;
 
   /// Scanning
   bool scanning = false;
-  final scanningController = StreamController<bool>.broadcast();
-  StreamSubscription? scanningSubscription;
-  Stream<bool> get scanningStream => scanningController.stream;
+  final _scanningController = StreamController<bool>.broadcast();
+  StreamSubscription? _scanningSubscription;
+  Stream<bool> get scanningStream => _scanningController.stream;
 
   /// Available devices
   DeviceList devices = DeviceList();
-  Device? _selected;
-  final devicesController = StreamController<Device>.broadcast();
-  StreamSubscription? devicesSubscription;
-  Stream<Device> get devicesStream => devicesController.stream;
+  Device? selected;
+  final _devicesController = StreamController<Device>.broadcast();
+  StreamSubscription? _devicesSubscription;
+  Stream<Device> get devicesStream => _devicesController.stream;
 
   BLE get ble => BLE();
 
@@ -43,13 +43,14 @@ class Scanner {
 
   void _init() async {
     print("$tag _init()");
-    scanningSubscription = scanningStream.listen(
+    _scanningSubscription = scanningStream.listen(
       (value) {
         scanning = value;
         print("$tag scanningSubscription: $value");
+        if (!scanning) selected?.connect();
       },
     );
-    devicesSubscription = devicesStream.listen(
+    _devicesSubscription = devicesStream.listen(
       (device) {
         bool isNew = !devices.containsIdentifier(device.identifier);
         //availableDevices.addOrUpdate(device);
@@ -64,14 +65,14 @@ class Scanner {
 
   void dispose() async {
     print("$tag dispose()");
-    await scanResultSubscription?.cancel();
-    await scanningController.close();
-    await scanningSubscription?.cancel();
-    await devicesController.close();
-    await devicesSubscription?.cancel();
+    await _scanResultSubscription?.cancel();
+    await _scanningController.close();
+    await _scanningSubscription?.cancel();
+    await _devicesController.close();
+    await _devicesSubscription?.cancel();
     await ble.dispose();
     devices.dispose();
-    _selected?.dispose();
+    selected?.dispose();
   }
 
   void startScan() async {
@@ -93,8 +94,8 @@ class Scanner {
         if (devices.isEmpty) print("$tag No devices found");
       },
     );
-    streamSendIfNotClosed(scanningController, true);
-    scanResultSubscription = ble.manager
+    streamSendIfNotClosed(_scanningController, true);
+    _scanResultSubscription = ble.manager
         .startPeripheralScan(
           uuids: [apiServiceUUID],
         )
@@ -103,7 +104,7 @@ class Scanner {
           (scanResult) {
             Device? device = devices.addOrUpdate(scanResult);
             print("$tag Device found: ${device?.name} ${device?.identifier}");
-            streamSendIfNotClosed(devicesController, device);
+            streamSendIfNotClosed(_devicesController, device);
           },
           onError: (e) => bleError(tag, "scanResultSubscription", e),
         );
@@ -111,15 +112,15 @@ class Scanner {
 
   Future<void> stopScan() async {
     print("$tag stopScan()");
-    await scanResultSubscription?.cancel();
+    await _scanResultSubscription?.cancel();
     await ble.manager.stopPeripheralScan();
-    streamSendIfNotClosed(scanningController, false);
+    streamSendIfNotClosed(_scanningController, false);
   }
 
   void select(Device device) {
     print("$tag Selected " + (device.name ?? "!!unnamed device!!"));
-    if (_selected?.identifier != device.identifier) _selected?.disconnect();
-    _selected = device;
+    if (selected?.identifier != device.identifier) selected?.disconnect();
+    selected = device;
     //print("$tag select() calling connect()");
     //device.connect();
   }
