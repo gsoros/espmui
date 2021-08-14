@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
 
+import 'package:espmui/scanner.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
 import 'util.dart';
@@ -30,6 +31,7 @@ abstract class BleCharacteristic<T> {
 
   /// read value from characteristic and set lastValue
   Future<T?> read() async {
+    await _init();
     if (null == _characteristic) {
       bleError(tag, "read() characteristic is null");
       return fromUint8List(Uint8List.fromList([]));
@@ -50,12 +52,7 @@ abstract class BleCharacteristic<T> {
     bool withResponse = false,
     String? transactionId,
   }) async {
-    if (!await _peripheral.isConnected().catchError((e) {
-      bleError(tag, "write() could not get connection state", e);
-    })) {
-      bleError(tag, "write() peripheral not connected");
-      return Future.value(null);
-    }
+    await _init();
     if (_characteristic == null) {
       bleError(tag, "write() characteristic is null");
       return Future.value(null);
@@ -80,25 +77,13 @@ abstract class BleCharacteristic<T> {
     });
   }
 
-  void subscribe() async {
+  Future<void> subscribe() async {
     print("$tag subscribe()");
     if (_subscription != null) {
       bleError(tag, "already subscribed");
       return;
     }
-    /*
-    _characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID).catchError((e) {
-      bleError(tag, "readCharacteristic()", e);
-      return Future.value(null);
-    });
-    */
-    try {
-      _characteristic =
-          await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
-    } catch (e) {
-      bleError(tag, "readCharacteristic()", e);
-      //  print("$tag readCharacteristic() serviceUUID: $serviceUUID, characteristicUUID: $characteristicUUID, $e");
-    }
+    await _init();
     if (_characteristic == null) {
       bleError(tag, "subscribe() characteristic is null");
       return;
@@ -127,20 +112,51 @@ abstract class BleCharacteristic<T> {
     );
   }
 
-  Future<T?> onNotify(T value) {
-    return Future.value(value);
-  }
-
   Future<void> unsubscribe() async {
     if (_subscription == null) return;
     print("$tag unsubscribe");
+    await _init();
     await _subscription?.cancel();
     _subscription = null;
+  }
+
+  Future<void> _init() async {
+    if (_characteristic != null) return; // already init'd
+    bool connected = await Scanner().selected?.connected ?? false;
+    print("$tag _init()");
+    if (!connected) {
+      bleError(tag, "_init() peripheral not connected");
+      return Future.value(null);
+    }
+    /*
+    _characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID).catchError((e) {
+      bleError(tag, "readCharacteristic()", e);
+      return Future.value(null);
+    });
+    */
+    try {
+      _characteristic =
+          await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
+    } catch (e) {
+      bleError(tag, "readCharacteristic()", e);
+      _characteristic = null;
+      //  print("$tag readCharacteristic() serviceUUID: $serviceUUID, characteristicUUID: $characteristicUUID, $e");
+    }
+  }
+
+  void deinit() {
+    print("$tag deinit()");
+    _characteristic = null;
+  }
+
+  Future<T?> onNotify(T value) {
+    return Future.value(value);
   }
 
   Future<void> dispose() async {
     await unsubscribe();
     await _controller.close();
+    deinit();
   }
 }
 

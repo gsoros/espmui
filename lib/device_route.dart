@@ -75,7 +75,8 @@ class DeviceRouteState extends State<DeviceRoute> {
 
   /// request initial values, returned values are discarded
   /// because the subscription will handle them
-  void requestInit() {
+  void requestInit() async {
+    if (!await device.connected) return;
     print("$tag Requesting init");
     [
       "hostName",
@@ -132,14 +133,18 @@ class DeviceRouteState extends State<DeviceRoute> {
     ];
 
     return GridView.builder(
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 5.0,
         mainAxisSpacing: 5.0,
       ),
       itemCount: items.length,
       itemBuilder: (BuildContext context, int index) {
-        return Card(color: Colors.black12, child: items[index]);
+        return Card(
+          color: Colors.black12,
+          child:
+              Container(padding: const EdgeInsets.all(5), child: items[index]),
+        );
       },
     );
   }
@@ -163,12 +168,14 @@ class Status extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<PeripheralConnectionState>(
+    return StreamBuilder<PeripheralConnectionState?>(
       stream: device.stateStream,
-      initialData: device.state,
+      initialData: null,
       builder: (BuildContext context,
-          AsyncSnapshot<PeripheralConnectionState> snapshot) {
-        String connState = snapshot.data.toString();
+          AsyncSnapshot<PeripheralConnectionState?> snapshot) {
+        String connState =
+            snapshot.hasData ? snapshot.data.toString() : "unknown status";
+        print("Device status: snapshot=$connState");
         return Text(
           connState.substring(connState.lastIndexOf(".") + 1),
           style: TextStyle(fontSize: 10),
@@ -284,11 +291,11 @@ class ConnectButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<PeripheralConnectionState>(
+    return StreamBuilder<PeripheralConnectionState?>(
       stream: device.stateStream,
-      initialData: device.state,
+      initialData: null,
       builder: (BuildContext context,
-          AsyncSnapshot<PeripheralConnectionState> snapshot) {
+          AsyncSnapshot<PeripheralConnectionState?> snapshot) {
         var action;
         var label = "Connect";
         if (snapshot.data == PeripheralConnectionState.connected) {
@@ -333,7 +340,10 @@ class Strain extends StatelessWidget {
         String strain = snapshot.hasData && value != null
             ? snapshot.data!.toStringAsFixed(2)
             : "0.00";
-        return Text("Strain: $strain");
+        const styleEnabled = TextStyle(fontSize: 40);
+        const styleDisabled = TextStyle(fontSize: 40, color: Colors.grey);
+        return Text(strain,
+            style: (value == true) ? styleEnabled : styleDisabled);
       },
     );
 
@@ -362,8 +372,9 @@ class Strain extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          strainOutput,
-          enableSwitch,
+          Text("Strain"),
+          Expanded(child: Align(child: strainOutput)),
+          Align(child: enableSwitch),
         ],
       ),
     );

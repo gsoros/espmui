@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:espmui/util.dart';
-
 import 'ble_characteristic.dart';
+import 'util.dart';
+import 'device.dart';
 
 enum ApiCommand {
   invalid,
@@ -71,6 +71,7 @@ class ApiMessage {
 
   /// Attempts to extract commandCode and commandStr from command
   void parseCommand() {
+    if (commandCode != null) return; // already parsed
     int eqSign = command.indexOf("=");
     String? parsedArg;
     if (eqSign > 0) {
@@ -95,6 +96,26 @@ class ApiMessage {
       isDone = true;
     }
     //print("$tag parsed: " + toString());
+  }
+
+  void checkAge() {
+    if (createdAt + maxAgeMs <= DateTime.now().millisecondsSinceEpoch) {
+      print("$tag max age reached: " + toString());
+      resultCode = -1;
+      resultStr = "ClientError";
+      info = "Maximum age reached";
+      isDone = true;
+    }
+  }
+
+  void checkAttempts() {
+    if (maxAttempts <= (attempts ?? 0)) {
+      print("$tag max attmpts reached: " + toString());
+      resultCode = -1;
+      resultStr = "ClientError";
+      info = "Maximum attempts reached";
+      isDone = true;
+    }
   }
 
   void destruct() {
@@ -137,7 +158,8 @@ class ApiMessage {
 class Api {
   final tag = "[Api]";
 
-  ApiCharacteristic _characteristic;
+  Device device;
+  ApiCharacteristic get _characteristic => device.apiCharacteristic;
   late StreamSubscription<String> _subscription;
   final doneController = StreamController<ApiMessage>.broadcast();
   Stream<ApiMessage> get messageDoneStream => doneController.stream;
@@ -146,7 +168,7 @@ class Api {
   Timer? _timer;
   int queueDelayMs;
 
-  Api(this._characteristic, {this.queueDelayMs = 200}) {
+  Api(this.device, {this.queueDelayMs = 200}) {
     _characteristic.subscribe();
     _subscription = _characteristic.stream.listen((reply) => _onNotify(reply));
   }
@@ -314,7 +336,9 @@ class Api {
     }
     //print("$tag queue run");
     var message = _queue.removeFirst();
-    if (message.commandCode == null) message.parseCommand();
+    message.parseCommand();
+    message.checkAge();
+    message.checkAttempts();
     if (message.isDone == true) {
       message.isDone = null;
       _onDone(message);
@@ -327,28 +351,16 @@ class Api {
     _running = false;
   }
 
-  void _send(ApiMessage message) {
+  void _send(ApiMessage message) async {
     int now = DateTime.now().millisecondsSinceEpoch;
     if (now < (message.lastSentAt ?? 0) + message.minDelayMs) return;
-    int attempts = message.attempts ?? 0;
-    if (message.maxAttempts <= attempts) {
-      print("$tag max attmpts reached: $message");
-      message.resultCode = -1;
-      message.resultStr = "ClientError";
-      message.info = "Maximum attempts reached";
-      message.isDone = true;
-      return;
-    }
-    if (message.createdAt + message.maxAgeMs <= now) {
-      print("$tag max age reached: $message");
-      message.resultCode = -1;
-      message.resultStr = "ClientError";
-      message.info = "Maximum age reached";
-      message.isDone = true;
+    //var device = Scanner().selected;
+    if (!await device.connected) {
+      print("$tag _send() not connected");
       return;
     }
     message.lastSentAt = now;
-    message.attempts = attempts + 1;
+    message.attempts = (message.attempts ?? 0) + 1;
     String toWrite = message.commandCode.toString();
     var arg = message.arg;
     if (arg != null) toWrite += "=$arg";

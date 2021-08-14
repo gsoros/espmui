@@ -14,7 +14,6 @@ class Device {
   late Api api;
 
   /// Connection state
-  var state = PeripheralConnectionState.disconnected;
   final stateController =
       StreamController<PeripheralConnectionState>.broadcast();
   Stream<PeripheralConnectionState> get stateStream => stateController.stream;
@@ -34,6 +33,10 @@ class Device {
   ApiStrainCharacteristic get apiStrain =>
       characteristic("apiStrain") as ApiStrainCharacteristic;
 
+  Future<bool> get connected => peripheral.isConnected().catchError((e) {
+        bleError(tag, "could not get connection state", e);
+      });
+
   Device(this.peripheral, {this.rssi = 0, this.lastSeen = 0}) {
     print("[Device] construct");
     characteristics = {
@@ -42,7 +45,7 @@ class Device {
       "api": ApiCharacteristic(peripheral),
       "apiStrain": ApiStrainCharacteristic(peripheral),
     };
-    api = Api(apiCharacteristic);
+    api = Api(this);
   }
 
   void dispose() async {
@@ -52,41 +55,61 @@ class Device {
     characteristics.forEach((_, char) {
       char.dispose();
     });
+    if (stateSubscription != null)
+      await stateSubscription
+          ?.cancel()
+          .catchError((e) => bleError(tag, "connStateSub.cancel()", e));
+    stateSubscription = null;
   }
 
   Future<void> connect() async {
     final connectedState = PeripheralConnectionState.connected;
-    stateSubscription = peripheral
-        .observeConnectionState(
-      emitCurrentValue: false,
-      completeOnDisconnect: true,
-    )
-        //.asBroadcastStream()
-        .listen(
-      (newState) async {
-        state = newState;
-        print("$tag _connectionStateSubscription $name $newState");
-        streamSendIfNotClosed(stateController, newState);
-        if (newState == connectedState) {
-          // api char can use values longer than 20 bytes
-          int mtu = await peripheral.requestMtu(512).catchError((e) {
-            bleError(tag, "requestMtu()", e);
-            return 0;
-          });
-          print("$tag got MTU=$mtu");
-          subscribeCharacteristics();
-        } else {
-          await unsubscribeCharacteristics();
-        }
-      },
-      onError: (e) => bleError(tag, "connectionStateSubscription", e),
-    );
-    if (!await peripheral.isConnected()) {
+    final disconnectedState = PeripheralConnectionState.disconnected;
+    if (stateSubscription == null) {
+      stateSubscription = peripheral
+          .observeConnectionState(
+        emitCurrentValue: true,
+        completeOnDisconnect: false,
+      )
+          //.asBroadcastStream()
+          .listen(
+        (newState) async {
+          if (newState == connectedState) {
+            //print("$tag _connectionStateSubscription delaying connected state");
+            //await Future.delayed(Duration(milliseconds: 500));
+          }
+          print(
+              "$tag _connectionStateSubscription $name newState=$newState connected=${await connected}");
+          if (newState == connectedState) {
+            print("$tag newState is connected");
+            // api char can use values longer than 20 bytes
+            peripheral.requestMtu(512).catchError((e) {
+              bleError(tag, "requestMtu()", e);
+              return 0;
+            });
+            //print("$tag got MTU=$mtu");
+            await discoverCharacteristics().then((_) {
+              subscribeCharacteristics();
+            }, onError: (e) {
+              bleError(tag, "discoverCharacteristics", e);
+            });
+            //streamSendIfNotClosed(stateController, newState);
+          } else if (newState == disconnectedState) {
+            print("$tag newState is disconnected");
+            unsubscribeCharacteristics();
+            //deinitCharacteristics();
+            //streamSendIfNotClosed(stateController, newState);
+          }
+          streamSendIfNotClosed(stateController, newState);
+        },
+        onError: (e) => bleError(tag, "connectionStateSubscription", e),
+      );
+    }
+    if (!await connected) {
       print("$tag Connecting to $name");
       await peripheral
           .connect(
-        //isAutoConnect: true,
-        isAutoConnect: false,
+        isAutoConnect: true,
         refreshGatt: true,
       )
           .catchError(
@@ -97,33 +120,46 @@ class Device {
             if (be.errorCode.value == BleErrorCode.deviceAlreadyConnected) {
               await disconnect();
               //await connect();
+              //streamSendIfNotClosed(stateController, connectedState);
             }
           }
         },
       );
     } else {
       print("$tag Not connecting to $name, already connected");
-      state = connectedState;
-      streamSendIfNotClosed(
-        stateController,
-        connectedState,
-      );
-      subscribeCharacteristics();
+      //state = connectedState;
+      //streamSendIfNotClosed(stateController, connectedState);
+      await discoverCharacteristics();
+      await subscribeCharacteristics();
     }
   }
 
-  void subscribeCharacteristics() async {
-    await peripheral
-        .discoverAllServicesAndCharacteristics()
-        .catchError((e) => bleError(tag, "discoverBlaBla()", e));
-    characteristics.forEach((_, char) {
-      char.subscribe();
+  Future<void> discoverCharacteristics() async {
+    print("$tag discoverCharacteristics() start conn=${await connected}");
+    if (!await connected) return;
+    print("$tag discoverCharacteristics()");
+    await peripheral.discoverAllServicesAndCharacteristics().catchError((e) {
+      bleError(tag, "discoverCharacteristics()", e);
+    });
+    print("$tag discoverCharacteristics() end conn=${await connected}");
+  }
+
+  Future<void> subscribeCharacteristics() async {
+    if (!await connected) return;
+    characteristics.forEach((_, char) async {
+      await char.subscribe();
     });
   }
 
   Future<void> unsubscribeCharacteristics() async {
     characteristics.forEach((_, char) async {
       await char.unsubscribe();
+    });
+  }
+
+  void deinitCharacteristics() {
+    characteristics.forEach((_, char) {
+      char.deinit();
     });
   }
 
@@ -134,13 +170,17 @@ class Device {
       //return;
     }
     await unsubscribeCharacteristics();
-    await peripheral
-        .disconnectOrCancelConnection()
-        .catchError((e) => bleError(tag, "peripheral.discBlaBla()", e));
-    if (stateSubscription != null)
-      await stateSubscription
-          ?.cancel()
-          .catchError((e) => bleError(tag, "connStateSub.cancel()", e));
+    await peripheral.disconnectOrCancelConnection().catchError((e) {
+      bleError(tag, "peripheral.discBlaBla()", e);
+      if (e is BleError) {
+        BleError be = e;
+        // 205
+        if (be.errorCode.value == BleErrorCode.deviceNotConnected) {
+          streamSendIfNotClosed(
+              stateController, PeripheralConnectionState.disconnected);
+        }
+      }
+    });
   }
 
   BleCharacteristic? characteristic(String id) {
