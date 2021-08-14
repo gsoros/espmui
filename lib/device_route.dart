@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:espmui/api.dart';
 import 'package:espmui/ble_characteristic.dart';
@@ -49,8 +48,10 @@ class DeviceRouteState extends State<DeviceRoute> {
           requestInit();
           break;
         case PeripheralConnectionState.disconnected:
-          // set some members to "unknown" state
-          setState(() => apiStrainEnabled = null);
+          // set some members to initial state
+          setState(() {
+            apiStrainEnabled = null;
+          });
           break;
         default:
       }
@@ -125,9 +126,10 @@ class DeviceRouteState extends State<DeviceRoute> {
 
   Widget _deviceProperties() {
     var items = [
-      Battery(device.battery),
-      Power(device.power),
+      PowerCadence(device.power, mode: "power"),
+      PowerCadence(device.power, mode: "cadence"),
       Strain(device, apiStrainEnabled),
+      Battery(device.battery),
       ApiStream(device.apiCharacteristic),
       ApiCommand(device.api),
     ];
@@ -173,9 +175,8 @@ class Status extends StatelessWidget {
       initialData: null,
       builder: (BuildContext context,
           AsyncSnapshot<PeripheralConnectionState?> snapshot) {
-        String connState =
-            snapshot.hasData ? snapshot.data.toString() : "unknown status";
-        print("Device status: snapshot=$connState");
+        String connState = snapshot.hasData ? snapshot.data.toString() : "....";
+        //print("Device status: snapshot=$connState");
         return Text(
           connState.substring(connState.lastIndexOf(".") + 1),
           style: TextStyle(fontSize: 10),
@@ -381,18 +382,33 @@ class Strain extends StatelessWidget {
   }
 }
 
-class Power extends StatelessWidget {
+class PowerCadence extends StatelessWidget {
   final PowerCharacteristic char;
-  Power(this.char);
+  final String mode;
+
+  /// [mode] = "power" | "cadence"
+  PowerCadence(this.char, {this.mode = "power"});
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<Uint8List>(
-      stream: char.stream,
-      initialData: char.lastValue,
-      builder: (BuildContext context, AsyncSnapshot<Uint8List> snapshot) {
-        return Text("Power: ${snapshot.data.toString()}");
+    var value = StreamBuilder<int>(
+      stream: mode == "power" ? char.powerStream : char.cadenceStream,
+      initialData: mode == "power" ? char.lastPower : char.lastCadence,
+      builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
+        return Text(
+          snapshot.hasData ? snapshot.data.toString() : "0",
+          style: const TextStyle(fontSize: 40),
+        );
       },
+    );
+    return Container(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(mode == "power" ? "Power" : "Cadence"),
+          Expanded(child: Align(child: value)),
+        ],
+      ),
     );
   }
 }

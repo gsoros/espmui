@@ -184,6 +184,17 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
   final String serviceUUID = "00001818-0000-1000-8000-00805f9b34fb";
   final String characteristicUUID = "00002a63-0000-1000-8000-00805f9b34fb";
 
+  int revolutions = 0;
+  int lastCrankEvent = 0;
+  int lastCrankEventTime = 0;
+  int lastPower = 0;
+  int lastCadence = 0;
+
+  final _powerController = StreamController<int>.broadcast();
+  Stream<int> get powerStream => _powerController.stream;
+  final _cadenceController = StreamController<int>.broadcast();
+  Stream<int> get cadenceStream => _cadenceController.stream;
+
   PowerCharacteristic(Peripheral peripheral) : super(peripheral);
 
   @override
@@ -191,6 +202,61 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
 
   @override
   Uint8List toUint8List(Uint8List value) => value;
+
+  @override
+  Future<Uint8List?> onNotify(Uint8List value) {
+    /// Format: little-endian
+    /// [flags: 2][power: 2][revolutions: 2][last crank event: 2]
+    /// Flags: 0b0000000000100000;  // Crank rev data present
+    /// crank event time unit: 1/1024s, rolls over
+    int power = value.buffer.asByteData().getUint16(2, Endian.little);
+    lastPower = power;
+    streamSendIfNotClosed(_powerController, power);
+
+    int newRevolutions = value.buffer.asByteData().getUint16(4, Endian.little);
+    int newCrankEvent = value.buffer.asByteData().getUint16(6, Endian.little);
+    double dTime = 0.0;
+    if (lastCrankEvent > 0) {
+      dTime = (newCrankEvent -
+              ((newCrankEvent < lastCrankEvent)
+                  ? (lastCrankEvent - 65535)
+                  : lastCrankEvent)) /
+          1.024 /
+          60000; // 1 minute
+    }
+
+    int cadence = 0;
+    int dRev = 0;
+    if (revolutions > 0 && dTime > 0) {
+      dRev = newRevolutions -
+          ((newRevolutions < revolutions)
+              ? (revolutions - 65535)
+              : revolutions);
+      cadence = (dRev / dTime).round();
+    }
+
+    int now = DateTime.now().millisecondsSinceEpoch;
+    if (lastCrankEventTime < now - 2000) cadence = 0;
+    if (lastCrankEvent != newCrankEvent) {
+      lastCrankEvent = newCrankEvent;
+      lastCrankEventTime = now;
+    }
+
+    if (lastCadence != cadence && cadence > 0 ||
+        (lastCrankEventTime < now - 2000))
+      streamSendIfNotClosed(_cadenceController, cadence);
+    lastCadence = cadence;
+    revolutions = newRevolutions;
+
+    return super.onNotify(value);
+  }
+
+  @override
+  Future<void> dispose() {
+    _powerController.close();
+    _cadenceController.close();
+    return Future.value(null);
+  }
 }
 
 class ApiCharacteristic extends BleCharacteristic<String> {
