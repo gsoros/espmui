@@ -160,7 +160,7 @@ class ScannerRouteState extends State<ScannerRoute> {
       scanner.select(device);
       print("[_deviceListItem] openDevice(): stopScan() and connect()");
       //Some phones have an issue with connecting while scanning
-      //await scanner.stopScan();
+      await scanner.stopScan();
       device.connect();
     }
 

@@ -104,6 +104,7 @@ class DeviceRouteState extends State<DeviceRoute> {
   }
 
   Future<bool> _onBackPressed() {
+    device.shouldConnect = false;
     device.disconnect();
     return Future.value(true);
   }
@@ -198,7 +199,10 @@ class AppBarTitle extends StatelessWidget {
         var api = device.api;
         snackbar("Sending new device name: $name", context);
         String? value = await api.request<String>("hostName=$name");
-        if (value != name) return false;
+        if (value != name) {
+          snackbar("Error renaming device", context);
+          return false;
+        }
         snackbar("Success setting new hostname on device: $value", context);
         snackbar("Sending reboot command", context);
         await api.request<bool>("reboot");
@@ -208,6 +212,7 @@ class AppBarTitle extends StatelessWidget {
         await Future.delayed(Duration(milliseconds: 3000));
         snackbar("Connecting to device", context);
         await device.connect();
+        snackbar("Success", context);
         return true;
       }
 
@@ -221,16 +226,11 @@ class AppBarTitle extends StatelessWidget {
               maxLength: 31,
               maxLines: 1,
               textInputAction: TextInputAction.send,
-              decoration: InputDecoration(border: OutlineInputBorder()),
+              decoration: const InputDecoration(border: OutlineInputBorder()),
               controller: TextEditingController()..text = device.name ?? "",
               onSubmitted: (text) async {
                 Navigator.of(context).pop();
-                snackbar(
-                  await apiDeviceName(text)
-                      ? "Success"
-                      : "Error renaming device",
-                  context,
-                );
+                await apiDeviceName(text);
               },
             ),
           );
@@ -254,7 +254,7 @@ class AppBarTitle extends StatelessWidget {
                         style: ButtonStyle(
                           alignment: Alignment.bottomLeft,
                           padding: MaterialStateProperty.all<EdgeInsets>(
-                              EdgeInsets.all(0)),
+                              const EdgeInsets.all(0)),
                         ),
                         onPressed: () {},
                         onLongPress: _editDeviceName,
@@ -300,11 +300,17 @@ class ConnectButton extends StatelessWidget {
         var action;
         var label = "Connect";
         if (snapshot.data == PeripheralConnectionState.connected) {
-          action = device.disconnect;
+          action = () {
+            device.shouldConnect = false;
+            device.disconnect();
+          };
           label = "Disconnect";
         }
         if (snapshot.data == PeripheralConnectionState.disconnected)
-          action = device.connect;
+          action = () {
+            device.shouldConnect = true;
+            device.connect();
+          };
         return EspmuiElevatedButton(label, action: action);
       },
     );
@@ -321,7 +327,22 @@ class Battery extends StatelessWidget {
       stream: char.stream,
       initialData: char.lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
-        return Text("Battery: ${snapshot.data.toString()}%");
+        return Container(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Battery"),
+              Expanded(
+                child: Align(
+                  child: Text(
+                    "${snapshot.data.toString()}%",
+                    style: const TextStyle(fontSize: 30),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
@@ -329,54 +350,50 @@ class Battery extends StatelessWidget {
 
 class Strain extends StatelessWidget {
   final Device device;
-  final bool? value;
-  Strain(this.device, this.value);
+  final bool? enabled;
+  Strain(this.device, this.enabled);
 
   @override
   Widget build(BuildContext context) {
+    void toggleStrainStream() async {
+      bool enable = enabled == true ? false : true;
+      bool? reply = await device.api
+          .request<bool>("apiStrain=" + (enable ? "true" : "false"));
+      bool success = reply == enable;
+      snackbar(
+        "Strain stream: " +
+            (enable ? "en" : "dis") +
+            "abl" +
+            (success ? "ed" : "ing failed"),
+        context,
+      );
+    }
+
     var strainOutput = StreamBuilder<double>(
       stream: device.apiStrain.stream,
       initialData: device.apiStrain.lastValue,
       builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
-        String strain = snapshot.hasData && value != null
+        String strain = snapshot.hasData && enabled != null
             ? snapshot.data!.toStringAsFixed(2)
             : "0.00";
+        if (strain.length > 6) strain = strain.substring(0, 6);
         const styleEnabled = TextStyle(fontSize: 40);
-        const styleDisabled = TextStyle(fontSize: 40, color: Colors.grey);
+        const styleDisabled = TextStyle(fontSize: 40, color: Colors.white12);
         return Text(strain,
-            style: (value == true) ? styleEnabled : styleDisabled);
+            style: (enabled == true) ? styleEnabled : styleDisabled);
       },
     );
 
-    //print("switch rebuild enabled=$value");
-    var enableSwitch = Switch(
-      value: value ?? false,
-      onChanged: (value != null)
-          ? (enable) async {
-              bool? reply = await device.api
-                  .request<bool>("apiStrain=" + (enable ? "true" : "false"));
-              //print("[Switch] enable apiStrain reply: $reply");
-              bool success = reply == enable;
-              snackbar(
-                "Strain stream: " +
-                    (enable ? "en" : "dis") +
-                    "abl" +
-                    (success ? "ed" : "ing failed"),
-                context,
-              );
-            }
-          : null,
-      activeColor: Colors.red,
-    );
-
-    return Container(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Strain"),
-          Expanded(child: Align(child: strainOutput)),
-          Align(child: enableSwitch),
-        ],
+    return InkWell(
+      onTap: toggleStrainStream,
+      child: Container(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Strain"),
+            Expanded(child: Align(child: strainOutput)),
+          ],
+        ),
       ),
     );
   }

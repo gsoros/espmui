@@ -37,12 +37,12 @@ class EspmuiElevatedButton extends StatelessWidget {
 }
 
 void snackbar(String s, BuildContext context) {
-  print("Snackbar message: $s");
+  print("[Snackbar] message: $s");
   ScaffoldMessengerState sms;
   try {
     sms = ScaffoldMessenger.of(context);
   } catch (e) {
-    print("Snackbar error: $e");
+    print("[Snackbar] error: $e");
     return;
   }
   sms.removeCurrentSnackBar();

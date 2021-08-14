@@ -119,8 +119,12 @@ class Scanner {
 
   void select(Device device) {
     print("$tag Selected " + (device.name ?? "!!unnamed device!!"));
-    if (selected?.identifier != device.identifier) selected?.disconnect();
+    if (selected?.identifier != device.identifier) {
+      selected?.disconnect();
+      selected?.shouldConnect = false;
+    }
     selected = device;
+    selected?.shouldConnect = true;
     //print("$tag select() calling connect()");
     //device.connect();
   }

@@ -143,47 +143,45 @@ void bleError(String tag, String message, [dynamic error]) {
     if (className != "BleError") {
       info += " (Non-Ble Error: '$className') " + errorString;
     } else {
-      if (error.errorCode != null) {
-        if (error.errorCode.value != null) {
-          info += " [code ${error.errorCode.value}";
-          // TODO use reflection to auto parse error code
-          switch (error.errorCode.value) {
-            case BleErrorCode.operationCancelled:
-              info += ": operationCancelled"; // 2
-              break;
-            case BleErrorCode.operationTimedOut: // 3
-              info += ": operationTimedOut";
-              break;
-            case BleErrorCode.bluetoothPoweredOff: // 102
-              info += ": bluetoothPoweredOff";
-              break;
-            case BleErrorCode.deviceDisconnected: // 201
-              info += ": deviceDisconnected";
-              break;
-            case BleErrorCode.deviceAlreadyConnected: // 203
-              info += ": deviceAlreadyConnected";
-              break;
-            case BleErrorCode.deviceNotConnected: // 205
-              info += ": deviceNotConnected";
-              break;
-            case BleErrorCode.serviceNotFound: // 302
-              info += ": serviceNotFound";
-              break;
-            case BleErrorCode.characteristicReadFailed: // 402
-              info += ": characteristicReadFailed";
-              break;
-            case BleErrorCode.characteristicNotifyChangeFailed: // 403
-              info += ": characteristicNotifyChangeFailed";
-              break;
-            case BleErrorCode.characteristicNotFound: // 404
-              info += ": characteristicNotFound";
-              break;
-            case BleErrorCode.locationServicesDisabled: // 601
-              info += ": locationServicesDisabled";
-              break;
-          }
-          info += "]";
+      if (error.errorCode != null && error.errorCode.value != null) {
+        info += " [code ${error.errorCode.value}";
+        // TODO use reflection to auto parse error code
+        switch (error.errorCode.value) {
+          case BleErrorCode.operationCancelled:
+            info += ": operationCancelled"; // 2
+            break;
+          case BleErrorCode.operationTimedOut: // 3
+            info += ": operationTimedOut";
+            break;
+          case BleErrorCode.bluetoothPoweredOff: // 102
+            info += ": bluetoothPoweredOff";
+            break;
+          case BleErrorCode.deviceDisconnected: // 201
+            info += ": deviceDisconnected";
+            break;
+          case BleErrorCode.deviceAlreadyConnected: // 203
+            info += ": deviceAlreadyConnected";
+            break;
+          case BleErrorCode.deviceNotConnected: // 205
+            info += ": deviceNotConnected";
+            break;
+          case BleErrorCode.serviceNotFound: // 302
+            info += ": serviceNotFound";
+            break;
+          case BleErrorCode.characteristicReadFailed: // 402
+            info += ": characteristicReadFailed";
+            break;
+          case BleErrorCode.characteristicNotifyChangeFailed: // 403
+            info += ": characteristicNotifyChangeFailed";
+            break;
+          case BleErrorCode.characteristicNotFound: // 404
+            info += ": characteristicNotFound";
+            break;
+          case BleErrorCode.locationServicesDisabled: // 601
+            info += ": locationServicesDisabled";
+            break;
         }
+        info += "]";
       }
       String params = errorString.substring(
         errorString.indexOf("(") + 1,

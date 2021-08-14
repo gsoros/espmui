@@ -12,6 +12,7 @@ class Device {
   int rssi = 0;
   double lastSeen = 0;
   late Api api;
+  bool shouldConnect = false;
 
   /// Connection state
   final stateController =
@@ -99,6 +100,11 @@ class Device {
             unsubscribeCharacteristics();
             //deinitCharacteristics();
             //streamSendIfNotClosed(stateController, newState);
+            if (shouldConnect)
+              await Future.delayed(Duration(milliseconds: 1000)).then((_) {
+                print("$tag Autoconnect calling connect()");
+                connect();
+              });
           }
           streamSendIfNotClosed(stateController, newState);
         },
@@ -118,8 +124,13 @@ class Device {
           if (e is BleError) {
             BleError be = e;
             if (be.errorCode.value == BleErrorCode.deviceAlreadyConnected) {
+              bool savedShouldConnect = shouldConnect;
+              shouldConnect = false;
               await disconnect();
-              //await connect();
+              await Future.delayed(Duration(milliseconds: 3000)).then((_) {
+                shouldConnect = savedShouldConnect;
+                connect();
+              });
               //streamSendIfNotClosed(stateController, connectedState);
             }
           }
@@ -176,8 +187,8 @@ class Device {
         BleError be = e;
         // 205
         if (be.errorCode.value == BleErrorCode.deviceNotConnected) {
-          streamSendIfNotClosed(
-              stateController, PeripheralConnectionState.disconnected);
+          //streamSendIfNotClosed(
+          //stateController, PeripheralConnectionState.disconnected);
         }
       }
     });
