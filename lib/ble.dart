@@ -199,16 +199,13 @@ void bleError(String tag, String message, [dynamic error]) {
   print("$tag Error: $message$info");
 }
 
-/// Displays [ifEnabled] or [ifDisabled] depending on the current
-/// state of the bluetooth adapter.
 class BleAdapterCheck extends StatelessWidget {
   final Widget ifEnabled;
-  final Widget ifDisabled;
+  final Widget Function(BluetoothState? state)? ifDisabled;
 
-  BleAdapterCheck(
-    this.ifEnabled, {
-    this.ifDisabled = const BleDisabled(),
-  });
+  /// Displays [ifEnabled] or [ifDisabled] depending on the current
+  /// state of the bluetooth adapter.
+  BleAdapterCheck(this.ifEnabled, {this.ifDisabled});
 
   @override
   Widget build(BuildContext context) {
@@ -219,17 +216,40 @@ class BleAdapterCheck extends StatelessWidget {
       builder: (BuildContext context, AsyncSnapshot<BluetoothState> snapshot) {
         return (snapshot.data == BluetoothState.POWERED_ON)
             ? ifEnabled
-            : ifDisabled;
+            : ifDisabled!(snapshot.data);
       },
     );
   }
 }
 
 class BleDisabled extends StatelessWidget {
-  const BleDisabled();
+  final BluetoothState? state;
+  const BleDisabled(this.state);
 
   @override
   Widget build(BuildContext context) {
+    String message = "";
+    switch (state) {
+      case BluetoothState.POWERED_OFF:
+        message = "Enable to allow scanning and connecting";
+        break;
+      case BluetoothState.POWERED_ON:
+        message = "powered on";
+        break;
+      case BluetoothState.RESETTING:
+        message = "resetting";
+        break;
+      case BluetoothState.UNAUTHORIZED:
+        message = "unauthorized";
+        break;
+      case BluetoothState.UNSUPPORTED:
+        message = "unsupported";
+        break;
+      case BluetoothState.UNKNOWN:
+      default:
+        message = "unknown state";
+        break;
+    }
     return Container(
       child: Row(
         children: [
@@ -237,7 +257,22 @@ class BleDisabled extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, // Align left
               children: [
-                Text("Bluetooth is disabled", style: TextStyle(fontSize: 13))
+                Row(
+                  children: [
+                    Text(
+                      "Bluetooth is disabled",
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Text(
+                      message,
+                      style: TextStyle(fontSize: 10),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -247,7 +282,7 @@ class BleDisabled extends StatelessWidget {
               EspmuiElevatedButton(
                 "Enable",
                 action: () {
-                  print("Enable radio pressed");
+                  print("Radio enable button pressed");
                   BLE().manager.enableRadio();
                 },
               ),

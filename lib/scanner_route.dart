@@ -44,7 +44,10 @@ class ScannerRouteState extends State<ScannerRoute> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: BleAdapterCheck(_appBarTitle()),
+        title: BleAdapterCheck(
+          _appBarTitle(),
+          ifDisabled: (state) => BleDisabled(state),
+        ),
       ),
       body: Container(
         margin: EdgeInsets.all(6),

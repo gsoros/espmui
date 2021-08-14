@@ -115,7 +115,10 @@ class DeviceRouteState extends State<DeviceRoute> {
       onWillPop: _onBackPressed,
       child: Scaffold(
         appBar: AppBar(
-          title: BleAdapterCheck(AppBarTitle(device)),
+          title: BleAdapterCheck(
+            AppBarTitle(device),
+            ifDisabled: (state) => BleDisabled(state),
+          ),
         ),
         body: Container(
           margin: const EdgeInsets.all(6),

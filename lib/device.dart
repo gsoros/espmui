@@ -79,8 +79,7 @@ class Device {
             //print("$tag _connectionStateSubscription delaying connected state");
             //await Future.delayed(Duration(milliseconds: 500));
           }
-          print(
-              "$tag _connectionStateSubscription $name newState=$newState connected=${await connected}");
+          print("$tag state connected=${await connected} newState: $newState");
           if (newState == connectedState) {
             print("$tag newState is connected");
             // api char can use values longer than 20 bytes
