@@ -161,12 +161,12 @@ class Api {
   Device device;
   ApiCharacteristic get _characteristic => device.apiCharacteristic;
   late StreamSubscription<String> _subscription;
-  final doneController = StreamController<ApiMessage>.broadcast();
-  Stream<ApiMessage> get messageDoneStream => doneController.stream;
+  final _doneController = StreamController<ApiMessage>.broadcast();
+  Stream<ApiMessage> get messageDoneStream => _doneController.stream;
   final _queue = Queue<ApiMessage>();
   bool _running = false;
   Timer? _timer;
-  int queueDelayMs;
+  final int queueDelayMs;
 
   Api(this.device, {this.queueDelayMs = 200}) {
     _characteristic.subscribe();
@@ -244,7 +244,7 @@ class Api {
   }
 
   void _onDone(ApiMessage message) {
-    streamSendIfNotClosed(doneController, message);
+    streamSendIfNotClosed(_doneController, message);
     var onDone = message.onDone;
     if (onDone == null) return;
     if (onDone is ApiCallback) {
@@ -323,6 +323,13 @@ class Api {
     return message as T?;
   }
 
+  bool queueContainsCommand({String? commandStr, ApiCommand? command}) {
+    for (ApiMessage message in _queue)
+      if (message.commandStr == commandStr ||
+          message.commandCode == command?.index) return true;
+    return false;
+  }
+
   void _runQueue() {
     if (_running) {
       print("$tag _runQueue() already running");
@@ -376,6 +383,6 @@ class Api {
       var message = _queue.removeFirst();
       message.destruct();
     }
-    doneController.close();
+    _doneController.close();
   }
 }
