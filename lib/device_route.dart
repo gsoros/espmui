@@ -30,7 +30,7 @@ class DeviceRouteState extends State<DeviceRoute> {
 
   StreamSubscription<ApiMessage>? apiSubsciption;
   StreamSubscription<PeripheralConnectionState>? stateSubsciption;
-  bool? apiStrainEnabled;
+  ExtendedBool apiStrainEnabled = ExtendedBool.Unknown;
 
   DeviceRouteState(this.device) {
     print("$tag construct");
@@ -50,7 +50,7 @@ class DeviceRouteState extends State<DeviceRoute> {
         case PeripheralConnectionState.disconnected:
           // set some members to initial state
           setState(() {
-            apiStrainEnabled = null;
+            apiStrainEnabled = ExtendedBool.Unknown;
           });
           break;
         default:
@@ -65,7 +65,9 @@ class DeviceRouteState extends State<DeviceRoute> {
             setState(() => device.name = message.valueAsString);
             break;
           case "apiStrain":
-            setState(() => apiStrainEnabled = message.valueAsBool);
+            setState(() => apiStrainEnabled = message.valueAsBool == true
+                ? ExtendedBool.True
+                : ExtendedBool.False);
             break;
         }
       }
@@ -135,7 +137,7 @@ class DeviceRouteState extends State<DeviceRoute> {
       Strain(device, apiStrainEnabled),
       Battery(device.battery),
       ApiStream(device.apiCharacteristic),
-      ApiCommand(device.api),
+      ApiCli(device.api),
     ];
 
     return GridView.builder(
@@ -353,13 +355,13 @@ class Battery extends StatelessWidget {
 
 class Strain extends StatelessWidget {
   final Device device;
-  final bool? enabled;
+  final ExtendedBool enabled;
   Strain(this.device, this.enabled);
 
   @override
   Widget build(BuildContext context) {
     void toggleStrainStream() async {
-      bool enable = enabled == true ? false : true;
+      bool enable = enabled == ExtendedBool.True ? false : true;
       bool? reply = await device.api
           .request<bool>("apiStrain=" + (enable ? "true" : "false"));
       bool success = reply == enable;
@@ -376,27 +378,30 @@ class Strain extends StatelessWidget {
       stream: device.apiStrain.stream,
       initialData: device.apiStrain.lastValue,
       builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
-        String strain = snapshot.hasData && enabled != null
+        String strain = snapshot.hasData && enabled != ExtendedBool.False
             ? snapshot.data!.toStringAsFixed(2)
             : "0.00";
         if (strain.length > 6) strain = strain.substring(0, 6);
         const styleEnabled = TextStyle(fontSize: 40);
         const styleDisabled = TextStyle(fontSize: 40, color: Colors.white12);
         return Text(strain,
-            style: (enabled == true) ? styleEnabled : styleDisabled);
+            style:
+                (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
       },
     );
 
     return InkWell(
       onTap: toggleStrainStream,
       child: Container(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Strain"),
-            Expanded(child: Align(child: strainOutput)),
-          ],
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text("Strain"),
+          Expanded(
+              child: Align(
+            child: enabled == ExtendedBool.True || enabled == ExtendedBool.False
+                ? strainOutput
+                : CircularProgressIndicator(),
+          ))
+        ]),
       ),
     );
   }
@@ -449,9 +454,9 @@ class ApiStream extends StatelessWidget {
   }
 }
 
-class ApiCommand extends StatelessWidget {
+class ApiCli extends StatelessWidget {
   final Api api;
-  ApiCommand(this.api);
+  ApiCli(this.api);
 
   @override
   Widget build(BuildContext context) {

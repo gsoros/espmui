@@ -86,12 +86,14 @@ class Device {
             peripheral.requestMtu(512).catchError((e) {
               bleError(tag, "requestMtu()", e);
               return 0;
-            });
-            //print("$tag got MTU=$mtu");
-            await discoverCharacteristics().then((_) {
-              subscribeCharacteristics();
-            }, onError: (e) {
-              bleError(tag, "discoverCharacteristics", e);
+            }).then((mtu) => print("$tag got MTU=$mtu"));
+
+            await discoverCharacteristics().catchError((e) {
+              bleError(tag, "discoverCharacteristics()", e);
+            }).then((_) async {
+              await subscribeCharacteristics().catchError((e) {
+                bleError(tag, "subscribeCharacteristics()", e);
+              });
             });
             //streamSendIfNotClosed(stateController, newState);
           } else if (newState == disconnectedState) {

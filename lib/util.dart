@@ -2,6 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+enum ExtendedBool {
+  False,
+  True,
+  Unknown,
+  Waiting,
+}
+
 void streamSendIfNotClosed(StreamController stream, dynamic value) {
   if (stream.isClosed)
     print("[streamSendIfNotClosed] Stream ${stream.toString()} is closed");

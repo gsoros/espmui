@@ -231,7 +231,7 @@ class BleDisabled extends StatelessWidget {
     String message = "";
     switch (state) {
       case BluetoothState.POWERED_OFF:
-        message = "Enable to allow scanning and connecting";
+        message = "Enable to scan and connect";
         break;
       case BluetoothState.POWERED_ON:
         message = "powered on";
