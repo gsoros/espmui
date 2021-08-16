@@ -54,7 +54,9 @@ void snackbar(String s, BuildContext context) {
   }
   sms.removeCurrentSnackBar();
   sms.showSnackBar(SnackBar(
-    backgroundColor: Colors.black38,
-    content: Text(s, textAlign: TextAlign.center),
+    backgroundColor: Colors.black45,
+    content: Text(s,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.white)),
   ));
 }

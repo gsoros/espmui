@@ -5,6 +5,7 @@ import 'package:espmui/ble_characteristic.dart';
 import 'package:espmui/util.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 import 'ble.dart';
 import 'device.dart';
@@ -131,31 +132,48 @@ class DeviceRouteState extends State<DeviceRoute> {
   }
 
   Widget _deviceProperties() {
-    var items = [
-      PowerCadence(device.power, mode: "power"),
-      PowerCadence(device.power, mode: "cadence"),
-      Strain(device, apiStrainEnabled),
-      Battery(device.battery),
-      ApiStream(device.apiCharacteristic),
-      ApiCli(device.api),
+    double cellHeight = MediaQuery.of(context).size.width / 3;
+
+    var items = <GridItem>[
+      GridItem(PowerCadence(device.power, mode: "power"), 3, cellHeight * 1.5),
+      GridItem(
+          PowerCadence(device.power, mode: "cadence"), 3, cellHeight * 1.5),
+      GridItem(Strain(device, apiStrainEnabled), 3, cellHeight),
+      GridItem(Battery(device.battery), 2, cellHeight),
+      GridItem(ValueListenableTest(device), 1, cellHeight),
+      GridItem(ApiCli(device.api), 6, cellHeight / 2),
+      GridItem(ApiStream(device.apiCharacteristic), 6, cellHeight),
     ];
 
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 5.0,
-        mainAxisSpacing: 5.0,
-      ),
+    return StaggeredGridView.countBuilder(
+      crossAxisCount: 6,
+      shrinkWrap: true,
       itemCount: items.length,
-      itemBuilder: (BuildContext context, int index) {
+      staggeredTileBuilder: (index) {
+        return StaggeredTile.extent(
+          items[index].colSpan,
+          items[index].height,
+          //MediaQuery.of(context).size.width / items.values.elementAt(index),
+        );
+      },
+      itemBuilder: (context, index) {
         return Card(
-          color: Colors.black12,
-          child:
-              Container(padding: const EdgeInsets.all(5), child: items[index]),
+          color: Colors.black,
+          child: Container(
+            padding: const EdgeInsets.all(5),
+            child: items[index].value,
+          ),
         );
       },
     );
   }
+}
+
+class GridItem {
+  Widget value;
+  int colSpan;
+  double height;
+  GridItem(this.value, this.colSpan, this.height);
 }
 
 class StatelessWidgetBoilerplate extends StatelessWidget {
@@ -394,13 +412,20 @@ class Strain extends StatelessWidget {
       onTap: toggleStrainStream,
       child: Container(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text("Strain"),
+          Text("Scale"),
           Expanded(
               child: Align(
             child: enabled == ExtendedBool.True || enabled == ExtendedBool.False
                 ? strainOutput
                 : CircularProgressIndicator(),
-          ))
+          )),
+          Align(
+            child: Text(
+              "Kg",
+              style: TextStyle(color: Colors.white24),
+            ),
+            alignment: Alignment.bottomRight,
+          ),
         ]),
       ),
     );
@@ -422,7 +447,7 @@ class PowerCadence extends StatelessWidget {
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
         return Text(
           snapshot.hasData ? snapshot.data.toString() : "0",
-          style: const TextStyle(fontSize: 40),
+          style: const TextStyle(fontSize: 60),
         );
       },
     );
@@ -432,6 +457,13 @@ class PowerCadence extends StatelessWidget {
         children: [
           Text(mode == "power" ? "Power" : "Cadence"),
           Expanded(child: Align(child: value)),
+          Align(
+            child: Text(
+              mode == "power" ? "W" : "rpm",
+              style: TextStyle(color: Colors.white24),
+            ),
+            alignment: Alignment.bottomRight,
+          ),
         ],
       ),
     );
@@ -465,6 +497,28 @@ class ApiCli extends StatelessWidget {
       onSubmitted: (String command) async {
         String? value = await api.request<String>(command);
         print("[ApiCommand] api.requestValue: $value");
+      },
+    );
+  }
+}
+
+class ValueListenableTest extends StatelessWidget {
+  final Device device;
+
+  ValueListenableTest(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: device.notifierTest,
+      builder: (context, value, child) {
+        return EspmuiElevatedButton(
+          "$value",
+          action: () {
+            print("ValueListenableTest action");
+            device.notifierTest.value += 1;
+          },
+        );
       },
     );
   }

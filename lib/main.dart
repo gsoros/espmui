@@ -9,19 +9,24 @@ void main() {
 class EspmUiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = const Color(0xff202020);
+    final primaryColor = Colors.red;
     return MaterialApp(
       title: 'ESPMUI',
       theme: ThemeData(
-        primarySwatch: Colors.red,
+        scaffoldBackgroundColor: backgroundColor,
+        primarySwatch: primaryColor,
       ),
       darkTheme: ThemeData.dark().copyWith(
-        primaryColor: Colors.red,
+        primaryColor: primaryColor,
+        scaffoldBackgroundColor: backgroundColor,
         colorScheme: ColorScheme.fromSwatch(
-          primarySwatch: Colors.red,
+          primarySwatch: primaryColor,
+          brightness: Brightness.dark,
         ),
       ),
       themeMode: ThemeMode.system,
-      debugShowCheckedModeBanner: false,
+      //debugShowCheckedModeBanner: false,
       home: ScannerRoute(),
     );
   }

@@ -1,4 +1,6 @@
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
 import 'ble_characteristic.dart';
@@ -14,13 +16,15 @@ class Device {
   late Api api;
   bool shouldConnect = false;
 
+  final notifierTest = ValueNotifier<int>(0);
+
   /// Connection state
   final stateController =
       StreamController<PeripheralConnectionState>.broadcast();
   Stream<PeripheralConnectionState> get stateStream => stateController.stream;
-  StreamSubscription<PeripheralConnectionState>? stateSubscription;
+  StreamSubscription<PeripheralConnectionState>? _stateSubscription;
 
-  Map<String, BleCharacteristic> characteristics = {};
+  Map<String, BleCharacteristic> _characteristics = {};
 
   String? get name => peripheral.name;
   set name(String? name) => peripheral.name = name;
@@ -40,7 +44,7 @@ class Device {
 
   Device(this.peripheral, {this.rssi = 0, this.lastSeen = 0}) {
     print("[Device] construct");
-    characteristics = {
+    _characteristics = {
       "battery": BatteryCharacteristic(peripheral),
       "power": PowerCharacteristic(peripheral),
       "api": ApiCharacteristic(peripheral),
@@ -53,21 +57,21 @@ class Device {
     print("$tag $name dispose");
     disconnect();
     await stateController.close();
-    characteristics.forEach((_, char) {
+    _characteristics.forEach((_, char) {
       char.dispose();
     });
-    if (stateSubscription != null)
-      await stateSubscription
+    if (_stateSubscription != null)
+      await _stateSubscription
           ?.cancel()
           .catchError((e) => bleError(tag, "connStateSub.cancel()", e));
-    stateSubscription = null;
+    _stateSubscription = null;
   }
 
   Future<void> connect() async {
     final connectedState = PeripheralConnectionState.connected;
     final disconnectedState = PeripheralConnectionState.disconnected;
-    if (stateSubscription == null) {
-      stateSubscription = peripheral
+    if (_stateSubscription == null) {
+      _stateSubscription = peripheral
           .observeConnectionState(
         emitCurrentValue: true,
         completeOnDisconnect: false,
@@ -158,19 +162,19 @@ class Device {
 
   Future<void> subscribeCharacteristics() async {
     if (!await connected) return;
-    characteristics.forEach((_, char) async {
+    _characteristics.forEach((_, char) async {
       await char.subscribe();
     });
   }
 
   Future<void> unsubscribeCharacteristics() async {
-    characteristics.forEach((_, char) async {
+    _characteristics.forEach((_, char) async {
       await char.unsubscribe();
     });
   }
 
   void deinitCharacteristics() {
-    characteristics.forEach((_, char) {
+    _characteristics.forEach((_, char) {
       char.deinit();
     });
   }
@@ -196,11 +200,11 @@ class Device {
   }
 
   BleCharacteristic? characteristic(String id) {
-    if (!characteristics.containsKey(id)) {
+    if (!_characteristics.containsKey(id)) {
       bleError(tag, "characteristic $id not found");
       return null;
     }
-    return characteristics[id];
+    return _characteristics[id];
   }
 }
 
