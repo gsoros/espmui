@@ -17,12 +17,16 @@ class Device {
   bool shouldConnect = false;
 
   final notifierTest = ValueNotifier<int>(0);
+  final apiStrainEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
 
   /// Connection state
   final stateController =
       StreamController<PeripheralConnectionState>.broadcast();
   Stream<PeripheralConnectionState> get stateStream => stateController.stream;
   StreamSubscription<PeripheralConnectionState>? _stateSubscription;
+
+  /// API done messages
+  StreamSubscription<ApiMessage>? _apiSubsciption;
 
   Map<String, BleCharacteristic> _characteristics = {};
 
@@ -51,6 +55,24 @@ class Device {
       "apiStrain": ApiStrainCharacteristic(peripheral),
     };
     api = Api(this);
+
+    /// listen to api message done events and set matching state members
+    _apiSubsciption = api.messageDoneStream.listen((message) {
+      //print("$tag messageDoneStream: $message");
+      if (message.resultCode == ApiResult.success.index) {
+        switch (message.commandStr) {
+          case "hostName":
+            name = message.valueAsString;
+            break;
+          case "apiStrain":
+            apiStrainEnabled.value = message.valueAsBool == true
+                ? ExtendedBool.True
+                : ExtendedBool.False;
+            print("$tag apiStrainEnabled updated to ${apiStrainEnabled.value}");
+            break;
+        }
+      }
+    });
   }
 
   void dispose() async {
@@ -60,11 +82,9 @@ class Device {
     _characteristics.forEach((_, char) {
       char.dispose();
     });
-    if (_stateSubscription != null)
-      await _stateSubscription
-          ?.cancel()
-          .catchError((e) => bleError(tag, "connStateSub.cancel()", e));
+    await _stateSubscription?.cancel();
     _stateSubscription = null;
+    _apiSubsciption?.cancel();
   }
 
   Future<void> connect() async {
@@ -79,13 +99,8 @@ class Device {
           //.asBroadcastStream()
           .listen(
         (newState) async {
-          if (newState == connectedState) {
-            //print("$tag _connectionStateSubscription delaying connected state");
-            //await Future.delayed(Duration(milliseconds: 500));
-          }
           print("$tag state connected=${await connected} newState: $newState");
           if (newState == connectedState) {
-            print("$tag newState is connected");
             // api char can use values longer than 20 bytes
             peripheral.requestMtu(512).catchError((e) {
               bleError(tag, "requestMtu()", e);
@@ -99,17 +114,19 @@ class Device {
                 bleError(tag, "subscribeCharacteristics()", e);
               });
             });
-            //streamSendIfNotClosed(stateController, newState);
+            requestInit();
           } else if (newState == disconnectedState) {
             print("$tag newState is disconnected");
             unsubscribeCharacteristics();
             //deinitCharacteristics();
             //streamSendIfNotClosed(stateController, newState);
-            if (shouldConnect)
+            if (shouldConnect) {
               await Future.delayed(Duration(milliseconds: 1000)).then((_) {
                 print("$tag Autoconnect calling connect()");
                 connect();
               });
+            }
+            resetInit();
           }
           streamSendIfNotClosed(stateController, newState);
         },
@@ -148,6 +165,31 @@ class Device {
       await discoverCharacteristics();
       await subscribeCharacteristics();
     }
+  }
+
+  /// request initial values, returned values are discarded
+  /// because the subscription will handle them
+  void requestInit() async {
+    if (!await connected) return;
+    apiStrainEnabled.value = ExtendedBool.Waiting;
+    print("$tag Requesting init");
+    [
+      "hostName",
+      "secureApi",
+      "apiStrain",
+    ].forEach((key) async {
+      api.request<String>(
+        key,
+        minDelayMs: 1000,
+        maxAttempts: 10,
+        maxAgeMs: 20000,
+      );
+      await Future.delayed(Duration(milliseconds: 150));
+    });
+  }
+
+  void resetInit() {
+    apiStrainEnabled.value = ExtendedBool.Unknown;
   }
 
   Future<void> discoverCharacteristics() async {

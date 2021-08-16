@@ -29,10 +29,6 @@ class DeviceRouteState extends State<DeviceRoute> {
   final String tag = "[DeviceRouteState]";
   Device device;
 
-  StreamSubscription<ApiMessage>? apiSubsciption;
-  StreamSubscription<PeripheralConnectionState>? stateSubsciption;
-  ExtendedBool apiStrainEnabled = ExtendedBool.Unknown;
-
   DeviceRouteState(this.device) {
     print("$tag construct");
   }
@@ -41,67 +37,11 @@ class DeviceRouteState extends State<DeviceRoute> {
   void initState() {
     print("$tag initState");
     super.initState();
-
-    /// listen to connection state changes
-    stateSubsciption = device.stateStream.listen((state) {
-      switch (state) {
-        case PeripheralConnectionState.connected:
-          requestInit();
-          break;
-        case PeripheralConnectionState.disconnected:
-          // set some members to initial state
-          setState(() {
-            apiStrainEnabled = ExtendedBool.Unknown;
-          });
-          break;
-        default:
-      }
-    });
-
-    /// listen to api message done events and set matching state members
-    apiSubsciption = device.api.messageDoneStream.listen((message) {
-      if (message.resultCode == ApiResult.success.index) {
-        switch (message.commandStr) {
-          case "hostName":
-            setState(() => device.name = message.valueAsString);
-            break;
-          case "apiStrain":
-            setState(() => apiStrainEnabled = message.valueAsBool == true
-                ? ExtendedBool.True
-                : ExtendedBool.False);
-            break;
-        }
-      }
-    });
-
-    requestInit();
-  }
-
-  /// request initial values, returned values are discarded
-  /// because the subscription will handle them
-  void requestInit() async {
-    if (!await device.connected) return;
-    print("$tag Requesting init");
-    [
-      "hostName",
-      "secureApi",
-      "apiStrain",
-    ].forEach((key) async {
-      device.api.request<String>(
-        key,
-        minDelayMs: 1000,
-        maxAttempts: 10,
-        maxAgeMs: 20000,
-      );
-      await Future.delayed(Duration(milliseconds: 150));
-    });
   }
 
   @override
   void dispose() async {
     print("$tag ${device.name} dispose");
-    apiSubsciption?.cancel();
-    stateSubsciption?.cancel();
     device.disconnect();
     super.dispose();
   }
@@ -138,7 +78,7 @@ class DeviceRouteState extends State<DeviceRoute> {
       GridItem(PowerCadence(device.power, mode: "power"), 3, cellHeight * 1.5),
       GridItem(
           PowerCadence(device.power, mode: "cadence"), 3, cellHeight * 1.5),
-      GridItem(Strain(device, apiStrainEnabled), 3, cellHeight),
+      GridItem(Strain(device), 3, cellHeight),
       GridItem(Battery(device.battery), 2, cellHeight),
       GridItem(ValueListenableTest(device), 1, cellHeight),
       GridItem(ApiCli(device.api), 6, cellHeight / 2),
@@ -373,12 +313,12 @@ class Battery extends StatelessWidget {
 
 class Strain extends StatelessWidget {
   final Device device;
-  final ExtendedBool enabled;
-  Strain(this.device, this.enabled);
+  Strain(this.device);
 
   @override
   Widget build(BuildContext context) {
-    void toggleStrainStream() async {
+    void toggleStrainStream(enabled) async {
+      device.apiStrainEnabled.value = ExtendedBool.Waiting;
       bool enable = enabled == ExtendedBool.True ? false : true;
       bool? reply = await device.api
           .request<bool>("apiStrain=" + (enable ? "true" : "false"));
@@ -392,42 +332,53 @@ class Strain extends StatelessWidget {
       );
     }
 
-    var strainOutput = StreamBuilder<double>(
-      stream: device.apiStrain.stream,
-      initialData: device.apiStrain.lastValue,
-      builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
-        String strain = snapshot.hasData && enabled != ExtendedBool.False
-            ? snapshot.data!.toStringAsFixed(2)
-            : "0.00";
-        if (strain.length > 6) strain = strain.substring(0, 6);
-        const styleEnabled = TextStyle(fontSize: 40);
-        const styleDisabled = TextStyle(fontSize: 40, color: Colors.white12);
-        return Text(strain,
-            style:
-                (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
-      },
-    );
+    return ValueListenableBuilder<ExtendedBool>(
+      valueListenable: device.apiStrainEnabled,
+      builder: (context, enabled, child) {
+        var strainOutput = StreamBuilder<double>(
+          stream: device.apiStrain.stream,
+          initialData: device.apiStrain.lastValue,
+          builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
+            String strain = snapshot.hasData && enabled != ExtendedBool.False
+                ? snapshot.data!.toStringAsFixed(2)
+                : "0.00";
+            if (strain.length > 6) strain = strain.substring(0, 6);
+            const styleEnabled = TextStyle(fontSize: 40);
+            const styleDisabled =
+                TextStyle(fontSize: 40, color: Colors.white12);
+            return Text(strain,
+                style: (enabled == ExtendedBool.True)
+                    ? styleEnabled
+                    : styleDisabled);
+          },
+        );
 
-    return InkWell(
-      onTap: toggleStrainStream,
-      child: Container(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text("Scale"),
-          Expanded(
-              child: Align(
-            child: enabled == ExtendedBool.True || enabled == ExtendedBool.False
-                ? strainOutput
-                : CircularProgressIndicator(),
-          )),
-          Align(
-            child: Text(
-              "Kg",
-              style: TextStyle(color: Colors.white24),
-            ),
-            alignment: Alignment.bottomRight,
+        return InkWell(
+          onTap: () {
+            if (enabled == ExtendedBool.True || enabled == ExtendedBool.False)
+              toggleStrainStream(enabled);
+          },
+          child: Container(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text("Scale"),
+              Expanded(
+                  child: Align(
+                child: enabled == ExtendedBool.Waiting
+                    ? CircularProgressIndicator()
+                    : strainOutput,
+              )),
+              Align(
+                child: Text(
+                  "Kg",
+                  style: TextStyle(color: Colors.white24),
+                ),
+                alignment: Alignment.bottomRight,
+              ),
+            ]),
           ),
-        ]),
-      ),
+        );
+      },
     );
   }
 }

@@ -244,6 +244,7 @@ class Api {
   }
 
   void _onDone(ApiMessage message) {
+    //print("$tag onDone $message");
     streamSendIfNotClosed(_doneController, message);
     var onDone = message.onDone;
     if (onDone == null) return;
