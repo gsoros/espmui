@@ -12,6 +12,8 @@ import 'scanner.dart';
 class BLE {
   static final BLE _instance = BLE._construct();
   final String tag = "[BLE]";
+  bool _createClientRequested = false;
+  bool _createClientCompleted = false;
 
   /// returns a singleton
   factory BLE() {
@@ -41,12 +43,31 @@ class BLE {
   }
 
   Future<void> _checkClient() async {
-    if (!await BleManager().isClientCreated()) {
-      print("$tag waiting for createClient");
-      await BleManager().createClient();
-      print("$tag createClient done");
+    print("$tag _checkClient() start");
+    if (!_createClientCompleted) {
+      while (!await BleManager().isClientCreated()) {
+        // make sure createClient() is called only once
+        if (!_createClientRequested) {
+          _createClientRequested = true;
+          print("$tag _checkClient() waiting for createClient");
+          await BleManager().createClient();
+          print("$tag _checkClient() createClient done");
+          await Future.delayed(Duration(milliseconds: 500));
+          // cycling radio resets stack cache
+          print("$tag _checkClient() disabling radio");
+          // don't await, the future never completes
+          BleManager().disableRadio();
+          await Future.delayed(Duration(milliseconds: 500));
+          print("$tag _checkClient() enabling radio");
+          await BleManager().enableRadio();
+          print("$tag _checkClient() enabled radio");
+        }
+        await Future.delayed(Duration(milliseconds: 500));
+      }
+      _createClientCompleted = true;
     }
-    return Future.value(null);
+    print("$tag _checkClient() end");
+    //return Future.value(null);
   }
 
   BleManager get manager {
@@ -108,10 +129,6 @@ class BLE {
           // 30 seconds will temporarily disable scanning
           //print("$tag Adapter powered on, starting scan");
           //startScan();
-          //if (_selected != null) {
-          //  print("$tag Adapter powered on, connecting to ${_selected.name}");
-          //  _selected.connect();
-          //}
           Scanner().selected?.connect();
         } else {
           bleError(tag, "Adapter not powered on");
