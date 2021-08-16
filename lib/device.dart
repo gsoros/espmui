@@ -134,30 +134,34 @@ class Device {
       );
     }
     if (!await connected) {
-      print("$tag Connecting to $name");
-      await peripheral
-          .connect(
-        isAutoConnect: true,
-        refreshGatt: true,
-      )
-          .catchError(
-        (e) async {
-          bleError(tag, "peripheral.connect()", e);
-          if (e is BleError) {
-            BleError be = e;
-            if (be.errorCode.value == BleErrorCode.deviceAlreadyConnected) {
-              bool savedShouldConnect = shouldConnect;
-              shouldConnect = false;
-              await disconnect();
-              await Future.delayed(Duration(milliseconds: 3000)).then((_) {
-                shouldConnect = savedShouldConnect;
-                connect();
-              });
-              //streamSendIfNotClosed(stateController, connectedState);
+      if (await BLE().currentState() != BluetoothState.POWERED_ON) {
+        print("$tag connect() Adapter is off, not connecting");
+      } else {
+        print("$tag Connecting to $name");
+        await peripheral
+            .connect(
+          isAutoConnect: true,
+          refreshGatt: true,
+        )
+            .catchError(
+          (e) async {
+            bleError(tag, "peripheral.connect()", e);
+            if (e is BleError) {
+              BleError be = e;
+              if (be.errorCode.value == BleErrorCode.deviceAlreadyConnected) {
+                bool savedShouldConnect = shouldConnect;
+                shouldConnect = false;
+                await disconnect();
+                await Future.delayed(Duration(milliseconds: 3000)).then((_) {
+                  shouldConnect = savedShouldConnect;
+                  connect();
+                });
+                //streamSendIfNotClosed(stateController, connectedState);
+              }
             }
-          }
-        },
-      );
+          },
+        );
+      }
     } else {
       print("$tag Not connecting to $name, already connected");
       //state = connectedState;

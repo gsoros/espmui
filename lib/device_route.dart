@@ -74,15 +74,42 @@ class DeviceRouteState extends State<DeviceRoute> {
   Widget _deviceProperties() {
     double cellHeight = MediaQuery.of(context).size.width / 3;
 
-    var items = <GridItem>[
-      GridItem(PowerCadence(device.power, mode: "power"), 3, cellHeight * 1.5),
-      GridItem(
-          PowerCadence(device.power, mode: "cadence"), 3, cellHeight * 1.5),
-      GridItem(Strain(device), 3, cellHeight),
-      GridItem(Battery(device.battery), 2, cellHeight),
-      GridItem(ValueListenableTest(device), 1, cellHeight),
-      GridItem(ApiCli(device.api), 6, cellHeight / 2),
-      GridItem(ApiStream(device.apiCharacteristic), 6, cellHeight),
+    var items = <StaggeredGridItem>[
+      StaggeredGridItem(
+        value: PowerCadence(device.power, mode: "power"),
+        colSpan: 3,
+        height: cellHeight * 1.5,
+      ),
+      StaggeredGridItem(
+        value: PowerCadence(device.power, mode: "cadence"),
+        colSpan: 3,
+        height: cellHeight * 1.5,
+      ),
+      StaggeredGridItem(
+        value: Strain(device),
+        colSpan: 3,
+        height: cellHeight,
+      ),
+      StaggeredGridItem(
+        value: Battery(device.battery),
+        colSpan: 2,
+        height: cellHeight,
+      ),
+      StaggeredGridItem(
+        value: ValueListenableTest(device),
+        colSpan: 1,
+        height: cellHeight,
+      ),
+      StaggeredGridItem(
+        value: ApiCli(device.api),
+        colSpan: 6,
+        height: cellHeight / 2,
+      ),
+      StaggeredGridItem(
+        value: ApiStream(device.apiCharacteristic),
+        colSpan: 6,
+        height: cellHeight,
+      ),
     ];
 
     return StaggeredGridView.countBuilder(
@@ -109,11 +136,15 @@ class DeviceRouteState extends State<DeviceRoute> {
   }
 }
 
-class GridItem {
+class StaggeredGridItem {
   Widget value;
   int colSpan;
   double height;
-  GridItem(this.value, this.colSpan, this.height);
+  StaggeredGridItem({
+    required this.value,
+    required this.colSpan,
+    required this.height,
+  });
 }
 
 class StatelessWidgetBoilerplate extends StatelessWidget {
@@ -157,7 +188,7 @@ class AppBarTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    void _editDeviceName() async {
+    void editDeviceName() async {
       Future<bool> apiDeviceName(String name) async {
         var api = device.api;
         snackbar("Sending new device name: $name", context);
@@ -220,7 +251,7 @@ class AppBarTitle extends StatelessWidget {
                               const EdgeInsets.all(0)),
                         ),
                         onPressed: () {},
-                        onLongPress: _editDeviceName,
+                        onLongPress: editDeviceName,
                         child: Text(
                           device.name ?? "",
                           style: Theme.of(context).textTheme.headline6,
@@ -311,12 +342,86 @@ class Battery extends StatelessWidget {
   }
 }
 
+class StrainStreamListener extends StatelessWidget {
+  final Device device;
+  final ExtendedBool enabled;
+
+  StrainStreamListener(this.device, this.enabled);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<double>(
+      stream: device.apiStrain.stream,
+      initialData: device.apiStrain.lastValue,
+      builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
+        String strain = snapshot.hasData && enabled != ExtendedBool.False
+            ? snapshot.data!.toStringAsFixed(2)
+            : "0.00";
+        if (strain.length > 6) strain = strain.substring(0, 6);
+        const styleEnabled = TextStyle(fontSize: 40);
+        const styleDisabled = TextStyle(fontSize: 40, color: Colors.white12);
+        return Text(strain,
+            style:
+                (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
+      },
+    );
+  }
+}
+
 class Strain extends StatelessWidget {
   final Device device;
   Strain(this.device);
 
   @override
   Widget build(BuildContext context) {
+    void calibrate() async {
+      Future<void> apiCalibrate(String knownMassStr) async {
+        var api = device.api;
+        snackbar("Sending calibration value: $knownMassStr", context);
+        String? value =
+            await api.request<String>("calibrateStrain=$knownMassStr");
+        if (value == null ||
+            double.tryParse(value) != double.tryParse(knownMassStr)) {
+          snackbar("Error calibrating device", context);
+          return;
+        }
+        snackbar("Success calibrating device", context);
+      }
+
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            scrollable: true,
+            title: Text("Calibrate device"),
+            content: Container(
+              child: Column(
+                children: [
+                  StrainStreamListener(device, ExtendedBool.True),
+                  TextField(
+                    maxLength: 10,
+                    maxLines: 1,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.send,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      hintText: "Enter known mass",
+                      suffixText: "kg",
+                    ),
+                    controller: TextEditingController(),
+                    onSubmitted: (text) async {
+                      Navigator.of(context).pop();
+                      await apiCalibrate(text);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     void toggleStrainStream(enabled) async {
       device.apiStrainEnabled.value = ExtendedBool.Waiting;
       bool enable = enabled == ExtendedBool.True ? false : true;
@@ -326,8 +431,17 @@ class Strain extends StatelessWidget {
       snackbar(
         "Strain stream: " +
             (enable ? "en" : "dis") +
-            "abl" +
-            (success ? "ed" : "ing failed"),
+            "able" +
+            (success ? "d" : " failed"),
+        context,
+      );
+    }
+
+    void tare() async {
+      var resultCode = await device.api.requestResultCode("tare");
+      snackbar(
+        "Tare " +
+            (resultCode == ApiResult.success.index ? "success" : "failed"),
         context,
       );
     }
@@ -335,26 +449,16 @@ class Strain extends StatelessWidget {
     return ValueListenableBuilder<ExtendedBool>(
       valueListenable: device.apiStrainEnabled,
       builder: (context, enabled, child) {
-        var strainOutput = StreamBuilder<double>(
-          stream: device.apiStrain.stream,
-          initialData: device.apiStrain.lastValue,
-          builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
-            String strain = snapshot.hasData && enabled != ExtendedBool.False
-                ? snapshot.data!.toStringAsFixed(2)
-                : "0.00";
-            if (strain.length > 6) strain = strain.substring(0, 6);
-            const styleEnabled = TextStyle(fontSize: 40);
-            const styleDisabled =
-                TextStyle(fontSize: 40, color: Colors.white12);
-            return Text(strain,
-                style: (enabled == ExtendedBool.True)
-                    ? styleEnabled
-                    : styleDisabled);
-          },
-        );
+        var strainOutput = StrainStreamListener(device, enabled);
 
         return InkWell(
           onTap: () {
+            if (enabled == ExtendedBool.True) tare();
+          },
+          onLongPress: () {
+            if (enabled == ExtendedBool.True) calibrate();
+          },
+          onDoubleTap: () {
             if (enabled == ExtendedBool.True || enabled == ExtendedBool.False)
               toggleStrainStream(enabled);
           },

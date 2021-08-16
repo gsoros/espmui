@@ -13,6 +13,8 @@ enum ApiCommand {
   passkey,
   secureApi,
   apiStrain,
+  calibrateStrain,
+  tare,
 }
 
 enum ApiResult {
@@ -25,6 +27,8 @@ enum ApiResult {
   hostNameInvalid,
   passkeyInvalid,
   secureApiInvalid,
+  calibrationFailed,
+  tareFailed,
 }
 
 typedef void ApiCallback(ApiMessage message);
@@ -302,19 +306,7 @@ class Api {
       minDelayMs: minDelayMs,
       maxAgeMs: maxAgeMs,
     );
-
-    /// polls the message
-    /// TODO use a Stream (each message could have an onChangedStream?)
-    await Future.doWhile(() async {
-      if (message.isDone != true && message.resultCode == null) {
-        //print("$tag requestValue polling...");
-        // TODO milliseconds: [message.minDelay, queueDelayMs].max
-        await Future.delayed(Duration(milliseconds: message.minDelayMs));
-        return true;
-      }
-      //print("$tag requestValue poll end");
-      return false;
-    });
+    await isDone(message);
     if (T == ApiMessage) return message as T?;
     if (T == String) return message.valueAsString as T?;
     if (T == double) return message.valueAsDouble as T?;
@@ -322,6 +314,38 @@ class Api {
     if (T == bool) return message.valueAsBool as T?;
     print("$tag request() error: type $T is not handled");
     return message as T?;
+  }
+
+  /// Requests a result from the device API
+  Future<int?> requestResultCode(
+    String command, {
+    int? maxAttempts,
+    int? minDelayMs,
+    int? maxAgeMs,
+  }) async {
+    var message = sendCommand(
+      command,
+      maxAttempts: maxAttempts,
+      minDelayMs: minDelayMs,
+      maxAgeMs: maxAgeMs,
+    );
+    await isDone(message);
+    return message.resultCode;
+  }
+
+  /// Polls the message while [isDone] != true && resultCode == null
+  /// TODO use a stream (each message could have an onChangedStream?)
+  Future<void> isDone(ApiMessage message) async {
+    await Future.doWhile(() async {
+      if (message.isDone != true && message.resultCode == null) {
+        //print("$tag polling...");
+        // TODO milliseconds: [message.minDelay, queueDelayMs].max
+        await Future.delayed(Duration(milliseconds: message.minDelayMs));
+        return true;
+      }
+      //print("$tag poll end");
+      return false;
+    });
   }
 
   bool queueContainsCommand({String? commandStr, ApiCommand? command}) {
