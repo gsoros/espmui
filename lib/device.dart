@@ -56,23 +56,30 @@ class Device {
     };
     api = Api(this);
 
-    /// listen to api message done events and set matching state members
-    _apiSubsciption = api.messageDoneStream.listen((message) {
-      //print("$tag messageDoneStream: $message");
-      if (message.resultCode == ApiResult.success.index) {
-        switch (message.commandStr) {
-          case "hostName":
-            name = message.valueAsString;
-            break;
-          case "apiStrain":
-            apiStrainEnabled.value = message.valueAsBool == true
-                ? ExtendedBool.True
-                : ExtendedBool.False;
-            print("$tag apiStrainEnabled updated to ${apiStrainEnabled.value}");
-            break;
-        }
-      }
-    });
+    /// listen to api message done events
+    _apiSubsciption =
+        api.messageDoneStream.listen((message) => onApiDone(message));
+  }
+
+  /// Processes "done" messages sent by the API
+  void onApiDone(ApiMessage message) {
+    // print("$tag onApiDone: $message");
+    if (message.resultCode != ApiResult.success.index) return;
+
+    // switch does not work with non-consant case :(
+
+    // hostName
+    if (ApiCommand.hostName.index == message.commandCode) {
+      name = message.valueAsString;
+      print("$tag onApiDone hostName updated to $name");
+    }
+    // apiStrain
+    else if (ApiCommand.apiStrain.index == message.commandCode) {
+      apiStrainEnabled.value =
+          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      print(
+          "$tag onApiDone apiStrainEnabled updated to ${apiStrainEnabled.value}");
+    }
   }
 
   void dispose() async {
@@ -87,6 +94,36 @@ class Device {
     _apiSubsciption?.cancel();
   }
 
+  Future<void> onConnected() async {
+    print("$tag onConnected()");
+    // api char can use values longer than 20 bytes
+    peripheral.requestMtu(512).catchError((e) {
+      bleError(tag, "requestMtu()", e);
+      return 0;
+    }).then((mtu) => print("$tag got MTU=$mtu"));
+
+    //await discoverCharacteristics().then((_) async {
+    //  await subscribeCharacteristics();
+    //});
+    await discoverCharacteristics();
+    await subscribeCharacteristics();
+    requestInit();
+  }
+
+  Future<void> onDisconnected() async {
+    print("$tag onDisconnected()");
+    unsubscribeCharacteristics();
+    //deinitCharacteristics();
+    //streamSendIfNotClosed(stateController, newState);
+    if (shouldConnect) {
+      await Future.delayed(Duration(milliseconds: 1000)).then((_) {
+        print("$tag Autoconnect calling connect()");
+        connect();
+      });
+    }
+    resetInit();
+  }
+
   Future<void> connect() async {
     final connectedState = PeripheralConnectionState.connected;
     final disconnectedState = PeripheralConnectionState.disconnected;
@@ -96,38 +133,12 @@ class Device {
         emitCurrentValue: true,
         completeOnDisconnect: false,
       )
-          //.asBroadcastStream()
           .listen(
         (newState) async {
           print("$tag state connected=${await connected} newState: $newState");
-          if (newState == connectedState) {
-            // api char can use values longer than 20 bytes
-            peripheral.requestMtu(512).catchError((e) {
-              bleError(tag, "requestMtu()", e);
-              return 0;
-            }).then((mtu) => print("$tag got MTU=$mtu"));
-
-            await discoverCharacteristics().catchError((e) {
-              bleError(tag, "discoverCharacteristics()", e);
-            }).then((_) async {
-              await subscribeCharacteristics().catchError((e) {
-                bleError(tag, "subscribeCharacteristics()", e);
-              });
-            });
-            requestInit();
-          } else if (newState == disconnectedState) {
-            print("$tag newState is disconnected");
-            unsubscribeCharacteristics();
-            //deinitCharacteristics();
-            //streamSendIfNotClosed(stateController, newState);
-            if (shouldConnect) {
-              await Future.delayed(Duration(milliseconds: 1000)).then((_) {
-                print("$tag Autoconnect calling connect()");
-                connect();
-              });
-            }
-            resetInit();
-          }
+          if (newState == connectedState)
+            await onConnected();
+          else if (newState == disconnectedState) await onDisconnected();
           streamSendIfNotClosed(stateController, newState);
         },
         onError: (e) => bleError(tag, "connectionStateSubscription", e),
@@ -168,11 +179,12 @@ class Device {
       //streamSendIfNotClosed(stateController, connectedState);
       await discoverCharacteristics();
       await subscribeCharacteristics();
+      requestInit();
     }
   }
 
   /// request initial values, returned values are discarded
-  /// because the subscription will handle them
+  /// because the message.done subscription will handle them
   void requestInit() async {
     if (!await connected) return;
     apiStrainEnabled.value = ExtendedBool.Waiting;
