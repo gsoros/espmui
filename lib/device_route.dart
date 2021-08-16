@@ -87,17 +87,12 @@ class DeviceRouteState extends State<DeviceRoute> {
       ),
       StaggeredGridItem(
         value: Strain(device),
-        colSpan: 3,
+        colSpan: 4,
         height: cellHeight,
       ),
       StaggeredGridItem(
         value: Battery(device.battery),
         colSpan: 2,
-        height: cellHeight,
-      ),
-      StaggeredGridItem(
-        value: ValueListenableTest(device),
-        colSpan: 1,
         height: cellHeight,
       ),
       StaggeredGridItem(
@@ -119,11 +114,26 @@ class DeviceRouteState extends State<DeviceRoute> {
         );
       },
       itemBuilder: (context, index) {
-        return Card(
-          color: Colors.black,
-          child: Container(
-            padding: const EdgeInsets.all(5),
-            child: items[index].value,
+        return Container(
+          decoration: new BoxDecoration(
+            boxShadow: [
+              new BoxShadow(
+                color: Colors.black38,
+                blurRadius: 5.0,
+                offset: Offset.fromDirection(1, 2),
+              ),
+            ],
+          ),
+          child: Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(5.0),
+            ),
+            elevation: 3,
+            color: Colors.black,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              child: items[index].value,
+            ),
           ),
         );
       },
@@ -470,7 +480,7 @@ class Strain extends StatelessWidget {
               )),
               Align(
                 child: Text(
-                  "Kg",
+                  "kg",
                   style: TextStyle(color: Colors.white24),
                 ),
                 alignment: Alignment.bottomRight,
@@ -579,28 +589,6 @@ class ApiInterface extends StatelessWidget {
         ),
         ApiCli(device),
       ],
-    );
-  }
-}
-
-class ValueListenableTest extends StatelessWidget {
-  final Device device;
-
-  ValueListenableTest(this.device);
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: device.notifierTest,
-      builder: (context, value, child) {
-        return EspmuiElevatedButton(
-          "$value",
-          action: () {
-            print("ValueListenableTest action");
-            device.notifierTest.value += 1;
-          },
-        );
-      },
     );
   }
 }

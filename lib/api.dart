@@ -60,7 +60,7 @@ class ApiMessage {
     int? minDelayMs,
     int? maxAgeMs,
   }) {
-    createdAt = DateTime.now().millisecondsSinceEpoch;
+    createdAt = uts();
     this.maxAttempts = maxAttempts ?? this.maxAttempts;
     this.minDelayMs = minDelayMs ?? this.minDelayMs;
     this.maxAgeMs = maxAgeMs ?? this.maxAgeMs;
@@ -103,7 +103,7 @@ class ApiMessage {
   }
 
   void checkAge() {
-    if (createdAt + maxAgeMs <= DateTime.now().millisecondsSinceEpoch) {
+    if (createdAt + maxAgeMs <= uts()) {
       print("$tag max age reached: " + toString());
       resultCode = -1;
       resultStr = "ClientError";
@@ -333,7 +333,7 @@ class Api {
     return message.resultCode;
   }
 
-  /// Polls the message while [isDone] != true && resultCode == null
+  /// Polls the message while [isDone] != true && [resultCode] == null
   /// TODO use a stream (each message could have an onChangedStream?)
   Future<void> isDone(ApiMessage message) async {
     await Future.doWhile(() async {
@@ -384,7 +384,7 @@ class Api {
   }
 
   void _send(ApiMessage message) async {
-    int now = DateTime.now().millisecondsSinceEpoch;
+    int now = uts();
     if (now < (message.lastSentAt ?? 0) + message.minDelayMs) return;
     //var device = Scanner().selected;
     if (!await device.connected) {

@@ -12,11 +12,10 @@ class Device {
   final String tag = "[Device]";
   Peripheral peripheral;
   int rssi = 0;
-  double lastSeen = 0;
+  int lastSeen = 0;
   late Api api;
   bool shouldConnect = false;
 
-  final notifierTest = ValueNotifier<int>(0);
   final apiStrainEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
 
   /// Connection state
@@ -58,11 +57,11 @@ class Device {
 
     /// listen to api message done events
     _apiSubsciption =
-        api.messageDoneStream.listen((message) => onApiDone(message));
+        api.messageDoneStream.listen((message) => _onApiDone(message));
   }
 
   /// Processes "done" messages sent by the API
-  void onApiDone(ApiMessage message) {
+  void _onApiDone(ApiMessage message) {
     // print("$tag onApiDone: $message");
     if (message.resultCode != ApiResult.success.index) return;
 
@@ -94,8 +93,8 @@ class Device {
     _apiSubsciption?.cancel();
   }
 
-  Future<void> onConnected() async {
-    print("$tag onConnected()");
+  Future<void> _onConnected() async {
+    print("$tag _onConnected()");
     // api char can use values longer than 20 bytes
     peripheral.requestMtu(512).catchError((e) {
       bleError(tag, "requestMtu()", e);
@@ -106,13 +105,13 @@ class Device {
     //  await subscribeCharacteristics();
     //});
     await discoverCharacteristics();
-    await subscribeCharacteristics();
-    requestInit();
+    await _subscribeCharacteristics();
+    _requestInit();
   }
 
-  Future<void> onDisconnected() async {
-    print("$tag onDisconnected()");
-    unsubscribeCharacteristics();
+  Future<void> _onDisconnected() async {
+    print("$tag _onDisconnected()");
+    _unsubscribeCharacteristics();
     //deinitCharacteristics();
     //streamSendIfNotClosed(stateController, newState);
     if (shouldConnect) {
@@ -121,7 +120,7 @@ class Device {
         connect();
       });
     }
-    resetInit();
+    _resetInit();
   }
 
   Future<void> connect() async {
@@ -137,8 +136,8 @@ class Device {
         (newState) async {
           print("$tag state connected=${await connected} newState: $newState");
           if (newState == connectedState)
-            await onConnected();
-          else if (newState == disconnectedState) await onDisconnected();
+            await _onConnected();
+          else if (newState == disconnectedState) await _onDisconnected();
           streamSendIfNotClosed(stateController, newState);
         },
         onError: (e) => bleError(tag, "connectionStateSubscription", e),
@@ -163,10 +162,10 @@ class Device {
                 bool savedShouldConnect = shouldConnect;
                 shouldConnect = false;
                 await disconnect();
-                await Future.delayed(Duration(milliseconds: 3000)).then((_) {
-                  shouldConnect = savedShouldConnect;
-                  connect();
-                });
+                await Future.delayed(Duration(milliseconds: 3000));
+                shouldConnect = savedShouldConnect;
+                connect();
+
                 //streamSendIfNotClosed(stateController, connectedState);
               }
             }
@@ -178,14 +177,14 @@ class Device {
       //state = connectedState;
       //streamSendIfNotClosed(stateController, connectedState);
       await discoverCharacteristics();
-      await subscribeCharacteristics();
-      requestInit();
+      await _subscribeCharacteristics();
+      _requestInit();
     }
   }
 
   /// request initial values, returned values are discarded
   /// because the message.done subscription will handle them
-  void requestInit() async {
+  void _requestInit() async {
     if (!await connected) return;
     apiStrainEnabled.value = ExtendedBool.Waiting;
     print("$tag Requesting init");
@@ -204,7 +203,7 @@ class Device {
     });
   }
 
-  void resetInit() {
+  void _resetInit() {
     apiStrainEnabled.value = ExtendedBool.Unknown;
   }
 
@@ -218,24 +217,26 @@ class Device {
     print("$tag discoverCharacteristics() end conn=${await connected}");
   }
 
-  Future<void> subscribeCharacteristics() async {
+  Future<void> _subscribeCharacteristics() async {
     if (!await connected) return;
     _characteristics.forEach((_, char) async {
       await char.subscribe();
     });
   }
 
-  Future<void> unsubscribeCharacteristics() async {
+  Future<void> _unsubscribeCharacteristics() async {
     _characteristics.forEach((_, char) async {
       await char.unsubscribe();
     });
   }
 
-  void deinitCharacteristics() {
+  /*
+  void _deinitCharacteristics() {
     _characteristics.forEach((_, char) {
       char.deinit();
     });
   }
+  */
 
   Future<void> disconnect() async {
     print("$tag disconnect() $name");
@@ -243,7 +244,7 @@ class Device {
       bleError(tag, "disconnect(): not connected, but proceeding anyway");
       //return;
     }
-    await unsubscribeCharacteristics();
+    await _unsubscribeCharacteristics();
     await peripheral.disconnectOrCancelConnection().catchError((e) {
       bleError(tag, "peripheral.discBlaBla()", e);
       if (e is BleError) {
@@ -284,7 +285,7 @@ class DeviceList {
   /// and lastSeen, otherwise adds new device.
   /// Returns the new or updated device or null on error.
   Device? addOrUpdate(ScanResult scanResult) {
-    final now = DateTime.now().millisecondsSinceEpoch / 1000;
+    final now = uts();
     final subject = scanResult.peripheral.name.toString() +
         " rssi=" +
         scanResult.rssi.toString();

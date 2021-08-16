@@ -9,6 +9,11 @@ enum ExtendedBool {
   Waiting,
 }
 
+/// Unix timestamp in milliseconds
+int uts() {
+  return DateTime.now().millisecondsSinceEpoch;
+}
+
 void streamSendIfNotClosed(StreamController stream, dynamic value) {
   if (stream.isClosed)
     print("[streamSendIfNotClosed] Stream ${stream.toString()} is closed");

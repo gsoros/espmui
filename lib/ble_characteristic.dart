@@ -66,6 +66,7 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "write() characteristic not writableWithResponse");
       return Future.value(null);
     }
+    //print("$tag write($value)");
     return _characteristic!
         .write(
       toUint8List(value),
