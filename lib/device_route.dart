@@ -101,14 +101,9 @@ class DeviceRouteState extends State<DeviceRoute> {
         height: cellHeight,
       ),
       StaggeredGridItem(
-        value: ApiCli(device.api),
+        value: ApiInterface(device),
         colSpan: 6,
-        height: cellHeight / 2,
-      ),
-      StaggeredGridItem(
-        value: ApiStream(device.apiCharacteristic),
-        colSpan: 6,
-        height: cellHeight,
+        height: cellHeight * 1.5,
       ),
     ];
 
@@ -358,6 +353,7 @@ class StrainStreamListener extends StatelessWidget {
             ? snapshot.data!.toStringAsFixed(2)
             : "0.00";
         if (strain.length > 6) strain = strain.substring(0, 6);
+        if (strain == "-0.00") strain = "0.00";
         const styleEnabled = TextStyle(fontSize: 40);
         const styleDisabled = TextStyle(fontSize: 40, color: Colors.white12);
         return Text(strain,
@@ -526,33 +522,63 @@ class PowerCadence extends StatelessWidget {
 }
 
 class ApiStream extends StatelessWidget {
-  final ApiCharacteristic char;
-  ApiStream(this.char);
+  final Device device;
+  ApiStream(this.device);
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<String>(
-      stream: char.stream,
-      initialData: char.lastValue,
+      stream: device.apiCharacteristic.stream,
+      initialData: device.apiCharacteristic.lastValue,
       builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
-        return Text("Api: ${snapshot.data}");
+        return Text("${snapshot.data}");
       },
     );
   }
 }
 
 class ApiCli extends StatelessWidget {
-  final Api api;
-  ApiCli(this.api);
+  final Device device;
+  ApiCli(this.device);
 
   @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: TextEditingController()..text = "hostName=ESPM",
+      controller: TextEditingController(text: ""),
+      decoration: const InputDecoration(
+        isDense: true,
+        contentPadding: EdgeInsets.all(4),
+        filled: true,
+        fillColor: Colors.white10,
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.white24),
+        ),
+      ),
       onSubmitted: (String command) async {
-        String? value = await api.request<String>(command);
-        print("[ApiCommand] api.requestValue: $value");
+        String? value = await device.api.request<String>(command);
+        print("[ApiCli] api.request($command): $value");
       },
+    );
+  }
+}
+
+class ApiInterface extends StatelessWidget {
+  final Device device;
+
+  ApiInterface(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: ApiStream(device),
+          ),
+        ),
+        ApiCli(device),
+      ],
     );
   }
 }

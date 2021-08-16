@@ -29,7 +29,7 @@ abstract class BleCharacteristic<T> {
   T fromUint8List(Uint8List list);
   Uint8List toUint8List(T value);
 
-  /// read value from characteristic and set lastValue
+  /// Reads value from characteristic and sets [lastValue]
   Future<T?> read() async {
     await _init();
     if (null == _characteristic) {
@@ -285,6 +285,7 @@ class ApiCharacteristic extends BleCharacteristic<String> {
 
   @override
   Future<String?> onNotify(String value) {
+    if (value.length < 20) return Future.value(value);
     // read full value as the notification is limited to 20 bytes
     return read();
   }
