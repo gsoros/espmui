@@ -43,7 +43,7 @@ class BLE {
   }
 
   Future<void> _checkClient() async {
-    print("$tag _checkClient() start");
+    //print("$tag _checkClient() start");
     if (!_createClientCompleted) {
       while (!await BleManager().isClientCreated()) {
         // make sure createClient() is called only once
@@ -53,7 +53,7 @@ class BLE {
           await BleManager().createClient();
           print("$tag _checkClient() createClient done");
           await Future.delayed(Duration(milliseconds: 500));
-          // cycling radio resets stack cache
+          // cycling radio
           print("$tag _checkClient() disabling radio");
           // don't await, the future never completes
           BleManager().disableRadio();
@@ -66,7 +66,7 @@ class BLE {
       }
       _createClientCompleted = true;
     }
-    print("$tag _checkClient() end");
+    //print("$tag _checkClient() end");
     //return Future.value(null);
   }
 

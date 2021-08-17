@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:espmui/scanner.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:mutex/mutex.dart';
 
 import 'util.dart';
 import 'ble.dart';
@@ -18,6 +19,7 @@ abstract class BleCharacteristic<T> {
   StreamSubscription<Uint8List>? _subscription;
   final _controller = StreamController<T>.broadcast();
   T? lastValue;
+  final mutex = Mutex();
 
   Stream<T> get stream => _controller.stream;
 
@@ -40,10 +42,12 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "read() characteristic not readable");
       return fromUint8List(Uint8List.fromList([]));
     }
-    lastValue = fromUint8List(await _characteristic!.read().catchError((e) {
-      bleError(tag, "read()", e);
-      return Uint8List.fromList([]);
-    }));
+    await mutex.protect(() async {
+      lastValue = fromUint8List(await _characteristic!.read().catchError((e) {
+        bleError(tag, "read()", e);
+        return Uint8List.fromList([]);
+      }));
+    });
     return lastValue;
   }
 
@@ -67,14 +71,16 @@ abstract class BleCharacteristic<T> {
       return Future.value(null);
     }
     //print("$tag write($value)");
-    return _characteristic!
-        .write(
-      toUint8List(value),
-      withResponse,
-      transactionId: transactionId,
-    )
-        .catchError((e) {
-      bleError(tag, "write($value)", e);
+    await mutex.protect(() async {
+      _characteristic!
+          .write(
+        toUint8List(value),
+        withResponse,
+        transactionId: transactionId,
+      )
+          .catchError((e) {
+        bleError(tag, "write($value)", e);
+      });
     });
   }
 
@@ -99,25 +105,27 @@ abstract class BleCharacteristic<T> {
     }
     _rawStream = _characteristic?.monitor().handleError((e) {
       bleError(tag, "_rawStream", e);
-    }).asBroadcastStream();
+    }); //.asBroadcastStream();
     if (_rawStream == null) {
       bleError(tag, "subscribe() _rawStream is null");
       return;
     }
-    _subscription = _rawStream?.listen(
-      (value) async {
-        lastValue = await onNotify(fromUint8List(value));
-        //print("$tag $lastValue");
-        streamSendIfNotClosed(_controller, lastValue);
-      },
-      onError: (e) => bleError(tag, "subscription", e),
-    );
+    await mutex.protect(() async {
+      _subscription = _rawStream?.listen(
+        (value) async {
+          lastValue = await onNotify(fromUint8List(value));
+          //print("$tag $lastValue");
+          streamSendIfNotClosed(_controller, lastValue);
+        },
+        onError: (e) => bleError(tag, "subscription", e),
+      );
+    });
   }
 
   Future<void> unsubscribe() async {
+    await _init();
     if (_subscription == null) return;
     print("$tag unsubscribe");
-    await _init();
     await _subscription?.cancel();
     _subscription = null;
   }

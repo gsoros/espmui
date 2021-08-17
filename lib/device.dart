@@ -100,20 +100,18 @@ class Device {
     peripheral.requestMtu(512).catchError((e) {
       bleError(tag, "requestMtu()", e);
       return 0;
-    }).then((mtu) => print("$tag got MTU=$mtu"));
-
-    //await discoverCharacteristics().then((_) async {
-    //  await subscribeCharacteristics();
-    //});
-    await discoverCharacteristics();
-    await _subscribeCharacteristics();
-    _requestInit();
+    }).then((mtu) async {
+      print("$tag got MTU=$mtu");
+      await discoverCharacteristics();
+      await _subscribeCharacteristics();
+      _requestInit();
+    });
   }
 
   Future<void> _onDisconnected() async {
     print("$tag _onDisconnected()");
-    _unsubscribeCharacteristics();
-    //deinitCharacteristics();
+    await _unsubscribeCharacteristics();
+    _deinitCharacteristics();
     //streamSendIfNotClosed(stateController, newState);
     if (shouldConnect) {
       await Future.delayed(Duration(milliseconds: 1000)).then((_) {
@@ -194,9 +192,9 @@ class Device {
       "secureApi",
       "weightService",
     ].forEach((key) async {
-      api.request<String>(
+      await api.request<String>(
         key,
-        minDelayMs: 3000,
+        minDelayMs: 10000,
         maxAttempts: 3,
       );
       await Future.delayed(Duration(milliseconds: 150));
@@ -230,13 +228,11 @@ class Device {
     });
   }
 
-  /*
   void _deinitCharacteristics() {
     _characteristics.forEach((_, char) {
       char.deinit();
     });
   }
-  */
 
   Future<void> disconnect() async {
     print("$tag disconnect() $name");

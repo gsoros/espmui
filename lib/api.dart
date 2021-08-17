@@ -7,7 +7,7 @@ import 'device.dart';
 
 enum ApiCommand {
   invalid,
-  bootMode,
+  wifi,
   hostName,
   reboot,
   passkey,
@@ -15,6 +15,12 @@ enum ApiCommand {
   weightService,
   calibrateStrain,
   tare,
+  wifiApEnabled,
+  wifiApSSID,
+  wifiApPassword,
+  wifiStaEnabled,
+  wifiStaSSID,
+  wifiStaPassword,
 }
 
 enum ApiResult {
@@ -23,8 +29,7 @@ enum ApiResult {
   unknownCommand,
   commandTooLong,
   argTooLong,
-  bootModeInvalid,
-  hostNameInvalid,
+  stringInvalid,
   passkeyInvalid,
   secureApiInvalid,
   calibrationFailed,
@@ -356,9 +361,9 @@ class Api {
     return false;
   }
 
-  void _runQueue() {
+  void _runQueue() async {
     if (_running) {
-      print("$tag _runQueue() already running");
+      //print("$tag _runQueue() already running");
       return;
     }
     _running = true;
@@ -380,6 +385,7 @@ class Api {
       _send(message);
       _queue.addLast(message);
     }
+    await Future.delayed(Duration(milliseconds: queueDelayMs));
     if (_queue.isNotEmpty) _startQueueSchedule();
     _running = false;
   }
