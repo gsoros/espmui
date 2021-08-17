@@ -12,7 +12,7 @@ enum ApiCommand {
   reboot,
   passkey,
   secureApi,
-  apiStrain,
+  weightService,
   calibrateStrain,
   tare,
 }
@@ -73,9 +73,10 @@ class ApiMessage {
       this.maxAgeMs = maxAttemtsTotalTime + this.minDelayMs;
   }
 
-  /// Attempts to extract commandCode and commandStr from command
+  /// Attempts to create commandCode and commandStr from command
   void parseCommand() {
     if (commandCode != null) return; // already parsed
+    //print("$tag parsing: $command");
     int eqSign = command.indexOf("=");
     String? parsedArg;
     if (eqSign > 0) {

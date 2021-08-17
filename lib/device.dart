@@ -16,7 +16,8 @@ class Device {
   late Api api;
   bool shouldConnect = false;
 
-  final apiStrainEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
+  final weightServiceEnabled =
+      ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
 
   /// Connection state
   final stateController =
@@ -38,8 +39,8 @@ class Device {
       characteristic("power") as PowerCharacteristic;
   ApiCharacteristic get apiCharacteristic =>
       characteristic("api") as ApiCharacteristic;
-  ApiStrainCharacteristic get apiStrain =>
-      characteristic("apiStrain") as ApiStrainCharacteristic;
+  WeightScaleCharacteristic get weightScale =>
+      characteristic("weightScale") as WeightScaleCharacteristic;
 
   Future<bool> get connected => peripheral.isConnected().catchError((e) {
         bleError(tag, "could not get connection state", e);
@@ -51,7 +52,7 @@ class Device {
       "battery": BatteryCharacteristic(peripheral),
       "power": PowerCharacteristic(peripheral),
       "api": ApiCharacteristic(peripheral),
-      "apiStrain": ApiStrainCharacteristic(peripheral),
+      "weightScale": WeightScaleCharacteristic(peripheral),
     };
     api = Api(this);
 
@@ -72,12 +73,12 @@ class Device {
       name = message.valueAsString;
       print("$tag onApiDone hostName updated to $name");
     }
-    // apiStrain
-    else if (ApiCommand.apiStrain.index == message.commandCode) {
-      apiStrainEnabled.value =
+    // weightServiceEnabled
+    else if (ApiCommand.weightService.index == message.commandCode) {
+      weightServiceEnabled.value =
           message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       print(
-          "$tag onApiDone apiStrainEnabled updated to ${apiStrainEnabled.value}");
+          "$tag onApiDone weightServiceEnabled updated to ${weightServiceEnabled.value}");
     }
   }
 
@@ -186,25 +187,24 @@ class Device {
   /// because the message.done subscription will handle them
   void _requestInit() async {
     if (!await connected) return;
-    apiStrainEnabled.value = ExtendedBool.Waiting;
+    weightServiceEnabled.value = ExtendedBool.Waiting;
     print("$tag Requesting init");
     [
       "hostName",
       "secureApi",
-      "apiStrain",
+      "weightService",
     ].forEach((key) async {
       api.request<String>(
         key,
-        minDelayMs: 1000,
-        maxAttempts: 10,
-        maxAgeMs: 20000,
+        minDelayMs: 3000,
+        maxAttempts: 3,
       );
       await Future.delayed(Duration(milliseconds: 150));
     });
   }
 
   void _resetInit() {
-    apiStrainEnabled.value = ExtendedBool.Unknown;
+    weightServiceEnabled.value = ExtendedBool.Unknown;
   }
 
   Future<void> discoverCharacteristics() async {

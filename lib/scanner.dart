@@ -97,7 +97,7 @@ class Scanner {
     streamSendIfNotClosed(_scanningController, true);
     _scanResultSubscription = ble.manager
         .startPeripheralScan(
-          uuids: [apiServiceUUID],
+          uuids: ["00001818-0000-1000-8000-00805f9b34fb"],
         )
         .asBroadcastStream()
         .listen(

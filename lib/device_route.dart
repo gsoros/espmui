@@ -86,7 +86,7 @@ class DeviceRouteState extends State<DeviceRoute> {
         height: cellHeight * 1.5,
       ),
       StaggeredGridItem(
-        value: Strain(device),
+        value: WeightScale(device),
         colSpan: 4,
         height: cellHeight,
       ),
@@ -356,8 +356,8 @@ class StrainStreamListener extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<double>(
-      stream: device.apiStrain.stream,
-      initialData: device.apiStrain.lastValue,
+      stream: device.weightScale.stream,
+      initialData: device.weightScale.lastValue,
       builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
         String strain = snapshot.hasData && enabled != ExtendedBool.False
             ? snapshot.data!.toStringAsFixed(2)
@@ -374,9 +374,9 @@ class StrainStreamListener extends StatelessWidget {
   }
 }
 
-class Strain extends StatelessWidget {
+class WeightScale extends StatelessWidget {
   final Device device;
-  Strain(this.device);
+  WeightScale(this.device);
 
   @override
   Widget build(BuildContext context) {
@@ -428,14 +428,15 @@ class Strain extends StatelessWidget {
       );
     }
 
-    void toggleStrainStream(enabled) async {
-      device.apiStrainEnabled.value = ExtendedBool.Waiting;
+    void toggleWeightScale(enabled) async {
+      device.weightServiceEnabled.value = ExtendedBool.Waiting;
       bool enable = enabled == ExtendedBool.True ? false : true;
       bool? reply = await device.api
-          .request<bool>("apiStrain=" + (enable ? "true" : "false"));
+          .request<bool>("weightService=" + (enable ? "true" : "false"));
       bool success = reply == enable;
+      if (!success) device.weightServiceEnabled.value = ExtendedBool.Unknown;
       snackbar(
-        "Strain stream: " +
+        "Weight service " +
             (enable ? "en" : "dis") +
             "able" +
             (success ? "d" : " failed"),
@@ -453,7 +454,7 @@ class Strain extends StatelessWidget {
     }
 
     return ValueListenableBuilder<ExtendedBool>(
-      valueListenable: device.apiStrainEnabled,
+      valueListenable: device.weightServiceEnabled,
       builder: (context, enabled, child) {
         var strainOutput = StrainStreamListener(device, enabled);
 
@@ -465,8 +466,9 @@ class Strain extends StatelessWidget {
             if (enabled == ExtendedBool.True) calibrate();
           },
           onDoubleTap: () {
-            if (enabled == ExtendedBool.True || enabled == ExtendedBool.False)
-              toggleStrainStream(enabled);
+            if (enabled == ExtendedBool.True ||
+                enabled == ExtendedBool.False ||
+                enabled == ExtendedBool.Unknown) toggleWeightScale(enabled);
           },
           child: Container(
             child:

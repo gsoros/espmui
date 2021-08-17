@@ -92,18 +92,19 @@ abstract class BleCharacteristic<T> {
     await read();
     print("$tag subscribe() initial value: $lastValue");
     streamSendIfNotClosed(_controller, lastValue);
-    if (!_characteristic!.isIndicatable && !_characteristic!.isNotifiable) {
+    if (!(_characteristic?.isIndicatable ?? false) &&
+        !(_characteristic?.isNotifiable ?? false)) {
       bleError(tag, "characteristic neither indicatable nor notifiable");
       return;
     }
-    _rawStream = _characteristic!.monitor().handleError((e) {
+    _rawStream = _characteristic?.monitor().handleError((e) {
       bleError(tag, "_rawStream", e);
     }).asBroadcastStream();
     if (_rawStream == null) {
       bleError(tag, "subscribe() _rawStream is null");
       return;
     }
-    _subscription = _rawStream!.listen(
+    _subscription = _rawStream?.listen(
       (value) async {
         lastValue = await onNotify(fromUint8List(value));
         //print("$tag $lastValue");
@@ -207,7 +208,7 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
   @override
   Future<Uint8List?> onNotify(Uint8List value) {
     /// Format: little-endian
-    /// [flags: 2][power: 2][revolutions: 2][last crank event: 2]
+    /// Bytes: [flags: 2][power: 2][revolutions: 2][last crank event: 2]
     /// Flags: 0b0000000000100000;  // Crank rev data present
     /// crank event time unit: 1/1024s, rolls over
     int power = value.buffer.asByteData().getUint16(2, Endian.little);
@@ -292,19 +293,23 @@ class ApiCharacteristic extends BleCharacteristic<String> {
   }
 }
 
-class ApiStrainCharacteristic extends BleCharacteristic<double> {
-  final String tag = "[ApiStrainCharacteristic]";
-  final String serviceUUID = "55bebab5-1857-4b14-a07b-d4879edad159";
-  final String characteristicUUID = "1d7fd29e-86bc-4640-86b5-00fa3462b480";
+class WeightScaleCharacteristic extends BleCharacteristic<double> {
+  final String tag = "[WeightScaleCharacteristic]";
+  final String serviceUUID = "0000181d-0000-1000-8000-00805f9b34fb";
+  final String characteristicUUID = "00002a9d-0000-1000-8000-00805f9b34fb";
 
-  ApiStrainCharacteristic(Peripheral peripheral) : super(peripheral);
-
-  @override
-  double fromUint8List(Uint8List list) => list.isNotEmpty
-      ? list.buffer.asByteData().getFloat32(0, Endian.little)
-      : 0.0;
+  WeightScaleCharacteristic(Peripheral peripheral) : super(peripheral);
 
   @override
-  Uint8List toUint8List(double value) =>
-      Uint8List(4)..buffer.asByteData().setFloat32(0, value, Endian.little);
+  double fromUint8List(Uint8List list) {
+    /// Format: little-endian
+    /// Bytes: [flags: 1][weight: 2]
+    return list.isNotEmpty
+        ? list.buffer.asByteData().getInt16(1, Endian.little) / 200
+        : 0.0;
+  }
+
+  @override
+  Uint8List toUint8List(double value) => Uint8List(3)
+    ..buffer.asByteData().setInt16(1, (value * 200).round(), Endian.little);
 }
