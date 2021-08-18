@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
 
-import 'package:espmui/scanner.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:mutex/mutex.dart';
 
@@ -95,9 +94,6 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "subscribe() characteristic is null");
       return;
     }
-    await read();
-    print("$tag subscribe() initial value: $lastValue");
-    streamSendIfNotClosed(_controller, lastValue);
     if (!(_characteristic?.isIndicatable ?? false) &&
         !(_characteristic?.isNotifiable ?? false)) {
       bleError(tag, "characteristic neither indicatable nor notifiable");
@@ -120,6 +116,9 @@ abstract class BleCharacteristic<T> {
         onError: (e) => bleError(tag, "subscription", e),
       );
     });
+    await read();
+    print("$tag subscribe() initial value: $lastValue");
+    streamSendIfNotClosed(_controller, lastValue);
   }
 
   Future<void> unsubscribe() async {
@@ -132,12 +131,13 @@ abstract class BleCharacteristic<T> {
 
   Future<void> _init() async {
     if (_characteristic != null) return; // already init'd
-    bool connected = await Scanner().selected?.connected ?? false;
-    print("$tag _init()");
+    //bool connected = await Scanner().selected?.connected ?? false;
+    bool connected = await _peripheral.isConnected();
     if (!connected) {
       bleError(tag, "_init() peripheral not connected");
       return Future.value(null);
     }
+    print("$tag _init()");
     /*
     _characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID).catchError((e) {
       bleError(tag, "readCharacteristic()", e);

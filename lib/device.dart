@@ -19,28 +19,33 @@ class Device {
   final weightServiceEnabled =
       ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
 
-  /// Connection state
-  final stateController =
+  /// Connection state stream controller
+  final _stateController =
       StreamController<PeripheralConnectionState>.broadcast();
-  Stream<PeripheralConnectionState> get stateStream => stateController.stream;
+
+  /// Connection state stream
+  Stream<PeripheralConnectionState> get stateStream => _stateController.stream;
+
+  /// Connection state subscription
   StreamSubscription<PeripheralConnectionState>? _stateSubscription;
 
   /// API done messages
   StreamSubscription<ApiMessage>? _apiSubsciption;
 
-  Map<String, BleCharacteristic> _characteristics = {};
+  //Map<String, BleCharacteristic> _characteristics = {};
+  var _characteristics = CharacteristicList();
 
   String? get name => peripheral.name;
   set name(String? name) => peripheral.name = name;
   String get identifier => peripheral.identifier;
-  BatteryCharacteristic get battery =>
-      characteristic("battery") as BatteryCharacteristic;
-  PowerCharacteristic get power =>
-      characteristic("power") as PowerCharacteristic;
-  ApiCharacteristic get apiCharacteristic =>
-      characteristic("api") as ApiCharacteristic;
-  WeightScaleCharacteristic get weightScale =>
-      characteristic("weightScale") as WeightScaleCharacteristic;
+  BatteryCharacteristic? get battery =>
+      characteristic("battery") as BatteryCharacteristic?;
+  PowerCharacteristic? get power =>
+      characteristic("power") as PowerCharacteristic?;
+  ApiCharacteristic? get apiCharacteristic =>
+      characteristic("api") as ApiCharacteristic?;
+  WeightScaleCharacteristic? get weightScale =>
+      characteristic("weightScale") as WeightScaleCharacteristic?;
 
   Future<bool> get connected => peripheral.isConnected().catchError((e) {
         bleError(tag, "could not get connection state", e);
@@ -48,12 +53,15 @@ class Device {
 
   Device(this.peripheral, {this.rssi = 0, this.lastSeen = 0}) {
     print("[Device] construct");
-    _characteristics = {
-      "battery": BatteryCharacteristic(peripheral),
-      "power": PowerCharacteristic(peripheral),
-      "api": ApiCharacteristic(peripheral),
-      "weightScale": WeightScaleCharacteristic(peripheral),
-    };
+    _characteristics.addAll({
+      "battery": CharacteristicListItem(BatteryCharacteristic(peripheral)),
+      "power": CharacteristicListItem(PowerCharacteristic(peripheral)),
+      "api": CharacteristicListItem(ApiCharacteristic(peripheral)),
+      "weightScale": CharacteristicListItem(
+        WeightScaleCharacteristic(peripheral),
+        subscribeOnConnect: false,
+      ),
+    });
     api = Api(this);
 
     /// listen to api message done events
@@ -62,7 +70,7 @@ class Device {
   }
 
   /// Processes "done" messages sent by the API
-  void _onApiDone(ApiMessage message) {
+  void _onApiDone(ApiMessage message) async {
     // print("$tag onApiDone: $message");
     if (message.resultCode != ApiResult.success.index) return;
 
@@ -79,15 +87,20 @@ class Device {
           message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       print(
           "$tag onApiDone weightServiceEnabled updated to ${weightServiceEnabled.value}");
+      if (message.valueAsBool ?? false)
+        await weightScale?.subscribe();
+      else
+        await weightScale?.unsubscribe();
     }
   }
 
   void dispose() async {
     print("$tag $name dispose");
     disconnect();
-    await stateController.close();
-    _characteristics.forEach((_, char) {
-      char.dispose();
+    await _stateController.close();
+    _characteristics.forEachCharacteristic((_, char) async {
+      await char?.unsubscribe();
+      await char?.dispose();
     });
     await _stateSubscription?.cancel();
     _stateSubscription = null;
@@ -137,7 +150,7 @@ class Device {
           if (newState == connectedState)
             await _onConnected();
           else if (newState == disconnectedState) await _onDisconnected();
-          streamSendIfNotClosed(stateController, newState);
+          streamSendIfNotClosed(_stateController, newState);
         },
         onError: (e) => bleError(tag, "connectionStateSubscription", e),
       );
@@ -189,6 +202,7 @@ class Device {
     print("$tag Requesting init");
     [
       "hostName",
+      "wifi",
       "secureApi",
       "weightService",
     ].forEach((key) async {
@@ -217,20 +231,20 @@ class Device {
 
   Future<void> _subscribeCharacteristics() async {
     if (!await connected) return;
-    _characteristics.forEach((_, char) async {
-      await char.subscribe();
+    _characteristics.forEachListItem((_, item) async {
+      if (item.subscribeOnConnect) await item.characteristic?.subscribe();
     });
   }
 
   Future<void> _unsubscribeCharacteristics() async {
-    _characteristics.forEach((_, char) async {
-      await char.unsubscribe();
+    _characteristics.forEachCharacteristic((_, char) async {
+      await char?.unsubscribe();
     });
   }
 
   void _deinitCharacteristics() {
-    _characteristics.forEach((_, char) {
-      char.deinit();
+    _characteristics.forEachCharacteristic((_, char) {
+      char?.deinit();
     });
   }
 
@@ -254,12 +268,8 @@ class Device {
     });
   }
 
-  BleCharacteristic? characteristic(String id) {
-    if (!_characteristics.containsKey(id)) {
-      bleError(tag, "characteristic $id not found");
-      return null;
-    }
-    return _characteristics[id];
+  BleCharacteristic? characteristic(String name) {
+    return _characteristics.get(name);
   }
 }
 
@@ -320,4 +330,45 @@ class DeviceList {
   int get length => _devices.length;
   bool get isEmpty => _devices.isEmpty;
   void forEach(void Function(String, Device) f) => _devices.forEach(f);
+}
+
+class CharacteristicList {
+  final String tag = "[CharacteristicList]";
+  Map<String, CharacteristicListItem> _items = {};
+
+  BleCharacteristic? get(String name) {
+    return _items.containsKey(name) ? _items[name]!.characteristic : null;
+  }
+
+  void set(String name, CharacteristicListItem item) => _items[name] = item;
+
+  void addAll(Map<String, CharacteristicListItem> items) =>
+      _items.addAll(items);
+
+  void dispose() {
+    print("$tag dispose");
+    _items.forEach((_, item) => item.dispose());
+    _items.clear();
+  }
+
+  void forEachCharacteristic(void Function(String, BleCharacteristic?) f) =>
+      _items.forEach((String name, CharacteristicListItem item) =>
+          f(name, item.characteristic));
+
+  void forEachListItem(void Function(String, CharacteristicListItem) f) =>
+      _items.forEach(f);
+}
+
+class CharacteristicListItem {
+  bool subscribeOnConnect;
+  BleCharacteristic? characteristic;
+
+  CharacteristicListItem(
+    this.characteristic, {
+    this.subscribeOnConnect = true,
+  });
+
+  void dispose() {
+    characteristic?.dispose();
+  }
 }

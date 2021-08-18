@@ -169,8 +169,8 @@ class Api {
   final tag = "[Api]";
 
   Device device;
-  ApiCharacteristic get _characteristic => device.apiCharacteristic;
-  late StreamSubscription<String> _subscription;
+  ApiCharacteristic? get _characteristic => device.apiCharacteristic;
+  late StreamSubscription<String>? _subscription;
   final _doneController = StreamController<ApiMessage>.broadcast();
   Stream<ApiMessage> get messageDoneStream => _doneController.stream;
   final _queue = Queue<ApiMessage>();
@@ -179,8 +179,8 @@ class Api {
   final int queueDelayMs;
 
   Api(this.device, {this.queueDelayMs = 200}) {
-    _characteristic.subscribe();
-    _subscription = _characteristic.stream.listen((reply) => _onNotify(reply));
+    _characteristic?.subscribe();
+    _subscription = _characteristic?.stream.listen((reply) => _onNotify(reply));
   }
 
   void _startQueueSchedule() {
@@ -404,13 +404,13 @@ class Api {
     var arg = message.arg;
     if (arg != null) toWrite += "=$arg";
     //print("$tag _send() calling char.write($toWrite)");
-    _characteristic.write(toWrite);
+    _characteristic?.write(toWrite);
   }
 
   Future<void> destruct() async {
     print("$tag destruct");
     _stopQueueSchedule();
-    await _subscription.cancel();
+    await _subscription?.cancel();
     while (_queue.isNotEmpty) {
       var message = _queue.removeFirst();
       message.destruct();

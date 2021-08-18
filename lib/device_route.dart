@@ -204,11 +204,11 @@ class AppBarTitle extends StatelessWidget {
         }
         snackbar("Success setting new hostname on device: $value", context);
         snackbar("Sending reboot command", context);
-        await api.request<bool>("reboot");
+        await api.request<bool>("reboot=2000"); // reboot in 2s
         snackbar("Disconnecting", context);
         await device.disconnect();
         snackbar("Waiting for device to boot", context);
-        await Future.delayed(Duration(milliseconds: 3000));
+        await Future.delayed(Duration(milliseconds: 4000));
         snackbar("Connecting to device", context);
         await device.connect();
         snackbar("Success", context);
@@ -317,14 +317,14 @@ class ConnectButton extends StatelessWidget {
 }
 
 class Battery extends StatelessWidget {
-  final BatteryCharacteristic char;
+  final BatteryCharacteristic? char;
   Battery(this.char);
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<int>(
-      stream: char.stream,
-      initialData: char.lastValue,
+      stream: char?.stream,
+      initialData: char?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
         return Container(
           child: Column(
@@ -356,8 +356,8 @@ class StrainStreamListener extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<double>(
-      stream: device.weightScale.stream,
-      initialData: device.weightScale.lastValue,
+      stream: device.weightScale?.stream,
+      initialData: device.weightScale?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
         String strain = snapshot.hasData && enabled != ExtendedBool.False
             ? snapshot.data!.toStringAsFixed(2)
@@ -434,7 +434,13 @@ class WeightScale extends StatelessWidget {
       bool? reply = await device.api
           .request<bool>("weightService=" + (enable ? "true" : "false"));
       bool success = reply == enable;
-      if (!success) device.weightServiceEnabled.value = ExtendedBool.Unknown;
+      if (success) {
+        if (enable)
+          await device.weightScale?.subscribe();
+        else
+          await device.characteristic("weightScale")?.unsubscribe();
+      } else
+        device.weightServiceEnabled.value = ExtendedBool.Unknown;
       snackbar(
         "Weight service " +
             (enable ? "en" : "dis") +
@@ -496,7 +502,7 @@ class WeightScale extends StatelessWidget {
 }
 
 class PowerCadence extends StatelessWidget {
-  final PowerCharacteristic char;
+  final PowerCharacteristic? char;
   final String mode;
 
   /// [mode] = "power" | "cadence"
@@ -505,8 +511,8 @@ class PowerCadence extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var value = StreamBuilder<int>(
-      stream: mode == "power" ? char.powerStream : char.cadenceStream,
-      initialData: mode == "power" ? char.lastPower : char.lastCadence,
+      stream: mode == "power" ? char?.powerStream : char?.cadenceStream,
+      initialData: mode == "power" ? char?.lastPower : char?.lastCadence,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
         return Text(
           snapshot.hasData ? snapshot.data.toString() : "0",
@@ -540,8 +546,8 @@ class ApiStream extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<String>(
-      stream: device.apiCharacteristic.stream,
-      initialData: device.apiCharacteristic.lastValue,
+      stream: device.apiCharacteristic?.stream,
+      initialData: device.apiCharacteristic?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
         return Text("${snapshot.data}");
       },
