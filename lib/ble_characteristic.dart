@@ -7,18 +7,19 @@ import 'package:mutex/mutex.dart';
 
 import 'util.dart';
 import 'ble.dart';
+import 'ble_constants.dart';
 
 abstract class BleCharacteristic<T> {
-  final String tag = "[Characteristic]";
+  final tag = "[Characteristic]";
   Peripheral _peripheral;
-  String serviceUUID = "";
-  String characteristicUUID = "";
+  final serviceUUID = "";
+  final characteristicUUID = "";
   CharacteristicWithValue? _characteristic;
   Stream<Uint8List>? _rawStream;
   StreamSubscription<Uint8List>? _subscription;
   final _controller = StreamController<T>.broadcast();
   T? lastValue;
-  final mutex = Mutex();
+  final _exclusiveAccess = Mutex();
 
   Stream<T> get stream => _controller.stream;
 
@@ -41,7 +42,7 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "read() characteristic not readable");
       return fromUint8List(Uint8List.fromList([]));
     }
-    await mutex.protect(() async {
+    await _exclusiveAccess.protect(() async {
       lastValue = fromUint8List(await _characteristic!.read().catchError((e) {
         bleError(tag, "read()", e);
         return Uint8List.fromList([]);
@@ -70,7 +71,7 @@ abstract class BleCharacteristic<T> {
       return Future.value(null);
     }
     //print("$tag write($value)");
-    await mutex.protect(() async {
+    await _exclusiveAccess.protect(() async {
       _characteristic!
           .write(
         toUint8List(value),
@@ -106,7 +107,7 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "subscribe() _rawStream is null");
       return;
     }
-    await mutex.protect(() async {
+    await _exclusiveAccess.protect(() async {
       _subscription = _rawStream?.listen(
         (value) async {
           lastValue = await onNotify(fromUint8List(value));
@@ -131,19 +132,12 @@ abstract class BleCharacteristic<T> {
 
   Future<void> _init() async {
     if (_characteristic != null) return; // already init'd
-    //bool connected = await Scanner().selected?.connected ?? false;
     bool connected = await _peripheral.isConnected();
     if (!connected) {
       bleError(tag, "_init() peripheral not connected");
       return Future.value(null);
     }
-    print("$tag _init()");
-    /*
-    _characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID).catchError((e) {
-      bleError(tag, "readCharacteristic()", e);
-      return Future.value(null);
-    });
-    */
+    //print("$tag _init()");
     try {
       _characteristic =
           await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
@@ -171,9 +165,9 @@ abstract class BleCharacteristic<T> {
 }
 
 class BatteryCharacteristic extends BleCharacteristic<int> {
-  final String tag = "[BatteryCharacteristic]";
-  final String serviceUUID = "0000180f-0000-1000-8000-00805f9b34fb";
-  final String characteristicUUID = "00002a19-0000-1000-8000-00805f9b34fb";
+  final tag = "[BatteryCharacteristic]";
+  final serviceUUID = BleConstants.BATTERY_SERVICE_UUID;
+  final characteristicUUID = BleConstants.BATTERY_LEVEL_CHAR_UUID;
 
   BatteryCharacteristic(Peripheral peripheral) : super(peripheral);
 
@@ -190,9 +184,9 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
 }
 
 class PowerCharacteristic extends BleCharacteristic<Uint8List> {
-  final String tag = "[PowerCharacteristic]";
-  final String serviceUUID = "00001818-0000-1000-8000-00805f9b34fb";
-  final String characteristicUUID = "00002a63-0000-1000-8000-00805f9b34fb";
+  final tag = "[PowerCharacteristic]";
+  final serviceUUID = BleConstants.CYCLING_POWER_SERVICE_UUID;
+  final characteristicUUID = BleConstants.CYCLING_POWER_MEASUREMENT_CHAR_UUID;
 
   int revolutions = 0;
   int lastCrankEvent = 0;
@@ -270,9 +264,9 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
 }
 
 class ApiCharacteristic extends BleCharacteristic<String> {
-  final String tag = "[ApiCharacteristic]";
-  final String serviceUUID = "55bebab5-1857-4b14-a07b-d4879edad159";
-  final String characteristicUUID = "da34811a-03c0-4efe-a266-ed014e181b65";
+  final tag = "[ApiCharacteristic]";
+  final serviceUUID = BleConstants.API_SERVICE_UUID;
+  final characteristicUUID = BleConstants.API_CHAR_UUID;
 
   ApiCharacteristic(Peripheral peripheral) : super(peripheral);
 
@@ -302,9 +296,9 @@ class ApiCharacteristic extends BleCharacteristic<String> {
 }
 
 class WeightScaleCharacteristic extends BleCharacteristic<double> {
-  final String tag = "[WeightScaleCharacteristic]";
-  final String serviceUUID = "0000181d-0000-1000-8000-00805f9b34fb";
-  final String characteristicUUID = "00002a9d-0000-1000-8000-00805f9b34fb";
+  final tag = "[WeightScaleCharacteristic]";
+  final serviceUUID = BleConstants.WEIGHT_SCALE_SERVICE_UUID;
+  final characteristicUUID = BleConstants.WEIGHT_MEASUREMENT_CHAR_UUID;
 
   WeightScaleCharacteristic(Peripheral peripheral) : super(peripheral);
 

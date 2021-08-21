@@ -18,6 +18,7 @@ class Device {
 
   final weightServiceEnabled =
       ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
+  final wifiSettings = PropertyValueNotifier<WifiSettings>(WifiSettings());
 
   /// Connection state stream controller
   final _stateController =
@@ -71,26 +72,60 @@ class Device {
 
   /// Processes "done" messages sent by the API
   void _onApiDone(ApiMessage message) async {
-    // print("$tag onApiDone: $message");
     if (message.resultCode != ApiResult.success.index) return;
-
+    //print("$tag onApiDone parsing successful message: $message");
     // switch does not work with non-consant case :(
 
     // hostName
     if (ApiCommand.hostName.index == message.commandCode) {
       name = message.valueAsString;
-      print("$tag onApiDone hostName updated to $name");
     }
     // weightServiceEnabled
     else if (ApiCommand.weightService.index == message.commandCode) {
       weightServiceEnabled.value =
           message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      print(
-          "$tag onApiDone weightServiceEnabled updated to ${weightServiceEnabled.value}");
       if (message.valueAsBool ?? false)
         await weightScale?.subscribe();
       else
         await weightScale?.unsubscribe();
+    }
+    // wifi
+    else if (ApiCommand.wifi.index == message.commandCode) {
+      wifiSettings.value.enabled =
+          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.notifyListeners();
+    }
+    // wifiApEnabled
+    else if (ApiCommand.wifiApEnabled.index == message.commandCode) {
+      wifiSettings.value.apEnabled =
+          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.notifyListeners();
+    }
+    // wifiApSSID
+    else if (ApiCommand.wifiApSSID.index == message.commandCode) {
+      wifiSettings.value.apSSID = message.valueAsString;
+      wifiSettings.notifyListeners();
+    }
+    // wifiApPassword
+    else if (ApiCommand.wifiApPassword.index == message.commandCode) {
+      wifiSettings.value.apPassword = message.valueAsString;
+      wifiSettings.notifyListeners();
+    }
+    // wifiStaEnabled
+    else if (ApiCommand.wifiStaEnabled.index == message.commandCode) {
+      wifiSettings.value.staEnabled =
+          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.notifyListeners();
+    }
+    // wifiStaSSID
+    else if (ApiCommand.wifiStaSSID.index == message.commandCode) {
+      wifiSettings.value.staSSID = message.valueAsString;
+      wifiSettings.notifyListeners();
+    }
+    // wifiStaPassword
+    else if (ApiCommand.wifiStaPassword.index == message.commandCode) {
+      wifiSettings.value.staPassword = message.valueAsString;
+      wifiSettings.notifyListeners();
     }
   }
 
@@ -141,7 +176,7 @@ class Device {
     if (_stateSubscription == null) {
       _stateSubscription = peripheral
           .observeConnectionState(
-        emitCurrentValue: true,
+        emitCurrentValue: false,
         completeOnDisconnect: false,
       )
           .listen(
@@ -201,22 +236,29 @@ class Device {
     weightServiceEnabled.value = ExtendedBool.Waiting;
     print("$tag Requesting init");
     [
+      "weightService",
       "hostName",
       "wifi",
+      "wifiApEnabled",
+      "wifiApSSID",
+      "wifiApPassword",
+      "wifiStaEnabled",
+      "wifiStaSSID",
+      "wifiStaPassword",
       "secureApi",
-      "weightService",
     ].forEach((key) async {
       await api.request<String>(
         key,
         minDelayMs: 10000,
         maxAttempts: 3,
       );
-      await Future.delayed(Duration(milliseconds: 150));
+      await Future.delayed(Duration(milliseconds: 250));
     });
   }
 
   void _resetInit() {
     weightServiceEnabled.value = ExtendedBool.Unknown;
+    wifiSettings.value = WifiSettings();
   }
 
   Future<void> discoverCharacteristics() async {
@@ -370,5 +412,43 @@ class CharacteristicListItem {
 
   void dispose() {
     characteristic?.dispose();
+  }
+}
+
+class WifiSettings {
+  var enabled = ExtendedBool.Unknown;
+  var apEnabled = ExtendedBool.Unknown;
+  String? apSSID;
+  String? apPassword;
+  var staEnabled = ExtendedBool.Unknown;
+  String? staSSID;
+  String? staPassword;
+
+  @override
+  bool operator ==(other) {
+    return (other is WifiSettings) &&
+        other.enabled == enabled &&
+        other.apEnabled == apEnabled &&
+        other.apSSID == apSSID &&
+        other.apPassword == apPassword &&
+        other.staEnabled == staEnabled &&
+        other.staSSID == staSSID &&
+        other.staPassword == staPassword;
+  }
+
+  @override
+  int get hashCode =>
+      enabled.hashCode ^
+      apEnabled.hashCode ^
+      apSSID.hashCode ^
+      apPassword.hashCode ^
+      staEnabled.hashCode ^
+      staSSID.hashCode ^
+      staPassword.hashCode;
+
+  String toString() {
+    return "WifiSettings {enabled: $enabled, "
+        "apEnabled: $apEnabled, apSSID: $apSSID, apPassword: $apPassword, "
+        "staEnabled: $staEnabled, staSSID: $staSSID, staPassword: $staPassword}";
   }
 }

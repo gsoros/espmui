@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:mutex/mutex.dart';
 
 import 'util.dart';
 import 'scanner.dart';
@@ -11,9 +12,11 @@ import 'scanner.dart';
 /// singleton class
 class BLE {
   static final BLE _instance = BLE._construct();
-  final String tag = "[BLE]";
+  final tag = "[BLE]";
   bool _createClientRequested = false;
   bool _createClientCompleted = false;
+  bool _initDone = false;
+  final _exclusiveAccess = Mutex();
 
   /// returns a singleton
   factory BLE() {
@@ -43,7 +46,7 @@ class BLE {
   }
 
   Future<void> _checkClient() async {
-    //print("$tag _checkClient() start");
+    print("$tag _checkClient() start");
     if (!_createClientCompleted) {
       while (!await BleManager().isClientCreated()) {
         // make sure createClient() is called only once
@@ -52,6 +55,7 @@ class BLE {
           print("$tag _checkClient() waiting for createClient");
           await BleManager().createClient();
           print("$tag _checkClient() createClient done");
+          /*
           await Future.delayed(Duration(milliseconds: 500));
           // cycling radio
           print("$tag _checkClient() disabling radio");
@@ -61,17 +65,23 @@ class BLE {
           print("$tag _checkClient() enabling radio");
           await BleManager().enableRadio();
           print("$tag _checkClient() enabled radio");
+          */
         }
         await Future.delayed(Duration(milliseconds: 500));
       }
       _createClientCompleted = true;
     }
-    //print("$tag _checkClient() end");
+    print("$tag _checkClient() end");
     //return Future.value(null);
   }
 
   BleManager get manager {
-    _checkClient();
+    if (!_initDone) {
+      print("$tag get manager calling _init()");
+      _init();
+      sleep(Duration(milliseconds: 1000));
+    }
+    //_checkClient();
     return BleManager();
   }
 
@@ -80,13 +90,18 @@ class BLE {
     _init();
   }
 
-  void _init() async {
-    print("$tag _init()");
-    await _checkPermissions();
-    await _checkClient();
-    print("$tag _init() _checkClient() done");
-    await _checkAdapter();
-    print("$tag _init() done");
+  Future<void> _init() async {
+    if (_initDone) return;
+    await _exclusiveAccess.protect(() async {
+      print("$tag _init()");
+      await _checkPermissions();
+      await _checkClient();
+      print("$tag _init() _checkClient() done");
+      await _checkAdapter();
+      _initDone = true;
+      print("$tag _init() done");
+      //return Future.value(null);
+    });
   }
 
   Future<void> dispose() async {
@@ -94,6 +109,12 @@ class BLE {
     await stateController.close();
     await stateSubscription?.cancel();
     await manager.destroyClient();
+    _initDone = false;
+  }
+
+  Future<void> reinit() async {
+    await dispose();
+    await _init();
   }
 
   Future<void> _checkPermissions() async {
@@ -107,12 +128,13 @@ class BLE {
       bleError(tag, "No blootueth permission");
       return Future.error(Exception("$tag Bluetooth permission not granted"));
     }
+    print("$tag Checking permissions done");
   }
 
   Future<void> _checkAdapter() async {
     print("$tag _checkAdaper()");
     await stateSubscription?.cancel();
-    stateSubscription = manager
+    stateSubscription = BleManager()
         .observeBluetoothState()
         .handleError(
           (e) => bleError(tag, "observeBluetoothState()", e),

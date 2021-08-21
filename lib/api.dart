@@ -179,7 +179,7 @@ class Api {
   final int queueDelayMs;
 
   Api(this.device, {this.queueDelayMs = 200}) {
-    _characteristic?.subscribe();
+    //_characteristic?.subscribe();
     _subscription = _characteristic?.stream.listen((reply) => _onNotify(reply));
   }
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
 import 'ble.dart';
+import 'ble_constants.dart';
 import 'device.dart';
 import 'util.dart';
 
@@ -15,8 +16,6 @@ class Scanner {
   factory Scanner() {
     return _instance;
   }
-
-  final String apiServiceUUID = "55bebab5-1857-4b14-a07b-d4879edad159";
 
   /// ScanResult
   StreamSubscription<ScanResult>? _scanResultSubscription;
@@ -97,7 +96,7 @@ class Scanner {
     streamSendIfNotClosed(_scanningController, true);
     _scanResultSubscription = ble.manager
         .startPeripheralScan(
-          uuids: ["00001818-0000-1000-8000-00805f9b34fb"],
+          uuids: [BleConstants.CYCLING_POWER_SERVICE_UUID],
         )
         .asBroadcastStream()
         .listen(

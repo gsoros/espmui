@@ -9,6 +9,18 @@ enum ExtendedBool {
   Waiting,
 }
 
+/// Workaround for "The member 'notifyListeners' can only be used within
+/// 'package:flutter/src/foundation/change_notifier.dart' or a test.dart
+/// (invalid_use_of_visible_for_testing_member)""
+class PropertyValueNotifier<T> extends ValueNotifier<T> {
+  PropertyValueNotifier(T value) : super(value);
+
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+  }
+}
+
 /// Unix timestamp in milliseconds
 int uts() {
   return DateTime.now().millisecondsSinceEpoch;

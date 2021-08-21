@@ -98,7 +98,12 @@ class DeviceRouteState extends State<DeviceRoute> {
       StaggeredGridItem(
         value: ApiInterface(device),
         colSpan: 6,
-        height: cellHeight * 1.5,
+        height: cellHeight * .7,
+      ),
+      StaggeredGridItem(
+        value: Wifi(device),
+        colSpan: 6,
+        height: cellHeight * 2.5,
       ),
     ];
 
@@ -386,9 +391,24 @@ class WeightScale extends StatelessWidget {
         snackbar("Sending calibration value: $knownMassStr", context);
         String? value =
             await api.request<String>("calibrateStrain=$knownMassStr");
-        if (value == null ||
-            double.tryParse(value) != double.tryParse(knownMassStr)) {
-          snackbar("Error calibrating device", context);
+        var errorMsg = "Error calibrating device";
+        if (value == null) {
+          snackbar(errorMsg, context);
+          return;
+        }
+        var parsedValue = double.tryParse(value);
+        if (parsedValue == null) {
+          snackbar(errorMsg, context);
+          return;
+        }
+        var parsedKnownMass = double.tryParse(knownMassStr);
+        if (parsedKnownMass == null) {
+          snackbar(errorMsg, context);
+          return;
+        }
+        if (parsedValue < parsedKnownMass * .999 ||
+            parsedValue > parsedKnownMass * 1.001) {
+          snackbar(errorMsg, context);
           return;
         }
         snackbar("Success calibrating device", context);
@@ -597,6 +617,181 @@ class ApiInterface extends StatelessWidget {
         ),
         ApiCli(device),
       ],
+    );
+  }
+}
+
+class Wifi extends StatelessWidget {
+  final Device device;
+
+  Wifi(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    Widget input({
+      required ApiCommand command,
+      String? value,
+      required bool enabled,
+      String? name,
+      bool isPassword = false,
+    }) {
+      return Flexible(
+        child: TextField(
+          obscureText: isPassword,
+          enableSuggestions: false,
+          autocorrect: false,
+          enabled: enabled,
+          controller: TextEditingController(text: value),
+          decoration: InputDecoration(
+            labelText: name,
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white10,
+            enabledBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.white24),
+            ),
+          ),
+          onSubmitted: (String edited) async {
+            final result = await device.api.requestResultCode(
+              "${command.index}=$edited",
+              minDelayMs: 2000,
+            );
+            if (name != null)
+              snackbar(
+                  "$name update${result == ApiResult.success.index ? "d" : " failed"}",
+                  context);
+            print("[Wifi Wijit] api.request($command): $result");
+          },
+        ),
+      );
+    }
+
+    Widget onOffSwitch({
+      required ApiCommand command,
+      required ExtendedBool value,
+      String? name,
+      void Function()? onChanged,
+    }) {
+      var onOff = value == ExtendedBool.Waiting
+          ? CircularProgressIndicator()
+          : Switch(
+              value: value == ExtendedBool.True ? true : false,
+              activeColor: Colors.red,
+              onChanged: (bool enabled) async {
+                if (onChanged != null) onChanged();
+                final result = await device.api.requestResultCode(
+                  "${command.index}=${enabled ? "1" : "0"}",
+                  minDelayMs: 2000,
+                );
+                if (name != null)
+                  snackbar(
+                      "$name ${enabled ? "en" : "dis"}able${result == ApiResult.success.index ? "d" : " failed"}",
+                      context);
+                print("[Wifi Wijit] api.requestResultCode($command): $result");
+              });
+      return (name == null)
+          ? onOff
+          : Row(children: [
+              Expanded(child: Text(name)),
+              onOff,
+            ]);
+    }
+
+    return ValueListenableBuilder<WifiSettings>(
+      valueListenable: device.wifiSettings,
+      builder: (context, changedSettings, child) {
+        print("changed: $changedSettings");
+        var widgets = [
+          onOffSwitch(
+            name: "Wifi",
+            command: ApiCommand.wifi,
+            value: changedSettings.enabled,
+            onChanged: () {
+              device.wifiSettings.value.enabled = ExtendedBool.Waiting;
+              device.wifiSettings.notifyListeners();
+            },
+          ),
+        ];
+        if (changedSettings.enabled == ExtendedBool.True)
+          widgets.add(
+            onOffSwitch(
+              name: "Access Point",
+              command: ApiCommand.wifiApEnabled,
+              value: changedSettings.apEnabled,
+              onChanged: () {
+                device.wifiSettings.value.apEnabled = ExtendedBool.Waiting;
+                device.wifiSettings.notifyListeners();
+              },
+            ),
+          );
+        if (changedSettings.enabled == ExtendedBool.True &&
+            changedSettings.apEnabled == ExtendedBool.True)
+          widgets.add(
+            Row(
+              children: [
+                input(
+                  name: "SSID",
+                  command: ApiCommand.wifiApSSID,
+                  value: changedSettings.apSSID,
+                  enabled: changedSettings.apEnabled == ExtendedBool.True
+                      ? true
+                      : false,
+                ),
+                Text(' '),
+                input(
+                  name: "Password",
+                  command: ApiCommand.wifiApPassword,
+                  value: "",
+                  isPassword: true,
+                  enabled: changedSettings.apEnabled == ExtendedBool.True
+                      ? true
+                      : false,
+                ),
+              ],
+            ),
+          );
+        if (changedSettings.enabled == ExtendedBool.True)
+          widgets.add(
+            onOffSwitch(
+              name: "Station",
+              command: ApiCommand.wifiStaEnabled,
+              value: changedSettings.staEnabled,
+              onChanged: () {
+                device.wifiSettings.value.staEnabled = ExtendedBool.Waiting;
+                device.wifiSettings.notifyListeners();
+              },
+            ),
+          );
+        if (changedSettings.enabled == ExtendedBool.True &&
+            changedSettings.staEnabled == ExtendedBool.True)
+          widgets.add(
+            Row(
+              children: [
+                input(
+                  name: "SSID",
+                  command: ApiCommand.wifiStaSSID,
+                  value: changedSettings.staSSID,
+                  enabled: changedSettings.staEnabled == ExtendedBool.True
+                      ? true
+                      : false,
+                ),
+                Text(' '),
+                input(
+                  name: "Password",
+                  command: ApiCommand.wifiStaPassword,
+                  value: "",
+                  isPassword: true,
+                  enabled: changedSettings.staEnabled == ExtendedBool.True
+                      ? true
+                      : false,
+                ),
+              ],
+            ),
+          );
+        return Column(
+          children: widgets,
+        );
+      },
     );
   }
 }
