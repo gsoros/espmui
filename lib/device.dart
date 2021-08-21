@@ -18,7 +18,10 @@ class Device {
 
   final weightServiceEnabled =
       ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
-  final wifiSettings = PropertyValueNotifier<WifiSettings>(WifiSettings());
+  final deviceSettings =
+      PropertyValueNotifier<DeviceSettings>(DeviceSettings());
+  final wifiSettings =
+      PropertyValueNotifier<DeviceWifiSettings>(DeviceWifiSettings());
 
   /// Connection state stream controller
   final _stateController =
@@ -126,6 +129,31 @@ class Device {
     else if (ApiCommand.wifiStaPassword.index == message.commandCode) {
       wifiSettings.value.staPassword = message.valueAsString;
       wifiSettings.notifyListeners();
+    }
+    // crankLength
+    else if (ApiCommand.crankLength.index == message.commandCode) {
+      deviceSettings.value.cranklength = message.valueAsDouble;
+      deviceSettings.notifyListeners();
+    }
+    // reverseStrain
+    else if (ApiCommand.reverseStrain.index == message.commandCode) {
+      deviceSettings.value.reverseStrain =
+          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      deviceSettings.notifyListeners();
+    }
+    // doublePower
+    else if (ApiCommand.doublePower.index == message.commandCode) {
+      deviceSettings.value.doublePower =
+          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      deviceSettings.notifyListeners();
+    }
+    // sleepDelay
+    else if (ApiCommand.sleepDelay.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.sleepDelay =
+            (message.valueAsInt! / 1000 / 60).round();
+        deviceSettings.notifyListeners();
+      }
     }
   }
 
@@ -246,6 +274,10 @@ class Device {
       "wifiStaSSID",
       "wifiStaPassword",
       "secureApi",
+      "crankLength",
+      "reverseStrain",
+      "doublePower",
+      "sleepDelay",
     ].forEach((key) async {
       await api.request<String>(
         key,
@@ -258,7 +290,10 @@ class Device {
 
   void _resetInit() {
     weightServiceEnabled.value = ExtendedBool.Unknown;
-    wifiSettings.value = WifiSettings();
+    wifiSettings.value = DeviceWifiSettings();
+    wifiSettings.notifyListeners();
+    deviceSettings.value = DeviceSettings();
+    deviceSettings.notifyListeners();
   }
 
   Future<void> discoverCharacteristics() async {
@@ -415,7 +450,38 @@ class CharacteristicListItem {
   }
 }
 
-class WifiSettings {
+class DeviceSettings {
+  double? cranklength;
+  var reverseStrain = ExtendedBool.Unknown;
+  var doublePower = ExtendedBool.Unknown;
+  int? sleepDelay;
+
+  @override
+  bool operator ==(other) {
+    return (other is DeviceSettings) &&
+        other.cranklength == cranklength &&
+        other.reverseStrain == reverseStrain &&
+        other.doublePower == doublePower &&
+        other.sleepDelay == sleepDelay;
+  }
+
+  @override
+  int get hashCode =>
+      cranklength.hashCode ^
+      reverseStrain.hashCode ^
+      doublePower.hashCode ^
+      sleepDelay.hashCode;
+
+  String toString() {
+    return "${describeIdentity(this)} ("
+        "crankLength: $cranklength, "
+        "reverseStrain: $reverseStrain, "
+        "doublePower: $doublePower, "
+        "sleepDelay: $sleepDelay)";
+  }
+}
+
+class DeviceWifiSettings {
   var enabled = ExtendedBool.Unknown;
   var apEnabled = ExtendedBool.Unknown;
   String? apSSID;
@@ -426,7 +492,7 @@ class WifiSettings {
 
   @override
   bool operator ==(other) {
-    return (other is WifiSettings) &&
+    return (other is DeviceWifiSettings) &&
         other.enabled == enabled &&
         other.apEnabled == apEnabled &&
         other.apSSID == apSSID &&
@@ -447,8 +513,13 @@ class WifiSettings {
       staPassword.hashCode;
 
   String toString() {
-    return "WifiSettings {enabled: $enabled, "
-        "apEnabled: $apEnabled, apSSID: $apSSID, apPassword: $apPassword, "
-        "staEnabled: $staEnabled, staSSID: $staSSID, staPassword: $staPassword}";
+    return "${describeIdentity(this)} ("
+        "enabled: $enabled, "
+        "apEnabled: $apEnabled, "
+        "apSSID: $apSSID, "
+        "apPassword: $apPassword, "
+        "staEnabled: $staEnabled, "
+        "staSSID: $staSSID, "
+        "staPassword: $staPassword)";
   }
 }

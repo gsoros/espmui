@@ -93,7 +93,7 @@ class DeviceRouteState extends State<DeviceRoute> {
         colSpan: 6,
       ),
       StaggeredGridItem(
-        value: Settings(device),
+        value: SettingsWidget(device),
         colSpan: 6,
       ),
     ];

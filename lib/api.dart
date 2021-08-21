@@ -21,6 +21,10 @@ enum ApiCommand {
   wifiStaEnabled,
   wifiStaSSID,
   wifiStaPassword,
+  crankLength,
+  reverseStrain,
+  doublePower,
+  sleepDelay,
 }
 
 enum ApiResult {

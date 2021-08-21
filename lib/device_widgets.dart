@@ -27,10 +27,17 @@ class Battery extends StatelessWidget {
                 fit: FlexFit.loose,
                 child: Align(
                   child: Text(
-                    "${snapshot.data.toString()}%",
-                    style: const TextStyle(fontSize: 30),
+                    "${snapshot.data}",
+                    style: const TextStyle(fontSize: 40),
                   ),
                 ),
+              ),
+              Align(
+                child: Text(
+                  "%",
+                  style: TextStyle(color: Colors.white24),
+                ),
+                alignment: Alignment.bottomRight,
               ),
             ],
           ),
@@ -320,19 +327,21 @@ class ApiInterface extends StatelessWidget {
   }
 }
 
-class Settings extends StatelessWidget {
+class SettingsWidget extends StatelessWidget {
   final Device device;
 
-  Settings(this.device);
+  SettingsWidget(this.device);
 
   @override
   Widget build(BuildContext context) {
     Widget input({
       required ApiCommand command,
       String? value,
-      required bool enabled,
+      bool enabled = true,
       String? name,
       bool isPassword = false,
+      String Function(String)? processor,
+      Widget? suffix,
     }) {
       return Flexible(
         fit: FlexFit.loose,
@@ -344,6 +353,7 @@ class Settings extends StatelessWidget {
           controller: TextEditingController(text: value),
           decoration: InputDecoration(
             labelText: name,
+            suffix: suffix,
             isDense: true,
             filled: true,
             fillColor: Colors.white10,
@@ -352,6 +362,7 @@ class Settings extends StatelessWidget {
             ),
           ),
           onSubmitted: (String edited) async {
+            if (processor != null) edited = processor(edited);
             final result = await device.api.requestResultCode(
               "${command.index}=$edited",
               minDelayMs: 2000,
@@ -400,10 +411,22 @@ class Settings extends StatelessWidget {
             ]);
     }
 
-    return ValueListenableBuilder<WifiSettings>(
+    Widget frame(Widget child) {
+      return Container(
+        padding: EdgeInsets.all(5),
+        margin: EdgeInsets.only(bottom: 15),
+        decoration: BoxDecoration(
+            //color: Colors.white10,
+            border: Border.all(width: 1, color: Colors.white12),
+            borderRadius: BorderRadius.circular(5)),
+        child: child,
+      );
+    }
+
+    final wifiSettings = ValueListenableBuilder<DeviceWifiSettings>(
       valueListenable: device.wifiSettings,
       builder: (context, settings, child) {
-        print("changed: $settings");
+        //print("changed: $settings");
         var widgets = [
           onOffSwitch(
             name: "Wifi",
@@ -415,7 +438,7 @@ class Settings extends StatelessWidget {
             },
           ),
         ];
-        if (settings.enabled == ExtendedBool.True)
+        if (settings.enabled == ExtendedBool.True) {
           widgets.add(
             onOffSwitch(
               name: "Access Point",
@@ -427,31 +450,31 @@ class Settings extends StatelessWidget {
               },
             ),
           );
-        if (settings.enabled == ExtendedBool.True &&
-            settings.apEnabled == ExtendedBool.True)
-          widgets.add(
-            Row(
-              children: [
-                input(
-                  name: "SSID",
-                  command: ApiCommand.wifiApSSID,
-                  value: settings.apSSID,
-                  enabled:
-                      settings.apEnabled == ExtendedBool.True ? true : false,
-                ),
-                Text(' '),
-                input(
-                  name: "Password",
-                  command: ApiCommand.wifiApPassword,
-                  value: "",
-                  isPassword: true,
-                  enabled:
-                      settings.apEnabled == ExtendedBool.True ? true : false,
-                ),
-              ],
-            ),
-          );
-        if (settings.enabled == ExtendedBool.True)
+          if (settings.apEnabled == ExtendedBool.True)
+            widgets.add(
+              Row(
+                children: [
+                  input(
+                    name: "SSID",
+                    command: ApiCommand.wifiApSSID,
+                    value: settings.apSSID,
+                    enabled:
+                        settings.apEnabled == ExtendedBool.True ? true : false,
+                  ),
+                  Text(' '),
+                  input(
+                    name: "Password",
+                    command: ApiCommand.wifiApPassword,
+                    value: "",
+                    isPassword: true,
+                    enabled:
+                        settings.apEnabled == ExtendedBool.True ? true : false,
+                  ),
+                ],
+              ),
+            );
+        }
+        if (settings.enabled == ExtendedBool.True) {
           widgets.add(
             onOffSwitch(
               name: "Station",
@@ -463,42 +486,102 @@ class Settings extends StatelessWidget {
               },
             ),
           );
-        if (settings.enabled == ExtendedBool.True &&
-            settings.staEnabled == ExtendedBool.True)
-          widgets.add(
-            Row(
-              children: [
-                input(
-                  name: "SSID",
-                  command: ApiCommand.wifiStaSSID,
-                  value: settings.staSSID,
-                  enabled:
-                      settings.staEnabled == ExtendedBool.True ? true : false,
-                ),
-                Text(' '),
-                input(
-                  name: "Password",
-                  command: ApiCommand.wifiStaPassword,
-                  value: "",
-                  isPassword: true,
-                  enabled:
-                      settings.staEnabled == ExtendedBool.True ? true : false,
-                ),
-              ],
-            ),
-          );
-        return ExpansionTile(
-          title: Text("Settings"),
-          textColor: Colors.white,
-          iconColor: Colors.white,
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: widgets,
-            )
-          ],
+          if (settings.staEnabled == ExtendedBool.True)
+            widgets.add(
+              Row(
+                children: [
+                  input(
+                    name: "SSID",
+                    command: ApiCommand.wifiStaSSID,
+                    value: settings.staSSID,
+                    enabled:
+                        settings.staEnabled == ExtendedBool.True ? true : false,
+                  ),
+                  Text(' '),
+                  input(
+                    name: "Password",
+                    command: ApiCommand.wifiStaPassword,
+                    value: "",
+                    isPassword: true,
+                    enabled:
+                        settings.staEnabled == ExtendedBool.True ? true : false,
+                  ),
+                ],
+              ),
+            );
+        }
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widgets,
         );
       },
+    );
+
+    final deviceSettings = ValueListenableBuilder<DeviceSettings>(
+      valueListenable: device.deviceSettings,
+      builder: (context, settings, child) {
+        //print("changed: $settings");
+        var widgets = [
+          input(
+            name: "Crank Length",
+            command: ApiCommand.crankLength,
+            value: settings.cranklength == null
+                ? ""
+                : settings.cranklength.toString(),
+            suffix: Text("mm"),
+          ),
+          onOffSwitch(
+            name: "Reverse Strain",
+            command: ApiCommand.reverseStrain,
+            value: settings.reverseStrain,
+            onChanged: () {
+              device.deviceSettings.value.reverseStrain = ExtendedBool.Waiting;
+              device.deviceSettings.notifyListeners();
+            },
+          ),
+          onOffSwitch(
+            name: "Double Power",
+            command: ApiCommand.doublePower,
+            value: settings.doublePower,
+            onChanged: () {
+              device.deviceSettings.value.doublePower = ExtendedBool.Waiting;
+              device.deviceSettings.notifyListeners();
+            },
+          ),
+          input(
+            name: "Sleep Delay",
+            command: ApiCommand.sleepDelay,
+            value: settings.sleepDelay == null
+                ? ""
+                : settings.sleepDelay.toString(),
+            processor: (value) {
+              var ms = int.tryParse(value);
+              return (ms == null) ? "30000" : "${ms * 1000 * 60}";
+            },
+            suffix: Text("minutes"),
+          ),
+        ];
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widgets,
+        );
+      },
+    );
+
+    return ExpansionTile(
+      title: Text("Settings"),
+      textColor: Colors.white,
+      iconColor: Colors.white,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            frame(wifiSettings),
+            frame(deviceSettings),
+          ],
+        )
+      ],
     );
   }
 }
