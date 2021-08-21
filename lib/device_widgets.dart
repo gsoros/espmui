@@ -327,6 +327,114 @@ class ApiInterface extends StatelessWidget {
   }
 }
 
+class ApiUpdateSettingInput extends StatelessWidget {
+  final Device device;
+  final ApiCommand command;
+  final String? value;
+  final bool enabled;
+  final String? name;
+  final bool isPassword;
+  final String Function(String)? transformInput;
+  final Widget? suffix;
+  final TextInputType? keyboardType;
+
+  ApiUpdateSettingInput({
+    required this.device,
+    required this.command,
+    this.value,
+    this.enabled = true,
+    this.name,
+    this.isPassword = false,
+    this.transformInput,
+    this.suffix,
+    this.keyboardType,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Flexible(
+      fit: FlexFit.loose,
+      child: TextField(
+        keyboardType: keyboardType,
+        obscureText: isPassword,
+        enableSuggestions: false,
+        autocorrect: false,
+        enabled: enabled,
+        controller: TextEditingController(text: value),
+        decoration: InputDecoration(
+          labelText: name,
+          suffix: suffix,
+          isDense: true,
+          filled: true,
+          fillColor: Colors.white10,
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.white24),
+          ),
+        ),
+        onSubmitted: (String edited) async {
+          if (transformInput != null) edited = transformInput!(edited);
+          final result = await device.api.requestResultCode(
+            "${command.index}=$edited",
+            minDelayMs: 2000,
+          );
+          if (name != null)
+            snackbar(
+                "$name update${result == ApiResult.success.index ? "d" : " failed"}",
+                context);
+          print("[Wifi Wijit] api.request($command): $result");
+        },
+      ),
+    );
+  }
+}
+
+class ApiUpdateSettingSwitch extends StatelessWidget {
+  final Device device;
+  final ApiCommand command;
+  final ExtendedBool value;
+  final String? name;
+  final void Function()? onChanged;
+
+  ApiUpdateSettingSwitch({
+    required this.device,
+    required this.command,
+    required this.value,
+    this.name,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    var onOff = value == ExtendedBool.Waiting
+        ? CircularProgressIndicator()
+        : Switch(
+            value: value == ExtendedBool.True ? true : false,
+            activeColor: Colors.red,
+            onChanged: (bool enabled) async {
+              if (onChanged != null) onChanged!();
+              final result = await device.api.requestResultCode(
+                "${command.index}=${enabled ? "1" : "0"}",
+                minDelayMs: 2000,
+              );
+              if (name != null)
+                snackbar(
+                    "$name ${enabled ? "en" : "dis"}able${result == ApiResult.success.index ? "d" : " failed"}",
+                    context);
+              print(
+                  "[Settings Wijit] api.requestResultCode($command): $result");
+            });
+    return (name == null)
+        ? onOff
+        : Row(children: [
+            Flexible(
+              fit: FlexFit.tight,
+              child: Text(name!),
+            ),
+            onOff,
+          ]);
+  }
+}
+
 class SettingsWidget extends StatelessWidget {
   final Device device;
 
@@ -334,85 +442,6 @@ class SettingsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget input({
-      required ApiCommand command,
-      String? value,
-      bool enabled = true,
-      String? name,
-      bool isPassword = false,
-      String Function(String)? processor,
-      Widget? suffix,
-      TextInputType? keyboardType,
-    }) {
-      return Flexible(
-        fit: FlexFit.loose,
-        child: TextField(
-          keyboardType: keyboardType,
-          obscureText: isPassword,
-          enableSuggestions: false,
-          autocorrect: false,
-          enabled: enabled,
-          controller: TextEditingController(text: value),
-          decoration: InputDecoration(
-            labelText: name,
-            suffix: suffix,
-            isDense: true,
-            filled: true,
-            fillColor: Colors.white10,
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.white24),
-            ),
-          ),
-          onSubmitted: (String edited) async {
-            if (processor != null) edited = processor(edited);
-            final result = await device.api.requestResultCode(
-              "${command.index}=$edited",
-              minDelayMs: 2000,
-            );
-            if (name != null)
-              snackbar(
-                  "$name update${result == ApiResult.success.index ? "d" : " failed"}",
-                  context);
-            print("[Wifi Wijit] api.request($command): $result");
-          },
-        ),
-      );
-    }
-
-    Widget onOffSwitch({
-      required ApiCommand command,
-      required ExtendedBool value,
-      String? name,
-      void Function()? onChanged,
-    }) {
-      var onOff = value == ExtendedBool.Waiting
-          ? CircularProgressIndicator()
-          : Switch(
-              value: value == ExtendedBool.True ? true : false,
-              activeColor: Colors.red,
-              onChanged: (bool enabled) async {
-                if (onChanged != null) onChanged();
-                final result = await device.api.requestResultCode(
-                  "${command.index}=${enabled ? "1" : "0"}",
-                  minDelayMs: 2000,
-                );
-                if (name != null)
-                  snackbar(
-                      "$name ${enabled ? "en" : "dis"}able${result == ApiResult.success.index ? "d" : " failed"}",
-                      context);
-                print("[Wifi Wijit] api.requestResultCode($command): $result");
-              });
-      return (name == null)
-          ? onOff
-          : Row(children: [
-              Flexible(
-                fit: FlexFit.tight,
-                child: Text(name),
-              ),
-              onOff,
-            ]);
-    }
-
     Widget frame(Widget child) {
       return Container(
         padding: EdgeInsets.all(5),
@@ -429,8 +458,9 @@ class SettingsWidget extends StatelessWidget {
       valueListenable: device.wifiSettings,
       builder: (context, settings, child) {
         //print("changed: $settings");
-        var widgets = [
-          onOffSwitch(
+        var widgets = <Widget>[
+          ApiUpdateSettingSwitch(
+            device: device,
             name: "Wifi",
             command: ApiCommand.wifi,
             value: settings.enabled,
@@ -442,7 +472,8 @@ class SettingsWidget extends StatelessWidget {
         ];
         if (settings.enabled == ExtendedBool.True) {
           widgets.add(
-            onOffSwitch(
+            ApiUpdateSettingSwitch(
+              device: device,
               name: "Access Point",
               command: ApiCommand.wifiApEnabled,
               value: settings.apEnabled,
@@ -456,7 +487,8 @@ class SettingsWidget extends StatelessWidget {
             widgets.add(
               Row(
                 children: [
-                  input(
+                  ApiUpdateSettingInput(
+                    device: device,
                     name: "SSID",
                     command: ApiCommand.wifiApSSID,
                     value: settings.apSSID,
@@ -464,7 +496,8 @@ class SettingsWidget extends StatelessWidget {
                         settings.apEnabled == ExtendedBool.True ? true : false,
                   ),
                   Text(' '),
-                  input(
+                  ApiUpdateSettingInput(
+                    device: device,
                     name: "Password",
                     command: ApiCommand.wifiApPassword,
                     value: "",
@@ -478,7 +511,8 @@ class SettingsWidget extends StatelessWidget {
         }
         if (settings.enabled == ExtendedBool.True) {
           widgets.add(
-            onOffSwitch(
+            ApiUpdateSettingSwitch(
+              device: device,
               name: "Station",
               command: ApiCommand.wifiStaEnabled,
               value: settings.staEnabled,
@@ -492,7 +526,8 @@ class SettingsWidget extends StatelessWidget {
             widgets.add(
               Row(
                 children: [
-                  input(
+                  ApiUpdateSettingInput(
+                    device: device,
                     name: "SSID",
                     command: ApiCommand.wifiStaSSID,
                     value: settings.staSSID,
@@ -500,7 +535,8 @@ class SettingsWidget extends StatelessWidget {
                         settings.staEnabled == ExtendedBool.True ? true : false,
                   ),
                   Text(' '),
-                  input(
+                  ApiUpdateSettingInput(
+                    device: device,
                     name: "Password",
                     command: ApiCommand.wifiStaPassword,
                     value: "",
@@ -524,7 +560,8 @@ class SettingsWidget extends StatelessWidget {
       builder: (context, settings, child) {
         //print("changed: $settings");
         var widgets = [
-          input(
+          ApiUpdateSettingInput(
+            device: device,
             name: "Crank Length",
             command: ApiCommand.crankLength,
             value: settings.cranklength == null
@@ -533,7 +570,8 @@ class SettingsWidget extends StatelessWidget {
             suffix: Text("mm"),
             keyboardType: TextInputType.number,
           ),
-          onOffSwitch(
+          ApiUpdateSettingSwitch(
+            device: device,
             name: "Reverse Strain",
             command: ApiCommand.reverseStrain,
             value: settings.reverseStrain,
@@ -542,7 +580,8 @@ class SettingsWidget extends StatelessWidget {
               device.deviceSettings.notifyListeners();
             },
           ),
-          onOffSwitch(
+          ApiUpdateSettingSwitch(
+            device: device,
             name: "Double Power",
             command: ApiCommand.doublePower,
             value: settings.doublePower,
@@ -551,13 +590,14 @@ class SettingsWidget extends StatelessWidget {
               device.deviceSettings.notifyListeners();
             },
           ),
-          input(
+          ApiUpdateSettingInput(
+            device: device,
             name: "Sleep Delay",
             command: ApiCommand.sleepDelay,
             value: settings.sleepDelay == null
                 ? ""
                 : settings.sleepDelay.toString(),
-            processor: (value) {
+            transformInput: (value) {
               var ms = int.tryParse(value);
               return (ms == null) ? "30000" : "${ms * 1000 * 60}";
             },
