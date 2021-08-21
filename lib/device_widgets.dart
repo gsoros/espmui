@@ -583,6 +583,7 @@ class SettingsWidget extends StatelessWidget {
           children: [
             frame(wifiSettings),
             frame(deviceSettings),
+            frame(ApiInterface(device)),
           ],
         )
       ],

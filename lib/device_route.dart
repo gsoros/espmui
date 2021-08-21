@@ -89,10 +89,6 @@ class DeviceRouteState extends State<DeviceRoute> {
         colSpan: 2,
       ),
       StaggeredGridItem(
-        value: ApiInterface(device),
-        colSpan: 6,
-      ),
-      StaggeredGridItem(
         value: SettingsWidget(device),
         colSpan: 6,
       ),
