@@ -342,10 +342,12 @@ class SettingsWidget extends StatelessWidget {
       bool isPassword = false,
       String Function(String)? processor,
       Widget? suffix,
+      TextInputType? keyboardType,
     }) {
       return Flexible(
         fit: FlexFit.loose,
         child: TextField(
+          keyboardType: keyboardType,
           obscureText: isPassword,
           enableSuggestions: false,
           autocorrect: false,
@@ -529,6 +531,7 @@ class SettingsWidget extends StatelessWidget {
                 ? ""
                 : settings.cranklength.toString(),
             suffix: Text("mm"),
+            keyboardType: TextInputType.number,
           ),
           onOffSwitch(
             name: "Reverse Strain",
@@ -559,6 +562,7 @@ class SettingsWidget extends StatelessWidget {
               return (ms == null) ? "30000" : "${ms * 1000 * 60}";
             },
             suffix: Text("minutes"),
+            keyboardType: TextInputType.number,
           ),
         ];
 
