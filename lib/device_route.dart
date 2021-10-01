@@ -82,7 +82,11 @@ class DeviceRouteState extends State<DeviceRoute> {
       ),
       StaggeredGridItem(
         value: WeightScale(device),
-        colSpan: 4,
+        colSpan: 2,
+      ),
+      StaggeredGridItem(
+        value: HallSensor(device),
+        colSpan: 2,
       ),
       StaggeredGridItem(
         value: Battery(device.battery),
@@ -161,8 +165,7 @@ class Status extends StatelessWidget {
     return StreamBuilder<PeripheralConnectionState?>(
       stream: device.stateStream,
       initialData: null,
-      builder: (BuildContext context,
-          AsyncSnapshot<PeripheralConnectionState?> snapshot) {
+      builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
         String connState = snapshot.hasData ? snapshot.data.toString() : "....";
         //print("Device status: snapshot=$connState");
         return Text(
@@ -240,8 +243,7 @@ class AppBarTitle extends StatelessWidget {
                       child: TextButton(
                         style: ButtonStyle(
                           alignment: Alignment.bottomLeft,
-                          padding: MaterialStateProperty.all<EdgeInsets>(
-                              const EdgeInsets.all(0)),
+                          padding: MaterialStateProperty.all<EdgeInsets>(const EdgeInsets.all(0)),
                         ),
                         onPressed: () {},
                         onLongPress: editDeviceName,
@@ -282,8 +284,7 @@ class ConnectButton extends StatelessWidget {
     return StreamBuilder<PeripheralConnectionState?>(
       stream: device.stateStream,
       initialData: null,
-      builder: (BuildContext context,
-          AsyncSnapshot<PeripheralConnectionState?> snapshot) {
+      builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
         var action;
         var label = "Connect";
         if (snapshot.data == PeripheralConnectionState.connected) {

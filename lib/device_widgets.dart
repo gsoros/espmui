@@ -59,16 +59,12 @@ class StrainStreamListener extends StatelessWidget {
       stream: device.weightScale?.stream,
       initialData: device.weightScale?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
-        String strain = snapshot.hasData && enabled != ExtendedBool.False
-            ? snapshot.data!.toStringAsFixed(2)
-            : "0.00";
+        String strain = snapshot.hasData && enabled != ExtendedBool.False ? snapshot.data!.toStringAsFixed(2) : "0.00";
         if (strain.length > 6) strain = strain.substring(0, 6);
         if (strain == "-0.00") strain = "0.00";
-        const styleEnabled = TextStyle(fontSize: 40);
-        const styleDisabled = TextStyle(fontSize: 40, color: Colors.white12);
-        return Text(strain,
-            style:
-                (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
+        const styleEnabled = TextStyle(fontSize: 30);
+        const styleDisabled = TextStyle(fontSize: 30, color: Colors.white12);
+        return Text(strain, style: (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
       },
     );
   }
@@ -84,8 +80,7 @@ class WeightScale extends StatelessWidget {
       Future<void> apiCalibrate(String knownMassStr) async {
         var api = device.api;
         snackbar("Sending calibration value: $knownMassStr", context);
-        String? value =
-            await api.request<String>("calibrateStrain=$knownMassStr");
+        String? value = await api.request<String>("calibrateStrain=$knownMassStr");
         var errorMsg = "Error calibrating device";
         if (value == null) {
           snackbar(errorMsg, context);
@@ -101,8 +96,7 @@ class WeightScale extends StatelessWidget {
           snackbar(errorMsg, context);
           return;
         }
-        if (parsedValue < parsedKnownMass * .999 ||
-            parsedValue > parsedKnownMass * 1.001) {
+        if (parsedValue < parsedKnownMass * .999 || parsedValue > parsedKnownMass * 1.001) {
           snackbar(errorMsg, context);
           return;
         }
@@ -143,11 +137,10 @@ class WeightScale extends StatelessWidget {
       );
     }
 
-    void toggleWeightScale(enabled) async {
+    void toggle(enabled) async {
       device.weightServiceEnabled.value = ExtendedBool.Waiting;
       bool enable = enabled == ExtendedBool.True ? false : true;
-      bool? reply = await device.api
-          .request<bool>("weightService=" + (enable ? "true" : "false"));
+      bool? reply = await device.api.request<bool>("weightService=" + (enable ? "true" : "false"));
       bool success = reply == enable;
       if (success) {
         if (enable)
@@ -157,10 +150,7 @@ class WeightScale extends StatelessWidget {
       } else
         device.weightServiceEnabled.value = ExtendedBool.Unknown;
       snackbar(
-        "Weight service " +
-            (enable ? "en" : "dis") +
-            "able" +
-            (success ? "d" : " failed"),
+        "Weight service " + (enable ? "en" : "dis") + "able" + (success ? "d" : " failed"),
         context,
       );
     }
@@ -168,8 +158,7 @@ class WeightScale extends StatelessWidget {
     void tare() async {
       var resultCode = await device.api.requestResultCode("tare");
       snackbar(
-        "Tare " +
-            (resultCode == ApiResult.success.index ? "success" : "failed"),
+        "Tare " + (resultCode == ApiResult.success.index ? "success" : "failed"),
         context,
       );
     }
@@ -187,9 +176,7 @@ class WeightScale extends StatelessWidget {
             if (enabled == ExtendedBool.True) calibrate();
           },
           onDoubleTap: () {
-            if (enabled == ExtendedBool.True ||
-                enabled == ExtendedBool.False ||
-                enabled == ExtendedBool.Unknown) toggleWeightScale(enabled);
+            if (enabled == ExtendedBool.True || enabled == ExtendedBool.False || enabled == ExtendedBool.Unknown) toggle(enabled);
           },
           child: Container(
             child: Column(
@@ -200,9 +187,7 @@ class WeightScale extends StatelessWidget {
                 Flexible(
                   fit: FlexFit.loose,
                   child: Align(
-                    child: enabled == ExtendedBool.Waiting
-                        ? CircularProgressIndicator()
-                        : strainOutput,
+                    child: enabled == ExtendedBool.Waiting ? CircularProgressIndicator() : strainOutput,
                   ),
                 ),
                 Align(
@@ -211,6 +196,138 @@ class WeightScale extends StatelessWidget {
                     style: TextStyle(color: Colors.white24),
                   ),
                   alignment: Alignment.bottomRight,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class HallStreamListener extends StatelessWidget {
+  final Device device;
+  final ExtendedBool enabled;
+
+  HallStreamListener(this.device, this.enabled);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: device.hall?.stream,
+      initialData: device.hall?.lastValue,
+      builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
+        String value = snapshot.hasData && enabled != ExtendedBool.False ? snapshot.data!.toString() : "0";
+        const styleEnabled = TextStyle(fontSize: 30);
+        const styleDisabled = TextStyle(fontSize: 30, color: Colors.white12);
+        return Text(value, style: (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
+      },
+    );
+  }
+}
+
+class HallSensor extends StatelessWidget {
+  final Device device;
+  HallSensor(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    void settings() async {
+      int? hallOffset = await device.api.request<int>("hallOffset");
+      int? hallThreshold = await device.api.request<int>("hallThreshold");
+      int? hallThresLow = await device.api.request<int>("hallThresLow");
+
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            scrollable: true,
+            title: Text("Hall Sensor Settings"),
+            content: Container(
+              child: Column(
+                children: [
+                  HallStreamListener(device, ExtendedBool.True),
+                  Row(
+                    children: [
+                      ApiSettingInput(
+                        name: "Offset",
+                        value: hallOffset.toString(),
+                        keyboardType: TextInputType.number,
+                        device: device,
+                        command: ApiCommand.hallOffset,
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      ApiSettingInput(
+                        name: "High Threshold",
+                        value: hallThreshold.toString(),
+                        keyboardType: TextInputType.number,
+                        device: device,
+                        command: ApiCommand.hallThreshold,
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      ApiSettingInput(
+                        name: "Low Threshold",
+                        value: hallThresLow.toString(),
+                        keyboardType: TextInputType.number,
+                        device: device,
+                        command: ApiCommand.hallThresLow,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    void toggle(enabled) async {
+      device.hallEnabled.value = ExtendedBool.Waiting;
+      bool enable = enabled == ExtendedBool.True ? false : true;
+      bool? reply = await device.api.request<bool>("hallChar=" + (enable ? "true" : "false"));
+      bool success = reply == enable;
+      if (success) {
+        if (enable)
+          await device.hall?.subscribe();
+        else
+          await device.hall?.unsubscribe();
+      } else
+        device.hallEnabled.value = ExtendedBool.Unknown;
+      snackbar(
+        "Hall readings " + (enable ? "en" : "dis") + "able" + (success ? "d" : " failed"),
+        context,
+      );
+    }
+
+    return ValueListenableBuilder<ExtendedBool>(
+      valueListenable: device.hallEnabled,
+      builder: (context, enabled, child) {
+        return InkWell(
+          onLongPress: () {
+            if (enabled == ExtendedBool.True) settings();
+          },
+          onDoubleTap: () {
+            if (enabled == ExtendedBool.True || enabled == ExtendedBool.False || enabled == ExtendedBool.Unknown) toggle(enabled);
+          },
+          child: Container(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Hall"),
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: Align(
+                    child: (enabled == ExtendedBool.Waiting) ? CircularProgressIndicator() : HallStreamListener(device, enabled),
+                  ),
                 ),
               ],
             ),
@@ -327,7 +444,7 @@ class ApiInterface extends StatelessWidget {
   }
 }
 
-class ApiUpdateSettingInput extends StatelessWidget {
+class ApiSettingInput extends StatelessWidget {
   final Device device;
   final ApiCommand command;
   final String? value;
@@ -338,7 +455,7 @@ class ApiUpdateSettingInput extends StatelessWidget {
   final Widget? suffix;
   final TextInputType? keyboardType;
 
-  ApiUpdateSettingInput({
+  ApiSettingInput({
     required this.device,
     required this.command,
     this.value,
@@ -377,25 +494,22 @@ class ApiUpdateSettingInput extends StatelessWidget {
             "${command.index}=$edited",
             minDelayMs: 2000,
           );
-          if (name != null)
-            snackbar(
-                "$name update${result == ApiResult.success.index ? "d" : " failed"}",
-                context);
-          print("[Wifi Wijit] api.request($command): $result");
+          if (name != null) snackbar("$name update${result == ApiResult.success.index ? "d" : " failed"}", context);
+          print("[ApiSettingInput] api.request($command): $result");
         },
       ),
     );
   }
 }
 
-class ApiUpdateSettingSwitch extends StatelessWidget {
+class ApiSettingSwitch extends StatelessWidget {
   final Device device;
   final ApiCommand command;
   final ExtendedBool value;
   final String? name;
   final void Function()? onChanged;
 
-  ApiUpdateSettingSwitch({
+  ApiSettingSwitch({
     required this.device,
     required this.command,
     required this.value,
@@ -416,12 +530,8 @@ class ApiUpdateSettingSwitch extends StatelessWidget {
                 "${command.index}=${enabled ? "1" : "0"}",
                 minDelayMs: 2000,
               );
-              if (name != null)
-                snackbar(
-                    "$name ${enabled ? "en" : "dis"}able${result == ApiResult.success.index ? "d" : " failed"}",
-                    context);
-              print(
-                  "[Settings Wijit] api.requestResultCode($command): $result");
+              if (name != null) snackbar("$name ${enabled ? "en" : "dis"}able${result == ApiResult.success.index ? "d" : " failed"}", context);
+              print("[Settings Wijit] api.requestResultCode($command): $result");
             });
     return (name == null)
         ? onOff
@@ -459,7 +569,7 @@ class SettingsWidget extends StatelessWidget {
       builder: (context, settings, child) {
         //print("changed: $settings");
         var widgets = <Widget>[
-          ApiUpdateSettingSwitch(
+          ApiSettingSwitch(
             device: device,
             name: "Wifi",
             command: ApiCommand.wifi,
@@ -472,7 +582,7 @@ class SettingsWidget extends StatelessWidget {
         ];
         if (settings.enabled == ExtendedBool.True) {
           widgets.add(
-            ApiUpdateSettingSwitch(
+            ApiSettingSwitch(
               device: device,
               name: "Access Point",
               command: ApiCommand.wifiApEnabled,
@@ -487,23 +597,21 @@ class SettingsWidget extends StatelessWidget {
             widgets.add(
               Row(
                 children: [
-                  ApiUpdateSettingInput(
+                  ApiSettingInput(
                     device: device,
                     name: "SSID",
                     command: ApiCommand.wifiApSSID,
                     value: settings.apSSID,
-                    enabled:
-                        settings.apEnabled == ExtendedBool.True ? true : false,
+                    enabled: settings.apEnabled == ExtendedBool.True ? true : false,
                   ),
                   Text(' '),
-                  ApiUpdateSettingInput(
+                  ApiSettingInput(
                     device: device,
                     name: "Password",
                     command: ApiCommand.wifiApPassword,
                     value: "",
                     isPassword: true,
-                    enabled:
-                        settings.apEnabled == ExtendedBool.True ? true : false,
+                    enabled: settings.apEnabled == ExtendedBool.True ? true : false,
                   ),
                 ],
               ),
@@ -511,7 +619,7 @@ class SettingsWidget extends StatelessWidget {
         }
         if (settings.enabled == ExtendedBool.True) {
           widgets.add(
-            ApiUpdateSettingSwitch(
+            ApiSettingSwitch(
               device: device,
               name: "Station",
               command: ApiCommand.wifiStaEnabled,
@@ -526,23 +634,21 @@ class SettingsWidget extends StatelessWidget {
             widgets.add(
               Row(
                 children: [
-                  ApiUpdateSettingInput(
+                  ApiSettingInput(
                     device: device,
                     name: "SSID",
                     command: ApiCommand.wifiStaSSID,
                     value: settings.staSSID,
-                    enabled:
-                        settings.staEnabled == ExtendedBool.True ? true : false,
+                    enabled: settings.staEnabled == ExtendedBool.True ? true : false,
                   ),
                   Text(' '),
-                  ApiUpdateSettingInput(
+                  ApiSettingInput(
                     device: device,
                     name: "Password",
                     command: ApiCommand.wifiStaPassword,
                     value: "",
                     isPassword: true,
-                    enabled:
-                        settings.staEnabled == ExtendedBool.True ? true : false,
+                    enabled: settings.staEnabled == ExtendedBool.True ? true : false,
                   ),
                 ],
               ),
@@ -560,17 +666,15 @@ class SettingsWidget extends StatelessWidget {
       builder: (context, settings, child) {
         //print("changed: $settings");
         var widgets = [
-          ApiUpdateSettingInput(
+          ApiSettingInput(
             device: device,
             name: "Crank Length",
             command: ApiCommand.crankLength,
-            value: settings.cranklength == null
-                ? ""
-                : settings.cranklength.toString(),
+            value: settings.cranklength == null ? "" : settings.cranklength.toString(),
             suffix: Text("mm"),
             keyboardType: TextInputType.number,
           ),
-          ApiUpdateSettingSwitch(
+          ApiSettingSwitch(
             device: device,
             name: "Reverse Strain",
             command: ApiCommand.reverseStrain,
@@ -580,7 +684,7 @@ class SettingsWidget extends StatelessWidget {
               device.deviceSettings.notifyListeners();
             },
           ),
-          ApiUpdateSettingSwitch(
+          ApiSettingSwitch(
             device: device,
             name: "Double Power",
             command: ApiCommand.doublePower,
@@ -590,13 +694,11 @@ class SettingsWidget extends StatelessWidget {
               device.deviceSettings.notifyListeners();
             },
           ),
-          ApiUpdateSettingInput(
+          ApiSettingInput(
             device: device,
             name: "Sleep Delay",
             command: ApiCommand.sleepDelay,
-            value: settings.sleepDelay == null
-                ? ""
-                : settings.sleepDelay.toString(),
+            value: settings.sleepDelay == null ? "" : settings.sleepDelay.toString(),
             transformInput: (value) {
               var ms = int.tryParse(value);
               return (ms == null) ? "30000" : "${ms * 1000 * 60}";

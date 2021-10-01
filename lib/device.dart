@@ -16,16 +16,13 @@ class Device {
   late Api api;
   bool shouldConnect = false;
 
-  final weightServiceEnabled =
-      ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
-  final deviceSettings =
-      PropertyValueNotifier<DeviceSettings>(DeviceSettings());
-  final wifiSettings =
-      PropertyValueNotifier<DeviceWifiSettings>(DeviceWifiSettings());
+  final weightServiceEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
+  final hallEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
+  final deviceSettings = PropertyValueNotifier<DeviceSettings>(DeviceSettings());
+  final wifiSettings = PropertyValueNotifier<DeviceWifiSettings>(DeviceWifiSettings());
 
   /// Connection state stream controller
-  final _stateController =
-      StreamController<PeripheralConnectionState>.broadcast();
+  final _stateController = StreamController<PeripheralConnectionState>.broadcast();
 
   /// Connection state stream
   Stream<PeripheralConnectionState> get stateStream => _stateController.stream;
@@ -42,14 +39,11 @@ class Device {
   String? get name => peripheral.name;
   set name(String? name) => peripheral.name = name;
   String get identifier => peripheral.identifier;
-  BatteryCharacteristic? get battery =>
-      characteristic("battery") as BatteryCharacteristic?;
-  PowerCharacteristic? get power =>
-      characteristic("power") as PowerCharacteristic?;
-  ApiCharacteristic? get apiCharacteristic =>
-      characteristic("api") as ApiCharacteristic?;
-  WeightScaleCharacteristic? get weightScale =>
-      characteristic("weightScale") as WeightScaleCharacteristic?;
+  BatteryCharacteristic? get battery => characteristic("battery") as BatteryCharacteristic?;
+  PowerCharacteristic? get power => characteristic("power") as PowerCharacteristic?;
+  ApiCharacteristic? get apiCharacteristic => characteristic("api") as ApiCharacteristic?;
+  WeightScaleCharacteristic? get weightScale => characteristic("weightScale") as WeightScaleCharacteristic?;
+  HallCharacteristic? get hall => characteristic("hall") as HallCharacteristic?;
 
   Future<bool> get connected => peripheral.isConnected().catchError((e) {
         bleError(tag, "could not get connection state", e);
@@ -65,12 +59,15 @@ class Device {
         WeightScaleCharacteristic(peripheral),
         subscribeOnConnect: false,
       ),
+      "hall": CharacteristicListItem(
+        HallCharacteristic(peripheral),
+        subscribeOnConnect: false,
+      ),
     });
     api = Api(this);
 
     /// listen to api message done events
-    _apiSubsciption =
-        api.messageDoneStream.listen((message) => _onApiDone(message));
+    _apiSubsciption = api.messageDoneStream.listen((message) => _onApiDone(message));
   }
 
   /// Processes "done" messages sent by the API
@@ -85,23 +82,28 @@ class Device {
     }
     // weightServiceEnabled
     else if (ApiCommand.weightService.index == message.commandCode) {
-      weightServiceEnabled.value =
-          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      weightServiceEnabled.value = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       if (message.valueAsBool ?? false)
         await weightScale?.subscribe();
       else
         await weightScale?.unsubscribe();
     }
+    // hallEnabled
+    else if (ApiCommand.hallChar.index == message.commandCode) {
+      hallEnabled.value = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      if (message.valueAsBool ?? false)
+        await hall?.subscribe();
+      else
+        await hall?.unsubscribe();
+    }
     // wifi
     else if (ApiCommand.wifi.index == message.commandCode) {
-      wifiSettings.value.enabled =
-          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.value.enabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       wifiSettings.notifyListeners();
     }
     // wifiApEnabled
     else if (ApiCommand.wifiApEnabled.index == message.commandCode) {
-      wifiSettings.value.apEnabled =
-          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.value.apEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       wifiSettings.notifyListeners();
     }
     // wifiApSSID
@@ -116,8 +118,7 @@ class Device {
     }
     // wifiStaEnabled
     else if (ApiCommand.wifiStaEnabled.index == message.commandCode) {
-      wifiSettings.value.staEnabled =
-          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.value.staEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       wifiSettings.notifyListeners();
     }
     // wifiStaSSID
@@ -137,21 +138,18 @@ class Device {
     }
     // reverseStrain
     else if (ApiCommand.reverseStrain.index == message.commandCode) {
-      deviceSettings.value.reverseStrain =
-          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      deviceSettings.value.reverseStrain = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       deviceSettings.notifyListeners();
     }
     // doublePower
     else if (ApiCommand.doublePower.index == message.commandCode) {
-      deviceSettings.value.doublePower =
-          message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      deviceSettings.value.doublePower = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       deviceSettings.notifyListeners();
     }
     // sleepDelay
     else if (ApiCommand.sleepDelay.index == message.commandCode) {
       if (message.valueAsInt != null) {
-        deviceSettings.value.sleepDelay =
-            (message.valueAsInt! / 1000 / 60).round();
+        deviceSettings.value.sleepDelay = (message.valueAsInt! / 1000 / 60).round();
         deviceSettings.notifyListeners();
       }
     }
@@ -265,6 +263,7 @@ class Device {
     print("$tag Requesting init");
     [
       "weightService",
+      "hallChar",
       "hostName",
       "wifi",
       "wifiApEnabled",
@@ -369,9 +368,7 @@ class DeviceList {
   /// Returns the new or updated device or null on error.
   Device? addOrUpdate(ScanResult scanResult) {
     final now = uts();
-    final subject = scanResult.peripheral.name.toString() +
-        " rssi=" +
-        scanResult.rssi.toString();
+    final subject = scanResult.peripheral.name.toString() + " rssi=" + scanResult.rssi.toString();
     _devices.update(
       scanResult.peripheral.identifier,
       (existing) {
@@ -419,8 +416,7 @@ class CharacteristicList {
 
   void set(String name, CharacteristicListItem item) => _items[name] = item;
 
-  void addAll(Map<String, CharacteristicListItem> items) =>
-      _items.addAll(items);
+  void addAll(Map<String, CharacteristicListItem> items) => _items.addAll(items);
 
   void dispose() {
     print("$tag dispose");
@@ -429,11 +425,9 @@ class CharacteristicList {
   }
 
   void forEachCharacteristic(void Function(String, BleCharacteristic?) f) =>
-      _items.forEach((String name, CharacteristicListItem item) =>
-          f(name, item.characteristic));
+      _items.forEach((String name, CharacteristicListItem item) => f(name, item.characteristic));
 
-  void forEachListItem(void Function(String, CharacteristicListItem) f) =>
-      _items.forEach(f);
+  void forEachListItem(void Function(String, CharacteristicListItem) f) => _items.forEach(f);
 }
 
 class CharacteristicListItem {
@@ -466,11 +460,7 @@ class DeviceSettings {
   }
 
   @override
-  int get hashCode =>
-      cranklength.hashCode ^
-      reverseStrain.hashCode ^
-      doublePower.hashCode ^
-      sleepDelay.hashCode;
+  int get hashCode => cranklength.hashCode ^ reverseStrain.hashCode ^ doublePower.hashCode ^ sleepDelay.hashCode;
 
   String toString() {
     return "${describeIdentity(this)} ("
@@ -504,13 +494,7 @@ class DeviceWifiSettings {
 
   @override
   int get hashCode =>
-      enabled.hashCode ^
-      apEnabled.hashCode ^
-      apSSID.hashCode ^
-      apPassword.hashCode ^
-      staEnabled.hashCode ^
-      staSSID.hashCode ^
-      staPassword.hashCode;
+      enabled.hashCode ^ apEnabled.hashCode ^ apSSID.hashCode ^ apPassword.hashCode ^ staEnabled.hashCode ^ staSSID.hashCode ^ staPassword.hashCode;
 
   String toString() {
     return "${describeIdentity(this)} ("

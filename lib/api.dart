@@ -25,6 +25,10 @@ enum ApiCommand {
   reverseStrain,
   doublePower,
   sleepDelay,
+  hallChar,
+  hallOffset,
+  hallThreshold,
+  hallThresLow,
 }
 
 enum ApiResult {
@@ -78,8 +82,7 @@ class ApiMessage {
     if (this.minDelayMs < 50) this.minDelayMs = 50;
     if (this.minDelayMs > 10000) this.minDelayMs = 10000;
     var maxAttemtsTotalTime = this.maxAttempts * this.minDelayMs;
-    if (this.maxAgeMs < maxAttemtsTotalTime)
-      this.maxAgeMs = maxAttemtsTotalTime + this.minDelayMs;
+    if (this.maxAgeMs < maxAttemtsTotalTime) this.maxAgeMs = maxAttemtsTotalTime + this.minDelayMs;
   }
 
   /// Attempts to create commandCode and commandStr from command
@@ -190,8 +193,7 @@ class Api {
   void _startQueueSchedule() {
     if (_timer != null) return;
     print("$tag queueSchedule start");
-    _timer = Timer.periodic(
-        Duration(milliseconds: queueDelayMs), (_) => _runQueue());
+    _timer = Timer.periodic(Duration(milliseconds: queueDelayMs), (_) => _runQueue());
   }
 
   void _stopQueueSchedule() {
@@ -253,8 +255,7 @@ class Api {
         // don't return on the first match, process all matching messages
       }
     }
-    if (matches == 0)
-      print("$tag did not find a matching queued message for the reply $reply");
+    if (matches == 0) print("$tag did not find a matching queued message for the reply $reply");
   }
 
   void _onDone(ApiMessage message) {
@@ -359,9 +360,7 @@ class Api {
   }
 
   bool queueContainsCommand({String? commandStr, ApiCommand? command}) {
-    for (ApiMessage message in _queue)
-      if (message.commandStr == commandStr ||
-          message.commandCode == command?.index) return true;
+    for (ApiMessage message in _queue) if (message.commandStr == commandStr || message.commandCode == command?.index) return true;
     return false;
   }
 

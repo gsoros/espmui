@@ -61,8 +61,7 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "write() characteristic is null");
       return Future.value(null);
     }
-    if (!_characteristic!.isWritableWithoutResponse &&
-        !_characteristic!.isWritableWithResponse) {
+    if (!_characteristic!.isWritableWithoutResponse && !_characteristic!.isWritableWithResponse) {
       bleError(tag, "write() characteristic not writable");
       return Future.value(null);
     }
@@ -95,8 +94,7 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "subscribe() characteristic is null");
       return;
     }
-    if (!(_characteristic?.isIndicatable ?? false) &&
-        !(_characteristic?.isNotifiable ?? false)) {
+    if (!(_characteristic?.isIndicatable ?? false) && !(_characteristic?.isNotifiable ?? false)) {
       bleError(tag, "characteristic neither indicatable nor notifiable");
       return;
     }
@@ -139,8 +137,7 @@ abstract class BleCharacteristic<T> {
     }
     //print("$tag _init()");
     try {
-      _characteristic =
-          await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
+      _characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
     } catch (e) {
       bleError(tag, "readCharacteristic()", e);
       _characteristic = null;
@@ -221,21 +218,13 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
     int newCrankEvent = value.buffer.asByteData().getUint16(6, Endian.little);
     double dTime = 0.0;
     if (lastCrankEvent > 0) {
-      dTime = (newCrankEvent -
-              ((newCrankEvent < lastCrankEvent)
-                  ? (lastCrankEvent - 65535)
-                  : lastCrankEvent)) /
-          1.024 /
-          60000; // 1 minute
+      dTime = (newCrankEvent - ((newCrankEvent < lastCrankEvent) ? (lastCrankEvent - 65535) : lastCrankEvent)) / 1.024 / 60000; // 1 minute
     }
 
     int cadence = 0;
     int dRev = 0;
     if (revolutions > 0 && dTime > 0) {
-      dRev = newRevolutions -
-          ((newRevolutions < revolutions)
-              ? (revolutions - 65535)
-              : revolutions);
+      dRev = newRevolutions - ((newRevolutions < revolutions) ? (revolutions - 65535) : revolutions);
       cadence = (dRev / dTime).round();
     }
 
@@ -246,9 +235,7 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
       lastCrankEventTime = now;
     }
 
-    if (lastCadence != cadence && cadence > 0 ||
-        (lastCrankEventTime < now - 2000))
-      streamSendIfNotClosed(_cadenceController, cadence);
+    if (lastCadence != cadence && cadence > 0 || (lastCrankEventTime < now - 2000)) streamSendIfNotClosed(_cadenceController, cadence);
     lastCadence = cadence;
     revolutions = newRevolutions;
 
@@ -306,12 +293,26 @@ class WeightScaleCharacteristic extends BleCharacteristic<double> {
   double fromUint8List(Uint8List list) {
     /// Format: little-endian
     /// Bytes: [flags: 1][weight: 2]
-    return list.isNotEmpty
-        ? list.buffer.asByteData().getInt16(1, Endian.little) / 200
-        : 0.0;
+    return list.isNotEmpty ? list.buffer.asByteData().getInt16(1, Endian.little) / 200 : 0.0;
   }
 
   @override
-  Uint8List toUint8List(double value) => Uint8List(3)
-    ..buffer.asByteData().setInt16(1, (value * 200).round(), Endian.little);
+  Uint8List toUint8List(double value) => Uint8List(3)..buffer.asByteData().setInt16(1, (value * 200).round(), Endian.little);
+}
+
+class HallCharacteristic extends BleCharacteristic<int> {
+  final tag = "[HallCharacteristic]";
+  final serviceUUID = BleConstants.API_SERVICE_UUID;
+  final characteristicUUID = BleConstants.HALL_CHAR_UUID;
+
+  HallCharacteristic(Peripheral peripheral) : super(peripheral);
+
+  @override
+  int fromUint8List(Uint8List list) {
+    /// Format: little-endian
+    return list.isNotEmpty ? list.buffer.asByteData().getInt16(0, Endian.little) : 0;
+  }
+
+  @override
+  Uint8List toUint8List(int value) => Uint8List(2)..buffer.asByteData().setInt16(0, (value).round(), Endian.little);
 }
