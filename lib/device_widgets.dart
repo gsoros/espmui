@@ -531,7 +531,7 @@ class ApiSettingSwitch extends StatelessWidget {
                 minDelayMs: 2000,
               );
               if (name != null) snackbar("$name ${enabled ? "en" : "dis"}able${result == ApiResult.success.index ? "d" : " failed"}", context);
-              print("[Settings Wijit] api.requestResultCode($command): $result");
+              print("[ApiSettingSwitch] api.requestResultCode($command): $result");
             });
     return (name == null)
         ? onOff
@@ -541,6 +541,42 @@ class ApiSettingSwitch extends StatelessWidget {
               child: Text(name!),
             ),
             onOff,
+          ]);
+  }
+}
+
+class ApiSettingDropdown extends StatelessWidget {
+  final Device device;
+  final ApiCommand command;
+  final String? value;
+  final List<DropdownMenuItem<String>>? items;
+  final String? name;
+  final void Function(String?)? onChanged;
+
+  ApiSettingDropdown({
+    required this.device,
+    required this.command,
+    required this.value,
+    required this.items,
+    this.name,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    var dropdown = DropdownButton<String>(
+      value: value,
+      items: items,
+      onChanged: onChanged,
+    );
+    return (name == null)
+        ? dropdown
+        : Row(children: [
+            Flexible(
+              fit: FlexFit.tight,
+              child: Text(name!),
+            ),
+            dropdown,
           ]);
   }
 }
@@ -706,6 +742,21 @@ class SettingsWidget extends StatelessWidget {
             suffix: Text("minutes"),
             keyboardType: TextInputType.number,
           ),
+          ApiSettingDropdown(
+            name: "Motion detection method",
+            device: device,
+            command: ApiCommand.motionDetectionMethod,
+            value: settings.motionDetectionMethod.toString(),
+            onChanged: (value) {
+              print(value);
+            },
+            items: settings.validMotionDetectionMethods.entries
+                .map((e) => DropdownMenuItem<String>(
+                      value: e.key.toString(),
+                      child: Text(e.value),
+                    ))
+                .toList(),
+          )
         ];
 
         return Column(

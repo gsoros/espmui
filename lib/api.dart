@@ -29,6 +29,9 @@ enum ApiCommand {
   hallOffset,
   hallThreshold,
   hallThresLow,
+  strainThreshold,
+  strainThresLow,
+  motionDetectionMethod,
 }
 
 enum ApiResult {
@@ -42,6 +45,7 @@ enum ApiResult {
   secureApiInvalid,
   calibrationFailed,
   tareFailed,
+  argInvalid,
 }
 
 typedef void ApiCallback(ApiMessage message);

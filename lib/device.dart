@@ -449,6 +449,13 @@ class DeviceSettings {
   var reverseStrain = ExtendedBool.Unknown;
   var doublePower = ExtendedBool.Unknown;
   int? sleepDelay;
+  int motionDetectionMethod = 0;
+
+  final validMotionDetectionMethods = {
+    0: "Hall effect sensor",
+    1: "MPU",
+    2: "Strain gauge",
+  };
 
   @override
   bool operator ==(other) {
@@ -456,18 +463,20 @@ class DeviceSettings {
         other.cranklength == cranklength &&
         other.reverseStrain == reverseStrain &&
         other.doublePower == doublePower &&
-        other.sleepDelay == sleepDelay;
+        other.sleepDelay == sleepDelay &&
+        other.motionDetectionMethod == motionDetectionMethod;
   }
 
   @override
-  int get hashCode => cranklength.hashCode ^ reverseStrain.hashCode ^ doublePower.hashCode ^ sleepDelay.hashCode;
+  int get hashCode => cranklength.hashCode ^ reverseStrain.hashCode ^ doublePower.hashCode ^ sleepDelay.hashCode ^ motionDetectionMethod.hashCode;
 
   String toString() {
     return "${describeIdentity(this)} ("
         "crankLength: $cranklength, "
         "reverseStrain: $reverseStrain, "
         "doublePower: $doublePower, "
-        "sleepDelay: $sleepDelay)";
+        "sleepDelay: $sleepDelay, "
+        "motionDetectionMethod: $motionDetectionMethod)";
   }
 }
 
