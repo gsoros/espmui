@@ -153,6 +153,26 @@ class Device {
         deviceSettings.notifyListeners();
       }
     }
+    // motionDetectionMethod
+    else if (ApiCommand.motionDetectionMethod.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.motionDetectionMethod = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    }
+    // strainThreshold
+    else if (ApiCommand.strainThreshold.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.strainThreshold = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    } // strainThresLow
+    else if (ApiCommand.strainThresLow.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.strainThresLow = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    }
   }
 
   void dispose() async {
@@ -277,6 +297,9 @@ class Device {
       "reverseStrain",
       "doublePower",
       "sleepDelay",
+      "motionDetectionMethod",
+      "strainThreshold",
+      "strainThresLow",
     ].forEach((key) async {
       await api.request<String>(
         key,
@@ -449,7 +472,9 @@ class DeviceSettings {
   var reverseStrain = ExtendedBool.Unknown;
   var doublePower = ExtendedBool.Unknown;
   int? sleepDelay;
-  int motionDetectionMethod = 0;
+  int? motionDetectionMethod;
+  int? strainThreshold;
+  int? strainThresLow;
 
   final validMotionDetectionMethods = {
     0: "Hall effect sensor",
@@ -464,11 +489,20 @@ class DeviceSettings {
         other.reverseStrain == reverseStrain &&
         other.doublePower == doublePower &&
         other.sleepDelay == sleepDelay &&
-        other.motionDetectionMethod == motionDetectionMethod;
+        other.motionDetectionMethod == motionDetectionMethod &&
+        other.strainThreshold == strainThreshold &&
+        other.strainThresLow == strainThresLow;
   }
 
   @override
-  int get hashCode => cranklength.hashCode ^ reverseStrain.hashCode ^ doublePower.hashCode ^ sleepDelay.hashCode ^ motionDetectionMethod.hashCode;
+  int get hashCode =>
+      cranklength.hashCode ^
+      reverseStrain.hashCode ^
+      doublePower.hashCode ^
+      sleepDelay.hashCode ^
+      motionDetectionMethod.hashCode ^
+      strainThreshold.hashCode ^
+      strainThresLow.hashCode;
 
   String toString() {
     return "${describeIdentity(this)} ("
@@ -476,7 +510,9 @@ class DeviceSettings {
         "reverseStrain: $reverseStrain, "
         "doublePower: $doublePower, "
         "sleepDelay: $sleepDelay, "
-        "motionDetectionMethod: $motionDetectionMethod)";
+        "motionDetectionMethod: $motionDetectionMethod, "
+        "strainThreshold: $strainThreshold, "
+        "strainThresLow: $strainThresLow)";
   }
 }
 

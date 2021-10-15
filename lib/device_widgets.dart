@@ -564,11 +564,21 @@ class ApiSettingDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var dropdown = DropdownButton<String>(
-      value: value,
-      items: items,
-      onChanged: onChanged,
-    );
+    dynamic dropdown = Text("unknown");
+    if (items != null) if (items!.any((item) => item.value == value))
+      dropdown = DropdownButton<String>(
+        value: value,
+        items: items,
+        onChanged: (String? value) async {
+          if (onChanged != null) onChanged!(value);
+          final result = await device.api.requestResultCode(
+            "${command.index}=${value ?? value.toString()}",
+            minDelayMs: 2000,
+          );
+          if (name != null) snackbar("$name ${value ?? value.toString()} ${result == ApiResult.success.index ? "success" : " failure"}", context);
+          print("[ApiSettingDropdown] api.requestResultCode($command): $result");
+        },
+      );
     return (name == null)
         ? dropdown
         : Row(children: [
@@ -666,7 +676,7 @@ class SettingsWidget extends StatelessWidget {
               },
             ),
           );
-          if (settings.staEnabled == ExtendedBool.True)
+          if (settings.staEnabled == ExtendedBool.True) {
             widgets.add(
               Row(
                 children: [
@@ -689,6 +699,7 @@ class SettingsWidget extends StatelessWidget {
                 ],
               ),
             );
+          }
         }
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -701,7 +712,7 @@ class SettingsWidget extends StatelessWidget {
       valueListenable: device.deviceSettings,
       builder: (context, settings, child) {
         //print("changed: $settings");
-        var widgets = [
+        var widgets = <Widget>[
           ApiSettingInput(
             device: device,
             name: "Crank Length",
@@ -750,14 +761,47 @@ class SettingsWidget extends StatelessWidget {
             onChanged: (value) {
               print(value);
             },
-            items: settings.validMotionDetectionMethods.entries
-                .map((e) => DropdownMenuItem<String>(
-                      value: e.key.toString(),
-                      child: Text(e.value),
-                    ))
-                .toList(),
+            items: settings.motionDetectionMethod == null
+                ? [
+                    DropdownMenuItem<String>(
+                      child: Text("unknown"),
+                    ),
+                  ]
+                : settings.validMotionDetectionMethods.entries
+                    .map((e) => DropdownMenuItem<String>(
+                          value: e.key.toString(),
+                          child: Text(e.value),
+                        ))
+                    .toList(),
           )
         ];
+        if (settings.motionDetectionMethod ==
+            settings.validMotionDetectionMethods.keys.firstWhere((k) => settings.validMotionDetectionMethods[k] == "Strain gauge", orElse: () => -1)) {
+          print(settings.strainThresLow);
+          widgets.add(
+            Row(
+              children: [
+                ApiSettingInput(
+                  device: device,
+                  name: "Low threshold",
+                  command: ApiCommand.strainThresLow,
+                  value: settings.strainThresLow == null ? null : settings.strainThresLow.toString(),
+                  keyboardType: TextInputType.number,
+                  enabled: settings.strainThresLow != null,
+                ),
+                Text(' '),
+                ApiSettingInput(
+                  device: device,
+                  name: "High threshold",
+                  command: ApiCommand.strainThreshold,
+                  value: settings.strainThreshold == null ? null : settings.strainThreshold.toString(),
+                  keyboardType: TextInputType.number,
+                  enabled: settings.strainThreshold != null,
+                ),
+              ],
+            ),
+          );
+        }
 
         return Column(
           mainAxisSize: MainAxisSize.min,
