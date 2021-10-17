@@ -32,6 +32,7 @@ enum ApiCommand {
   strainThreshold,
   strainThresLow,
   motionDetectionMethod,
+  sleep,
 }
 
 enum ApiResult {
