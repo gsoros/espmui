@@ -31,6 +31,11 @@ dependencies:
   page_transition: ^2.0.2
   flutter_staggered_grid_view: ^0.4.0
   mutex: ^3.0.0
+  # reorderables: ^0.4.1
+  flutter_circle_color_picker:
+    #git:
+    #  url: git@github.com:gsoros/flutter_circle_color_picker.git
+    path: lib/flutter_circle_color_picker
 
 
   # The following adds the Cupertino Icons font to your application.

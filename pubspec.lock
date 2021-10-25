@@ -64,6 +64,13 @@ packages:
       url: "git@github.com:gsoros/FlutterBleLib.git"
     source: git
     version: "2.4.0"
+  flutter_circle_color_picker:
+    dependency: "direct main"
+    description:
+      path: "lib/flutter_circle_color_picker"
+      relative: true
+    source: path
+    version: "0.3.0"
   flutter_staggered_grid_view:
     dependency: "direct main"
     description:

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import 'scanner_route.dart';
+import 'sensors_route.dart';
 
 void main() {
+  //debugRepaintRainbowEnabled = true;
   runApp(EspmUiApp());
 }
 
@@ -26,8 +29,10 @@ class EspmUiApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      //debugShowCheckedModeBanner: false,
-      home: ScannerRoute(),
+      debugShowCheckedModeBanner: false,
+      //showPerformanceOverlay: true,
+      //home: ScannerRoute(),
+      home: SensorsRoute(),
     );
   }
 }
