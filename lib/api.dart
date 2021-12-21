@@ -33,6 +33,7 @@ enum ApiCommand {
   strainThresLow,
   motionDetectionMethod,
   sleep,
+  negativeTorqueMethod,
 }
 
 enum ApiResult {

@@ -566,28 +566,45 @@ class ApiSettingDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     dynamic dropdown = Text("unknown");
     if (items != null) if (items!.any((item) => item.value == value))
-      dropdown = DropdownButton<String>(
-        value: value,
-        items: items,
-        onChanged: (String? value) async {
-          if (onChanged != null) onChanged!(value);
-          final result = await device.api.requestResultCode(
-            "${command.index}=${value ?? value.toString()}",
-            minDelayMs: 2000,
-          );
-          if (name != null) snackbar("$name ${value ?? value.toString()} ${result == ApiResult.success.index ? "success" : " failure"}", context);
-          print("[ApiSettingDropdown] api.requestResultCode($command): $result");
-        },
+      dropdown = DecoratedBox(
+        decoration: ShapeDecoration(
+          color: Colors.white10,
+          shape: RoundedRectangleBorder(
+            side: BorderSide(width: 1.0, style: BorderStyle.solid, color: Colors.white24),
+            borderRadius: BorderRadius.all(Radius.circular(3.0)),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
+          child: DropdownButton<String>(
+            value: value,
+            items: items,
+            underline: SizedBox(),
+            onChanged: (String? value) async {
+              if (onChanged != null) onChanged!(value);
+              final result = await device.api.requestResultCode(
+                "${command.index}=${value ?? value.toString()}",
+                minDelayMs: 2000,
+              );
+              if (name != null) snackbar("$name ${value ?? value.toString()} ${result == ApiResult.success.index ? "success" : " failure"}", context);
+              print("[ApiSettingDropdown] api.requestResultCode($command): $result");
+            },
+          ),
+        ),
       );
-    return (name == null)
-        ? dropdown
-        : Row(children: [
-            Flexible(
-              fit: FlexFit.tight,
-              child: Text(name!),
-            ),
-            dropdown,
-          ]);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 5, 0, 5),
+      child: (name == null)
+          ? dropdown
+          : Row(children: [
+              Flexible(
+                fit: FlexFit.tight,
+                child: Text(name!),
+              ),
+              Text(" "),
+              dropdown,
+            ]),
+    );
   }
 }
 
@@ -754,12 +771,33 @@ class SettingsWidget extends StatelessWidget {
             keyboardType: TextInputType.number,
           ),
           ApiSettingDropdown(
+            name: "Negative torque method",
+            device: device,
+            command: ApiCommand.negativeTorqueMethod,
+            value: settings.negativeTorqueMethod.toString(),
+            onChanged: (value) {
+              print("Negative torque method: $value");
+            },
+            items: settings.negativeTorqueMethod == null
+                ? [
+                    DropdownMenuItem<String>(
+                      child: Text("unknown"),
+                    ),
+                  ]
+                : settings.validNegativeTorqueMethods.entries
+                    .map((e) => DropdownMenuItem<String>(
+                          value: e.key.toString(),
+                          child: Text(e.value),
+                        ))
+                    .toList(),
+          ),
+          ApiSettingDropdown(
             name: "Motion detection method",
             device: device,
             command: ApiCommand.motionDetectionMethod,
             value: settings.motionDetectionMethod.toString(),
             onChanged: (value) {
-              print(value);
+              print("Motion detection method: $value");
             },
             items: settings.motionDetectionMethod == null
                 ? [
@@ -773,11 +811,11 @@ class SettingsWidget extends StatelessWidget {
                           child: Text(e.value),
                         ))
                     .toList(),
-          )
+          ),
         ];
         if (settings.motionDetectionMethod ==
             settings.validMotionDetectionMethods.keys.firstWhere((k) => settings.validMotionDetectionMethods[k] == "Strain gauge", orElse: () => -1)) {
-          print(settings.strainThresLow);
+          //print("strainThresLow: ${settings.strainThresLow}");
           widgets.add(
             Row(
               children: [

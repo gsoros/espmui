@@ -3,10 +3,12 @@ import 'dart:math';
 import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
+import 'package:page_transition/page_transition.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutter_circle_color_picker/flutter_circle_color_picker.dart';
 
 import 'package:espmui/util.dart';
+import 'package:espmui/scanner_route.dart';
 
 class SensorsRoute extends StatefulWidget {
   const SensorsRoute({Key? key}) : super(key: key);
@@ -58,14 +60,37 @@ class _SensorsRouteState extends State<SensorsRoute> {
                         return Center(
                           child: AlertDialog(
                             title: Hero(tag: 'fab', child: Icon(Icons.settings)),
-                            content: Container(
-                              width: 100.0,
-                              height: 50.0,
-                              child: ElevatedButton(
-                                  onPressed: () => setState(() {
-                                        _tiles = SensorTileList(key: UniqueKey());
-                                      }),
-                                  child: Text("Random tiles")),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 150.0,
+                                  height: 50.0,
+                                  child: ElevatedButton(
+                                      onPressed: () => setState(() {
+                                            _tiles = SensorTileList(key: UniqueKey());
+                                          }),
+                                      child: Text("Randomize tiles")),
+                                ),
+                                Container(
+                                  width: 150.0,
+                                  height: 50.0,
+                                  margin: EdgeInsets.only(top: 30),
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.of(context).pop(); // close dialog
+                                      Navigator.push(
+                                        context,
+                                        PageTransition(
+                                          type: PageTransitionType.rightToLeft,
+                                          child: ScannerRoute(),
+                                        ),
+                                      );
+                                    },
+                                    child: Text("Devices"),
+                                  ),
+                                ),
+                              ],
                             ),
                             actions: <Widget>[
                               TextButton(

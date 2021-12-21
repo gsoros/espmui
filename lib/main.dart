@@ -31,8 +31,8 @@ class EspmUiApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
       //showPerformanceOverlay: true,
-      //home: ScannerRoute(),
-      home: SensorsRoute(),
+      home: ScannerRoute(),
+      //home: SensorsRoute(),
     );
   }
 }

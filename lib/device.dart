@@ -173,6 +173,13 @@ class Device {
         deviceSettings.notifyListeners();
       }
     }
+    // negativeTorqueMethod
+    else if (ApiCommand.negativeTorqueMethod.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.negativeTorqueMethod = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    }
   }
 
   void dispose() async {
@@ -300,6 +307,7 @@ class Device {
       "motionDetectionMethod",
       "strainThreshold",
       "strainThresLow",
+      "negativeTorqueMethod",
     ].forEach((key) async {
       await api.request<String>(
         key,
@@ -475,11 +483,19 @@ class DeviceSettings {
   int? motionDetectionMethod;
   int? strainThreshold;
   int? strainThresLow;
+  int? negativeTorqueMethod;
 
   final validMotionDetectionMethods = {
     0: "Hall effect sensor",
     1: "MPU",
     2: "Strain gauge",
+  };
+
+  final validNegativeTorqueMethods = {
+    0: "Keep",
+    1: "Zero",
+    2: "Discard",
+    3: "Absolute value",
   };
 
   @override
@@ -491,7 +507,8 @@ class DeviceSettings {
         other.sleepDelay == sleepDelay &&
         other.motionDetectionMethod == motionDetectionMethod &&
         other.strainThreshold == strainThreshold &&
-        other.strainThresLow == strainThresLow;
+        other.strainThresLow == strainThresLow &&
+        other.negativeTorqueMethod == negativeTorqueMethod;
   }
 
   @override
@@ -502,7 +519,8 @@ class DeviceSettings {
       sleepDelay.hashCode ^
       motionDetectionMethod.hashCode ^
       strainThreshold.hashCode ^
-      strainThresLow.hashCode;
+      strainThresLow.hashCode ^
+      negativeTorqueMethod.hashCode;
 
   String toString() {
     return "${describeIdentity(this)} ("
@@ -512,7 +530,8 @@ class DeviceSettings {
         "sleepDelay: $sleepDelay, "
         "motionDetectionMethod: $motionDetectionMethod, "
         "strainThreshold: $strainThreshold, "
-        "strainThresLow: $strainThresLow)";
+        "strainThresLow: $strainThresLow, "
+        "negativeTorqueMethod: $negativeTorqueMethod)";
   }
 }
 
