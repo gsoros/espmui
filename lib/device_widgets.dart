@@ -871,7 +871,7 @@ class SettingsWidget extends StatelessWidget {
                 Text(' '),
                 ApiSettingInput(
                   device: device,
-                  name: "Min. Range",
+                  name: "Max. Range",
                   command: ApiCommand.autoTareRangeG,
                   value: settings.autoTareRangeG == null ? null : settings.autoTareRangeG.toString(),
                   keyboardType: TextInputType.number,
