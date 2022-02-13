@@ -34,6 +34,9 @@ enum ApiCommand {
   motionDetectionMethod,
   sleep,
   negativeTorqueMethod,
+  autoTare,
+  autoTareDelayMs,
+  autoTareRangeG,
 }
 
 enum ApiResult {

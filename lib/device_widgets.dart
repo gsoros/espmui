@@ -771,17 +771,17 @@ class SettingsWidget extends StatelessWidget {
             keyboardType: TextInputType.number,
           ),
           ApiSettingDropdown(
-            name: "Negative torque method",
+            name: "Negative Torque Method",
             device: device,
             command: ApiCommand.negativeTorqueMethod,
             value: settings.negativeTorqueMethod.toString(),
             onChanged: (value) {
-              print("Negative torque method: $value");
+              print("Negative Torque Method: $value");
             },
             items: settings.negativeTorqueMethod == null
                 ? [
                     DropdownMenuItem<String>(
-                      child: Text("unknown"),
+                      child: Text("Unknown"),
                     ),
                   ]
                 : settings.validNegativeTorqueMethods.entries
@@ -792,17 +792,17 @@ class SettingsWidget extends StatelessWidget {
                     .toList(),
           ),
           ApiSettingDropdown(
-            name: "Motion detection method",
+            name: "Motion Detection Method",
             device: device,
             command: ApiCommand.motionDetectionMethod,
             value: settings.motionDetectionMethod.toString(),
             onChanged: (value) {
-              print("Motion detection method: $value");
+              print("Motion Detection Method: $value");
             },
             items: settings.motionDetectionMethod == null
                 ? [
                     DropdownMenuItem<String>(
-                      child: Text("unknown"),
+                      child: Text("Unknown"),
                     ),
                   ]
                 : settings.validMotionDetectionMethods.entries
@@ -815,26 +815,68 @@ class SettingsWidget extends StatelessWidget {
         ];
         if (settings.motionDetectionMethod ==
             settings.validMotionDetectionMethods.keys.firstWhere((k) => settings.validMotionDetectionMethods[k] == "Strain gauge", orElse: () => -1)) {
-          //print("strainThresLow: ${settings.strainThresLow}");
+          //print("MDM==SG strainThresLow: ${settings.strainThresLow}");
           widgets.add(
             Row(
               children: [
                 ApiSettingInput(
                   device: device,
-                  name: "Low threshold",
+                  name: "Low Threshold",
                   command: ApiCommand.strainThresLow,
                   value: settings.strainThresLow == null ? null : settings.strainThresLow.toString(),
                   keyboardType: TextInputType.number,
                   enabled: settings.strainThresLow != null,
+                  suffix: Text("kg"),
                 ),
                 Text(' '),
                 ApiSettingInput(
                   device: device,
-                  name: "High threshold",
+                  name: "High Threshold",
                   command: ApiCommand.strainThreshold,
                   value: settings.strainThreshold == null ? null : settings.strainThreshold.toString(),
                   keyboardType: TextInputType.number,
                   enabled: settings.strainThreshold != null,
+                  suffix: Text("kg"),
+                ),
+              ],
+            ),
+          );
+        }
+
+        widgets.add(
+          ApiSettingSwitch(
+            device: device,
+            name: "Auto Tare",
+            command: ApiCommand.autoTare,
+            value: settings.autoTare,
+            onChanged: () {
+              device.deviceSettings.value.autoTare = ExtendedBool.Waiting;
+              device.deviceSettings.notifyListeners();
+            },
+          ),
+        );
+        if (ExtendedBool.True == settings.autoTare) {
+          widgets.add(
+            Row(
+              children: [
+                ApiSettingInput(
+                  device: device,
+                  name: "Delay",
+                  command: ApiCommand.autoTareDelayMs,
+                  value: settings.autoTareDelayMs == null ? null : settings.autoTareDelayMs.toString(),
+                  keyboardType: TextInputType.number,
+                  enabled: settings.autoTareDelayMs != null,
+                  suffix: Text("ms"),
+                ),
+                Text(' '),
+                ApiSettingInput(
+                  device: device,
+                  name: "Min. Range",
+                  command: ApiCommand.autoTareRangeG,
+                  value: settings.autoTareRangeG == null ? null : settings.autoTareRangeG.toString(),
+                  keyboardType: TextInputType.number,
+                  enabled: settings.autoTareRangeG != null,
+                  suffix: Text("g"),
                 ),
               ],
             ),

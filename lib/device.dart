@@ -180,6 +180,25 @@ class Device {
         deviceSettings.notifyListeners();
       }
     }
+    // autoTare
+    else if (ApiCommand.autoTare.index == message.commandCode) {
+      deviceSettings.value.autoTare = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      deviceSettings.notifyListeners();
+    }
+    // autoTareDelayMs
+    else if (ApiCommand.autoTareDelayMs.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.autoTareDelayMs = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    }
+    // autoTareRangG
+    else if (ApiCommand.autoTareRangeG.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.autoTareRangeG = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    }
   }
 
   void dispose() async {
@@ -308,6 +327,9 @@ class Device {
       "strainThreshold",
       "strainThresLow",
       "negativeTorqueMethod",
+      "autoTare",
+      "autoTareDelayMs",
+      "autoTareRangeG",
     ].forEach((key) async {
       await api.request<String>(
         key,
@@ -484,6 +506,9 @@ class DeviceSettings {
   int? strainThreshold;
   int? strainThresLow;
   int? negativeTorqueMethod;
+  var autoTare = ExtendedBool.Unknown;
+  int? autoTareDelayMs;
+  int? autoTareRangeG;
 
   final validMotionDetectionMethods = {
     0: "Hall effect sensor",
@@ -508,7 +533,10 @@ class DeviceSettings {
         other.motionDetectionMethod == motionDetectionMethod &&
         other.strainThreshold == strainThreshold &&
         other.strainThresLow == strainThresLow &&
-        other.negativeTorqueMethod == negativeTorqueMethod;
+        other.negativeTorqueMethod == negativeTorqueMethod &&
+        other.autoTare == autoTare &&
+        other.autoTareDelayMs == autoTareDelayMs &&
+        other.autoTareRangeG == autoTareRangeG;
   }
 
   @override
@@ -520,7 +548,10 @@ class DeviceSettings {
       motionDetectionMethod.hashCode ^
       strainThreshold.hashCode ^
       strainThresLow.hashCode ^
-      negativeTorqueMethod.hashCode;
+      negativeTorqueMethod.hashCode ^
+      autoTare.hashCode ^
+      autoTareDelayMs.hashCode ^
+      autoTareDelayMs.hashCode;
 
   String toString() {
     return "${describeIdentity(this)} ("
@@ -531,7 +562,10 @@ class DeviceSettings {
         "motionDetectionMethod: $motionDetectionMethod, "
         "strainThreshold: $strainThreshold, "
         "strainThresLow: $strainThresLow, "
-        "negativeTorqueMethod: $negativeTorqueMethod)";
+        "negativeTorqueMethod: $negativeTorqueMethod, "
+        "autoTare: $autoTare, "
+        "autoTareDelayMs: $autoTareDelayMs, "
+        "autoTareRangeG: $autoTareRangeG)";
   }
 }
 

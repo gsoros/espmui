@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import 'scanner_route.dart';
-import 'sensors_route.dart';
+// import 'sensors_route.dart';
 
 void main() {
   //debugRepaintRainbowEnabled = true;
