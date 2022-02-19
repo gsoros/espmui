@@ -564,7 +564,7 @@ class ApiSettingDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    dynamic dropdown = Text("unknown");
+    dynamic dropdown = Text("");
     if (items != null) if (items!.any((item) => item.value == value))
       dropdown = DecoratedBox(
         decoration: ShapeDecoration(
@@ -781,7 +781,7 @@ class SettingsWidget extends StatelessWidget {
             items: settings.negativeTorqueMethod == null
                 ? [
                     DropdownMenuItem<String>(
-                      child: Text("Unknown"),
+                      child: Text(""),
                     ),
                   ]
                 : settings.validNegativeTorqueMethods.entries
@@ -802,7 +802,7 @@ class SettingsWidget extends StatelessWidget {
             items: settings.motionDetectionMethod == null
                 ? [
                     DropdownMenuItem<String>(
-                      child: Text("Unknown"),
+                      child: Text(""),
                     ),
                   ]
                 : settings.validMotionDetectionMethods.entries
