@@ -53,9 +53,7 @@ class Scanner {
       (device) {
         bool isNew = !devices.containsIdentifier(device.identifier);
         //availableDevices.addOrUpdate(device);
-        print("$tag devicesSubscription: " +
-            device.identifier +
-            " new=$isNew rssi=${device.rssi}");
+        print("$tag devicesSubscription: " + device.identifier + " new=$isNew rssi=${device.rssi}");
       },
     );
     startScan();
@@ -69,9 +67,9 @@ class Scanner {
     await _scanningSubscription?.cancel();
     await _devicesController.close();
     await _devicesSubscription?.cancel();
+    await devices.dispose();
+    await selected?.dispose();
     await ble.dispose();
-    devices.dispose();
-    selected?.dispose();
   }
 
   void startScan() async {
@@ -80,10 +78,7 @@ class Scanner {
       return;
     }
     if (await ble.currentState() != BluetoothState.POWERED_ON) {
-      bleError(
-          tag,
-          "startScan() adapter not powered on, state is: " +
-              (await ble.currentState()).toString());
+      bleError(tag, "startScan() adapter not powered on, state is: " + (await ble.currentState()).toString());
       return;
     }
     Timer(

@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:page_transition/page_transition.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutter_circle_color_picker/flutter_circle_color_picker.dart';
 
@@ -18,6 +20,7 @@ class SensorsRoute extends StatefulWidget {
 }
 
 class _SensorsRouteState extends State<SensorsRoute> {
+  static const String tag = '[_SensorsRouteState]';
   bool _fabVisible = false;
   Timer? _fabTimer;
 
@@ -68,7 +71,24 @@ class _SensorsRouteState extends State<SensorsRoute> {
                                   height: 50.0,
                                   child: ElevatedButton(
                                       onPressed: () => setState(() {
-                                            _tiles = SensorTileList(key: UniqueKey());
+                                            dev.log('$tag calling SensorTileList(fromPreferences: true)');
+                                            _tiles = SensorTileList(
+                                              key: UniqueKey(),
+                                              mode: 'fromPreferences',
+                                            );
+                                          }),
+                                      child: Text("Load tiles")),
+                                ),
+                                Container(
+                                  width: 150.0,
+                                  height: 50.0,
+                                  margin: EdgeInsets.only(top: 30),
+                                  child: ElevatedButton(
+                                      onPressed: () => setState(() {
+                                            _tiles = SensorTileList(
+                                              key: UniqueKey(),
+                                              mode: 'random',
+                                            );
                                           }),
                                       child: Text("Randomize tiles")),
                                 ),
@@ -193,6 +213,23 @@ class SensorTile extends StatelessWidget {
     );
   }
 
+  SensorTile.fromJson(Map<String, dynamic> json)
+      : name = json['name'],
+        color = Color(json['color']),
+        textColor = Color(json['textColor']),
+        colSpan = json['colSpan'],
+        height = json['height'],
+        background = Graph(),
+        value = Text('Loading...');
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'color': color.value,
+        'textColor': textColor.value,
+        'colSpan': colSpan,
+        'height': height,
+      };
+
   @override
   Widget build(BuildContext context) {
     var sizeUnit = MediaQuery.of(context).size.width / 10;
@@ -284,13 +321,29 @@ class SensorTile extends StatelessWidget {
 }
 
 class SensorTileList extends StatefulWidget {
-  const SensorTileList({Key? key}) : super(key: key);
+  static const String tag = '[SensorTileList]';
+  final String mode;
+
+  const SensorTileList({
+    Key? key,
+    this.mode = 'fromPreferences',
+  }) : super(key: key);
+
   @override
-  _SensorTileListState createState() => _SensorTileListState();
+  _SensorTileListState createState() {
+    dev.log('$tag createState()');
+    _SensorTileListState state = _SensorTileListState();
+    if (mode == 'fromPreferences')
+      state._loadFromPreferences();
+    else if (mode == 'random') state._randomize();
+    return state;
+  }
 }
 
 class _SensorTileListState extends State<SensorTileList> {
+  static const String tag = '[_SensorTileListState]';
   var _tiles = <SensorTile>[];
+  Timer? _saveToPreferencesTimer;
   double dialogOpacity = 1;
   bool colorPicker = false;
   void Function(Color)? colorPickerCallback;
@@ -298,25 +351,61 @@ class _SensorTileListState extends State<SensorTileList> {
 
   @override
   void initState() {
-    dev.log("_SensorTileListState initState");
-    reset();
+    dev.log('$tag initState');
     super.initState();
   }
 
-  void reset() => setState(() {
-        _tiles = <SensorTile>[];
-        for (var i = 0; i < 20; i++)
-          _tiles.add(
-            SensorTile.random(),
-          );
-      });
+  void _randomize() {
+    dev.log('$tag _randomize');
+    _tiles.clear();
+    for (var i = 0; i < 5; i++) {
+      SensorTile tile = SensorTile.random();
+      _tiles.add(tile);
+    }
+  }
 
   void _moveTile(SensorTile tile, int index) {
-    dev.log('reorder tile:${tile.name} newIndex:$index');
+    dev.log('$tag reorder tile:${tile.name} newIndex:$index');
     setState(() {
       _tiles.removeWhere((existing) => existing.hashCode == tile.hashCode);
       _tiles.insert(index, tile);
     });
+    //_savePreferences();
+  }
+
+  void _saveToPreferences([bool delayed = true]) async {
+    if (delayed) {
+      dev.log(_saveToPreferencesTimer == null ? '$tag new savePrefs timer' : '$tag updating savePrefs timer');
+      _saveToPreferencesTimer?.cancel();
+      _saveToPreferencesTimer = Timer(Duration(seconds: 1), () {
+        _saveToPreferences(false);
+      });
+      return;
+    }
+    List<String> tilePrefs = [];
+    _tiles.forEach((tile) {
+      tilePrefs.add(jsonEncode(tile));
+    });
+    dev.log('$tag saving prefs: ${tilePrefs.join(', ')}');
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setStringList('tiles', tilePrefs);
+    _saveToPreferencesTimer = null;
+  }
+
+  Future<bool> _loadFromPreferences() async {
+    dev.log('$tag loadFromPreferences');
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String>? tilePrefs = prefs.getStringList('tiles');
+    setState(() {
+      _tiles.clear();
+      tilePrefs?.forEach((tileString) {
+        SensorTile tile = SensorTile.fromJson(jsonDecode(tileString));
+        //dev.log('$tag loading $tileString');
+        //dev.log('$tag loading ${tile.toJson().toString()}');
+        _tiles.add(tile);
+      });
+    });
+    return _tiles.isEmpty;
   }
 
   @override
@@ -343,6 +432,7 @@ class _SensorTileListState extends State<SensorTileList> {
         return DragTarget<SensorTile>(
           onAccept: (tile) {
             dev.log("onAccept $index ${tile.name}");
+            _saveToPreferences();
           },
           onWillAccept: (tile) {
             if (tile == null) return false;
@@ -429,6 +519,7 @@ class _SensorTileListState extends State<SensorTileList> {
                                                   setDialogState(() {
                                                     dialogOpacity = 1;
                                                   });
+                                                  _saveToPreferences();
                                                 },
                                                 onChanged: (value) {
                                                   dev.log("colspan changed");
@@ -460,6 +551,7 @@ class _SensorTileListState extends State<SensorTileList> {
                                                         setDialogState(() {
                                                           dialogOpacity = 1;
                                                         });
+                                                        _saveToPreferences();
                                                       },
                                                       onChanged: (value) {
                                                         dev.log("height changed");
@@ -491,6 +583,7 @@ class _SensorTileListState extends State<SensorTileList> {
                                                                     colorPickerInitialColor = _tiles[index].color;
                                                                     colorPickerCallback = (color) {
                                                                       _tiles[index] = SensorTile.from(_tiles[index], color: color);
+                                                                      _saveToPreferences();
                                                                     };
                                                                   });
                                                                 });
@@ -503,6 +596,7 @@ class _SensorTileListState extends State<SensorTileList> {
                                                                     colorPickerInitialColor = _tiles[index].textColor;
                                                                     colorPickerCallback = (color) {
                                                                       _tiles[index] = SensorTile.from(_tiles[index], textColor: color);
+                                                                      _saveToPreferences();
                                                                     };
                                                                   });
                                                                 });

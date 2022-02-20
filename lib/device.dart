@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
@@ -201,9 +202,9 @@ class Device {
     }
   }
 
-  void dispose() async {
+  Future<void> dispose() async {
     print("$tag $name dispose");
-    disconnect();
+    await disconnect();
     await _stateController.close();
     _characteristics.forEachCharacteristic((_, char) async {
       await char?.unsubscribe();
@@ -448,7 +449,7 @@ class DeviceList {
     return null;
   }
 
-  void dispose() {
+  Future<void> dispose() async {
     print("$tag dispose");
     _devices.forEach((_, device) => device.dispose());
     _devices.clear();

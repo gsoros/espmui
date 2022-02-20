@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import 'scanner_route.dart';
-// import 'sensors_route.dart';
+//import 'scanner_route.dart';
+import 'sensors_route.dart';
 
 void main() {
   //debugRepaintRainbowEnabled = true;
@@ -31,8 +31,8 @@ class EspmUiApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
       //showPerformanceOverlay: true,
-      home: ScannerRoute(),
-      //home: SensorsRoute(),
+      //home: ScannerRoute(),
+      home: SensorsRoute(),
     );
   }
 }
