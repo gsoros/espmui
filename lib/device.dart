@@ -1,205 +1,61 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 
-import 'package:flutter/cupertino.dart';
+import 'package:espmui/ble_constants.dart';
+import 'package:espmui/preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
-import 'ble_characteristic.dart';
-import 'util.dart';
 import 'ble.dart';
-import 'api.dart';
+import 'ble_characteristic.dart';
+import 'espm_api.dart';
+import 'util.dart';
+
+/*
+Device: Battery
+  ├─ PowerMeter: Power(, Cadence)
+  │    └─ ESPM: Api, WeightScale, Hall
+  ├─ HeartrateMonitor: Heartrate
+  ├─ TODO CadenceSensor: Cadence
+  └─ TODO SpeedSensor: Speed
+*/
 
 class Device {
-  final String tag = "[Device]";
+  final String tag = '[Device]';
   Peripheral peripheral;
   int rssi = 0;
   int lastSeen = 0;
-  late Api api;
   bool shouldConnect = false;
-
-  final weightServiceEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
-  final hallEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
-  final deviceSettings = PropertyValueNotifier<DeviceSettings>(DeviceSettings());
-  final wifiSettings = PropertyValueNotifier<DeviceWifiSettings>(DeviceWifiSettings());
-
-  /// Connection state stream controller
-  final _stateController = StreamController<PeripheralConnectionState>.broadcast();
-
-  /// Connection state stream
-  Stream<PeripheralConnectionState> get stateStream => _stateController.stream;
-
-  /// Connection state subscription
-  StreamSubscription<PeripheralConnectionState>? _stateSubscription;
-
-  /// API done messages
-  StreamSubscription<ApiMessage>? _apiSubsciption;
-
-  //Map<String, BleCharacteristic> _characteristics = {};
+  final autoConnect = ValueNotifier<bool>(false);
   var _characteristics = CharacteristicList();
 
   String? get name => peripheral.name;
   set name(String? name) => peripheral.name = name;
   String get identifier => peripheral.identifier;
   BatteryCharacteristic? get battery => characteristic("battery") as BatteryCharacteristic?;
-  PowerCharacteristic? get power => characteristic("power") as PowerCharacteristic?;
-  ApiCharacteristic? get apiCharacteristic => characteristic("api") as ApiCharacteristic?;
-  WeightScaleCharacteristic? get weightScale => characteristic("weightScale") as WeightScaleCharacteristic?;
-  HallCharacteristic? get hall => characteristic("hall") as HallCharacteristic?;
 
   Future<bool> get connected => peripheral.isConnected().catchError((e) {
         bleError(tag, "could not get connection state", e);
       });
 
-  Device(this.peripheral, {this.rssi = 0, this.lastSeen = 0}) {
-    print("[Device] construct");
-    _characteristics.addAll({
-      "battery": CharacteristicListItem(BatteryCharacteristic(peripheral)),
-      "power": CharacteristicListItem(PowerCharacteristic(peripheral)),
-      "api": CharacteristicListItem(ApiCharacteristic(peripheral)),
-      "weightScale": CharacteristicListItem(
-        WeightScaleCharacteristic(peripheral),
-        subscribeOnConnect: false,
-      ),
-      "hall": CharacteristicListItem(
-        HallCharacteristic(peripheral),
-        subscribeOnConnect: false,
-      ),
-    });
-    api = Api(this);
+  // Connection state stream controller
+  final _stateController = StreamController<PeripheralConnectionState>.broadcast();
 
-    /// listen to api message done events
-    _apiSubsciption = api.messageDoneStream.listen((message) => _onApiDone(message));
+  // Connection state stream
+  Stream<PeripheralConnectionState> get stateStream => _stateController.stream;
+
+  // Connection state subscription
+  StreamSubscription<PeripheralConnectionState>? _stateSubscription;
+
+  Device(this.peripheral, {this.rssi = 0, this.lastSeen = 0}) {
+    _characteristics.addAll({
+      'battery': CharacteristicListItem(BatteryCharacteristic(peripheral)),
+    });
+    init();
   }
 
-  /// Processes "done" messages sent by the API
-  void _onApiDone(ApiMessage message) async {
-    if (message.resultCode != ApiResult.success.index) return;
-    //print("$tag onApiDone parsing successful message: $message");
-    // switch does not work with non-consant case :(
-
-    // hostName
-    if (ApiCommand.hostName.index == message.commandCode) {
-      name = message.valueAsString;
-    }
-    // weightServiceEnabled
-    else if (ApiCommand.weightService.index == message.commandCode) {
-      weightServiceEnabled.value = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      if (message.valueAsBool ?? false)
-        await weightScale?.subscribe();
-      else
-        await weightScale?.unsubscribe();
-    }
-    // hallEnabled
-    else if (ApiCommand.hallChar.index == message.commandCode) {
-      hallEnabled.value = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      if (message.valueAsBool ?? false)
-        await hall?.subscribe();
-      else
-        await hall?.unsubscribe();
-    }
-    // wifi
-    else if (ApiCommand.wifi.index == message.commandCode) {
-      wifiSettings.value.enabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      wifiSettings.notifyListeners();
-    }
-    // wifiApEnabled
-    else if (ApiCommand.wifiApEnabled.index == message.commandCode) {
-      wifiSettings.value.apEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      wifiSettings.notifyListeners();
-    }
-    // wifiApSSID
-    else if (ApiCommand.wifiApSSID.index == message.commandCode) {
-      wifiSettings.value.apSSID = message.valueAsString;
-      wifiSettings.notifyListeners();
-    }
-    // wifiApPassword
-    else if (ApiCommand.wifiApPassword.index == message.commandCode) {
-      wifiSettings.value.apPassword = message.valueAsString;
-      wifiSettings.notifyListeners();
-    }
-    // wifiStaEnabled
-    else if (ApiCommand.wifiStaEnabled.index == message.commandCode) {
-      wifiSettings.value.staEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      wifiSettings.notifyListeners();
-    }
-    // wifiStaSSID
-    else if (ApiCommand.wifiStaSSID.index == message.commandCode) {
-      wifiSettings.value.staSSID = message.valueAsString;
-      wifiSettings.notifyListeners();
-    }
-    // wifiStaPassword
-    else if (ApiCommand.wifiStaPassword.index == message.commandCode) {
-      wifiSettings.value.staPassword = message.valueAsString;
-      wifiSettings.notifyListeners();
-    }
-    // crankLength
-    else if (ApiCommand.crankLength.index == message.commandCode) {
-      deviceSettings.value.cranklength = message.valueAsDouble;
-      deviceSettings.notifyListeners();
-    }
-    // reverseStrain
-    else if (ApiCommand.reverseStrain.index == message.commandCode) {
-      deviceSettings.value.reverseStrain = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      deviceSettings.notifyListeners();
-    }
-    // doublePower
-    else if (ApiCommand.doublePower.index == message.commandCode) {
-      deviceSettings.value.doublePower = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      deviceSettings.notifyListeners();
-    }
-    // sleepDelay
-    else if (ApiCommand.sleepDelay.index == message.commandCode) {
-      if (message.valueAsInt != null) {
-        deviceSettings.value.sleepDelay = (message.valueAsInt! / 1000 / 60).round();
-        deviceSettings.notifyListeners();
-      }
-    }
-    // motionDetectionMethod
-    else if (ApiCommand.motionDetectionMethod.index == message.commandCode) {
-      if (message.valueAsInt != null) {
-        deviceSettings.value.motionDetectionMethod = message.valueAsInt!;
-        deviceSettings.notifyListeners();
-      }
-    }
-    // strainThreshold
-    else if (ApiCommand.strainThreshold.index == message.commandCode) {
-      if (message.valueAsInt != null) {
-        deviceSettings.value.strainThreshold = message.valueAsInt!;
-        deviceSettings.notifyListeners();
-      }
-    } // strainThresLow
-    else if (ApiCommand.strainThresLow.index == message.commandCode) {
-      if (message.valueAsInt != null) {
-        deviceSettings.value.strainThresLow = message.valueAsInt!;
-        deviceSettings.notifyListeners();
-      }
-    }
-    // negativeTorqueMethod
-    else if (ApiCommand.negativeTorqueMethod.index == message.commandCode) {
-      if (message.valueAsInt != null) {
-        deviceSettings.value.negativeTorqueMethod = message.valueAsInt!;
-        deviceSettings.notifyListeners();
-      }
-    }
-    // autoTare
-    else if (ApiCommand.autoTare.index == message.commandCode) {
-      deviceSettings.value.autoTare = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      deviceSettings.notifyListeners();
-    }
-    // autoTareDelayMs
-    else if (ApiCommand.autoTareDelayMs.index == message.commandCode) {
-      if (message.valueAsInt != null) {
-        deviceSettings.value.autoTareDelayMs = message.valueAsInt!;
-        deviceSettings.notifyListeners();
-      }
-    }
-    // autoTareRangG
-    else if (ApiCommand.autoTareRangeG.index == message.commandCode) {
-      if (message.valueAsInt != null) {
-        deviceSettings.value.autoTareRangeG = message.valueAsInt!;
-        deviceSettings.notifyListeners();
-      }
-    }
+  void init() async {
+    autoConnect.value = await isSaved();
   }
 
   Future<void> dispose() async {
@@ -212,7 +68,6 @@ class Device {
     });
     await _stateSubscription?.cancel();
     _stateSubscription = null;
-    _apiSubsciption?.cancel();
   }
 
   Future<void> _onConnected() async {
@@ -225,7 +80,6 @@ class Device {
       print("$tag got MTU=$mtu");
       await discoverCharacteristics();
       await _subscribeCharacteristics();
-      _requestInit();
     });
   }
 
@@ -235,12 +89,11 @@ class Device {
     _deinitCharacteristics();
     //streamSendIfNotClosed(stateController, newState);
     if (shouldConnect) {
-      await Future.delayed(Duration(milliseconds: 1000)).then((_) {
+      await Future.delayed(Duration(milliseconds: 1000)).then((_) async {
         print("$tag Autoconnect calling connect()");
-        connect();
+        await connect();
       });
     }
-    _resetInit();
   }
 
   Future<void> connect() async {
@@ -298,55 +151,8 @@ class Device {
       //streamSendIfNotClosed(stateController, connectedState);
       await discoverCharacteristics();
       await _subscribeCharacteristics();
-      _requestInit();
+      //_requestInit();
     }
-  }
-
-  /// request initial values, returned values are discarded
-  /// because the message.done subscription will handle them
-  void _requestInit() async {
-    if (!await connected) return;
-    weightServiceEnabled.value = ExtendedBool.Waiting;
-    print("$tag Requesting init");
-    [
-      "weightService",
-      "hallChar",
-      "hostName",
-      "wifi",
-      "wifiApEnabled",
-      "wifiApSSID",
-      "wifiApPassword",
-      "wifiStaEnabled",
-      "wifiStaSSID",
-      "wifiStaPassword",
-      "secureApi",
-      "crankLength",
-      "reverseStrain",
-      "doublePower",
-      "sleepDelay",
-      "motionDetectionMethod",
-      "strainThreshold",
-      "strainThresLow",
-      "negativeTorqueMethod",
-      "autoTare",
-      "autoTareDelayMs",
-      "autoTareRangeG",
-    ].forEach((key) async {
-      await api.request<String>(
-        key,
-        minDelayMs: 10000,
-        maxAttempts: 3,
-      );
-      await Future.delayed(Duration(milliseconds: 250));
-    });
-  }
-
-  void _resetInit() {
-    weightServiceEnabled.value = ExtendedBool.Unknown;
-    wifiSettings.value = DeviceWifiSettings();
-    wifiSettings.notifyListeners();
-    deviceSettings.value = DeviceSettings();
-    deviceSettings.notifyListeners();
   }
 
   Future<void> discoverCharacteristics() async {
@@ -401,63 +207,344 @@ class Device {
   BleCharacteristic? characteristic(String name) {
     return _characteristics.get(name);
   }
+
+  void setAutoConnect(bool value) async {
+    autoConnect.value = value;
+    updatePreferences();
+  }
+
+  void updatePreferences() async {
+    List<String> devices = (await Preferences().getDevices()).value;
+    dev.log('$tag updatePreferences savedDevices before: $devices');
+    String item = (name?.replaceAll(RegExp(r';'), '') ?? '') + ';' + peripheral.identifier;
+    dev.log('$tag updatePreferences item: $item');
+    if (autoConnect.value)
+      devices.add(item);
+    else
+      devices.removeWhere((item) => item.endsWith(peripheral.identifier));
+    Preferences().setDevices(devices);
+    dev.log('$tag updatePreferences savedDevices after: $devices');
+  }
+
+  Future<bool> isSaved() async {
+    var devices = (await Preferences().getDevices()).value;
+    return devices.any((item) => item.endsWith(peripheral.identifier));
+  }
 }
 
-class DeviceList {
-  final String tag = "[DeviceList]";
-  Map<String, Device> _devices = {};
+class PowerMeter extends Device {
+  final String tag = '[PowerMeter]';
+  PowerCharacteristic? get power => characteristic("power") as PowerCharacteristic?;
 
-  DeviceList() {
+  PowerMeter(Peripheral peripheral) : super(peripheral) {
+    _characteristics.addAll({
+      'power': CharacteristicListItem(PowerCharacteristic(peripheral)),
+    });
+  }
+}
+
+class ESPM extends PowerMeter {
+  final String tag = '[ESPM]';
+  late EspmApi api;
+  final weightServiceEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
+  final hallEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
+  final deviceSettings = AlwaysNotifier<ESPMSettings>(ESPMSettings());
+  final wifiSettings = AlwaysNotifier<ESPMWifiSettings>(ESPMWifiSettings());
+
+  ApiCharacteristic? get apiCharacteristic => characteristic("api") as ApiCharacteristic?;
+  WeightScaleCharacteristic? get weightScale => characteristic("weightScale") as WeightScaleCharacteristic?;
+  HallCharacteristic? get hall => characteristic("hall") as HallCharacteristic?;
+  StreamSubscription<EspmApiMessage>? _apiSubsciption;
+
+  ESPM(Peripheral peripheral) : super(peripheral) {
+    _characteristics.addAll({
+      'api': CharacteristicListItem(ApiCharacteristic(peripheral)),
+      'weightScale': CharacteristicListItem(
+        WeightScaleCharacteristic(peripheral),
+        subscribeOnConnect: false,
+      ),
+      'hall': CharacteristicListItem(
+        HallCharacteristic(peripheral),
+        subscribeOnConnect: false,
+      ),
+    });
+    api = EspmApi(this);
+    // listen to api message done events
+    _apiSubsciption = api.messageDoneStream.listen((message) => _onApiDone(message));
+  }
+
+  /// Processes "done" messages sent by the API
+  void _onApiDone(EspmApiMessage message) async {
+    if (message.resultCode != EspmApiResult.success.index) return;
+    //print("$tag onApiDone parsing successful message: $message");
+    // switch does not work with non-consant case :(
+
+    // hostName
+    if (EspmApiCommand.hostName.index == message.commandCode) {
+      name = message.valueAsString;
+    }
+    // weightServiceEnabled
+    else if (EspmApiCommand.weightService.index == message.commandCode) {
+      weightServiceEnabled.value = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      if (message.valueAsBool ?? false)
+        await weightScale?.subscribe();
+      else
+        await weightScale?.unsubscribe();
+    }
+    // hallEnabled
+    else if (EspmApiCommand.hallChar.index == message.commandCode) {
+      hallEnabled.value = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      if (message.valueAsBool ?? false)
+        await hall?.subscribe();
+      else
+        await hall?.unsubscribe();
+    }
+    // wifi
+    else if (EspmApiCommand.wifi.index == message.commandCode) {
+      wifiSettings.value.enabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.notifyListeners();
+    }
+    // wifiApEnabled
+    else if (EspmApiCommand.wifiApEnabled.index == message.commandCode) {
+      wifiSettings.value.apEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.notifyListeners();
+    }
+    // wifiApSSID
+    else if (EspmApiCommand.wifiApSSID.index == message.commandCode) {
+      wifiSettings.value.apSSID = message.valueAsString;
+      wifiSettings.notifyListeners();
+    }
+    // wifiApPassword
+    else if (EspmApiCommand.wifiApPassword.index == message.commandCode) {
+      wifiSettings.value.apPassword = message.valueAsString;
+      wifiSettings.notifyListeners();
+    }
+    // wifiStaEnabled
+    else if (EspmApiCommand.wifiStaEnabled.index == message.commandCode) {
+      wifiSettings.value.staEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.notifyListeners();
+    }
+    // wifiStaSSID
+    else if (EspmApiCommand.wifiStaSSID.index == message.commandCode) {
+      wifiSettings.value.staSSID = message.valueAsString;
+      wifiSettings.notifyListeners();
+    }
+    // wifiStaPassword
+    else if (EspmApiCommand.wifiStaPassword.index == message.commandCode) {
+      wifiSettings.value.staPassword = message.valueAsString;
+      wifiSettings.notifyListeners();
+    }
+    // crankLength
+    else if (EspmApiCommand.crankLength.index == message.commandCode) {
+      deviceSettings.value.cranklength = message.valueAsDouble;
+      deviceSettings.notifyListeners();
+    }
+    // reverseStrain
+    else if (EspmApiCommand.reverseStrain.index == message.commandCode) {
+      deviceSettings.value.reverseStrain = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      deviceSettings.notifyListeners();
+    }
+    // doublePower
+    else if (EspmApiCommand.doublePower.index == message.commandCode) {
+      deviceSettings.value.doublePower = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      deviceSettings.notifyListeners();
+    }
+    // sleepDelay
+    else if (EspmApiCommand.sleepDelay.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.sleepDelay = (message.valueAsInt! / 1000 / 60).round();
+        deviceSettings.notifyListeners();
+      }
+    }
+    // motionDetectionMethod
+    else if (EspmApiCommand.motionDetectionMethod.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.motionDetectionMethod = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    }
+    // strainThreshold
+    else if (EspmApiCommand.strainThreshold.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.strainThreshold = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    } // strainThresLow
+    else if (EspmApiCommand.strainThresLow.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.strainThresLow = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    }
+    // negativeTorqueMethod
+    else if (EspmApiCommand.negativeTorqueMethod.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.negativeTorqueMethod = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    }
+    // autoTare
+    else if (EspmApiCommand.autoTare.index == message.commandCode) {
+      deviceSettings.value.autoTare = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      deviceSettings.notifyListeners();
+    }
+    // autoTareDelayMs
+    else if (EspmApiCommand.autoTareDelayMs.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.autoTareDelayMs = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    }
+    // autoTareRangG
+    else if (EspmApiCommand.autoTareRangeG.index == message.commandCode) {
+      if (message.valueAsInt != null) {
+        deviceSettings.value.autoTareRangeG = message.valueAsInt!;
+        deviceSettings.notifyListeners();
+      }
+    }
+  }
+
+  Future<void> dispose() async {
+    print("$tag $name dispose");
+    _apiSubsciption?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _onConnected() async {
+    print("$tag _onConnected()");
+    await super._onConnected();
+    _requestInit();
+  }
+
+  Future<void> _onDisconnected() async {
+    print("$tag _onDisconnected()");
+    await super._onDisconnected();
+    _resetInit();
+  }
+
+  /// request initial values, returned values are discarded
+  /// because the message.done subscription will handle them
+  void _requestInit() async {
+    if (!await connected) return;
+    weightServiceEnabled.value = ExtendedBool.Waiting;
+    print("$tag Requesting init");
+    [
+      "weightService",
+      "hallChar",
+      "hostName",
+      "wifi",
+      "wifiApEnabled",
+      "wifiApSSID",
+      "wifiApPassword",
+      "wifiStaEnabled",
+      "wifiStaSSID",
+      "wifiStaPassword",
+      "secureApi",
+      "crankLength",
+      "reverseStrain",
+      "doublePower",
+      "sleepDelay",
+      "motionDetectionMethod",
+      "strainThreshold",
+      "strainThresLow",
+      "negativeTorqueMethod",
+      "autoTare",
+      "autoTareDelayMs",
+      "autoTareRangeG",
+    ].forEach((key) async {
+      await api.request<String>(
+        key,
+        minDelayMs: 10000,
+        maxAttempts: 3,
+      );
+      await Future.delayed(Duration(milliseconds: 250));
+    });
+  }
+
+  void _resetInit() {
+    weightServiceEnabled.value = ExtendedBool.Unknown;
+    wifiSettings.value = ESPMWifiSettings();
+    deviceSettings.value = ESPMSettings();
+  }
+}
+
+class HeartRateMonitor extends Device {
+  final String tag = '[HeartRateMonitor]';
+  HeartRateCharacteristic? get heartRate => characteristic("heartRate") as HeartRateCharacteristic?;
+
+  HeartRateMonitor(Peripheral peripheral) : super(peripheral) {
+    _characteristics.addAll({
+      'heartRate': CharacteristicListItem(HeartRateCharacteristic(peripheral)),
+    });
+  }
+}
+
+Device createDevice(ScanResult scanResult) {
+  if (null == scanResult.advertisementData.serviceUuids) {
+    dev.log('[createDevice] no serviceUuids in scanResult.advertisementData');
+    return Device(scanResult.peripheral);
+  }
+  dev.log('[createDevice] uuids: ${scanResult.advertisementData.serviceUuids}');
+  if (scanResult.advertisementData.serviceUuids!.contains(BleConstants.ESPM_API_SERVICE_UUID)) {
+    return ESPM(scanResult.peripheral);
+  }
+  if (scanResult.advertisementData.serviceUuids!.contains(BleConstants.CYCLING_POWER_SERVICE_UUID)) {
+    return PowerMeter(scanResult.peripheral);
+  }
+  if (scanResult.advertisementData.serviceUuids!.contains(BleConstants.HEART_RATE_SERVICE_UUID)) {
+    return HeartRateMonitor(scanResult.peripheral);
+  }
+  return Device(scanResult.peripheral);
+}
+
+class ScanResultList {
+  final String tag = "[ScanResultList]";
+  Map<String, ScanResult> _items = {};
+
+  ScanResultList() {
     print("$tag construct");
   }
 
   bool containsIdentifier(String identifier) {
-    return _devices.containsKey(identifier);
+    return _items.containsKey(identifier);
   }
 
-  /// Adds or updates a device from a [ScanResult]
+  /// Adds or updates an item from a [ScanResult]
   ///
-  /// If a device with the same identifier already exists, updates name, rssi
-  /// and lastSeen, otherwise adds new device.
-  /// Returns the new or updated device or null on error.
-  Device? addOrUpdate(ScanResult scanResult) {
-    final now = uts();
+  /// If an item with the same identifier already exists, updates the item,
+  /// otherwise adds new item.
+  /// Returns the new or updated [ScanResult] or null on error.
+  ScanResult? addOrUpdate(ScanResult scanResult) {
     final subject = scanResult.peripheral.name.toString() + " rssi=" + scanResult.rssi.toString();
-    _devices.update(
+    _items.update(
       scanResult.peripheral.identifier,
       (existing) {
         print("$tag updating $subject");
-        existing.name = scanResult.peripheral.name;
-        existing.rssi = scanResult.rssi;
-        existing.lastSeen = now;
+        existing = scanResult;
         return existing;
       },
       ifAbsent: () {
         print("$tag adding $subject");
-        return Device(
-          scanResult.peripheral,
-          rssi: scanResult.rssi,
-          lastSeen: now,
-        );
+        return scanResult;
       },
     );
-    return _devices[scanResult.peripheral.identifier];
+    return _items[scanResult.peripheral.identifier];
   }
 
-  Device? byIdentifier(String identifier) {
-    if (containsIdentifier(identifier)) return _devices[identifier];
+  ScanResult? byIdentifier(String identifier) {
+    if (containsIdentifier(identifier)) return _items[identifier];
     return null;
   }
 
   Future<void> dispose() async {
     print("$tag dispose");
-    _devices.forEach((_, device) => device.dispose());
-    _devices.clear();
+    //_items.forEach((_, scanResult) => scanResult.dispose());
+    _items.clear();
   }
 
-  int get length => _devices.length;
-  bool get isEmpty => _devices.isEmpty;
-  void forEach(void Function(String, Device) f) => _devices.forEach(f);
+  int get length => _items.length;
+  bool get isEmpty => _items.isEmpty;
+  void forEach(void Function(String, ScanResult) f) => _items.forEach(f);
 }
 
 class CharacteristicList {
@@ -498,7 +585,7 @@ class CharacteristicListItem {
   }
 }
 
-class DeviceSettings {
+class ESPMSettings {
   double? cranklength;
   var reverseStrain = ExtendedBool.Unknown;
   var doublePower = ExtendedBool.Unknown;
@@ -526,7 +613,7 @@ class DeviceSettings {
 
   @override
   bool operator ==(other) {
-    return (other is DeviceSettings) &&
+    return (other is ESPMSettings) &&
         other.cranklength == cranklength &&
         other.reverseStrain == reverseStrain &&
         other.doublePower == doublePower &&
@@ -570,7 +657,7 @@ class DeviceSettings {
   }
 }
 
-class DeviceWifiSettings {
+class ESPMWifiSettings {
   var enabled = ExtendedBool.Unknown;
   var apEnabled = ExtendedBool.Unknown;
   String? apSSID;
@@ -581,7 +668,7 @@ class DeviceWifiSettings {
 
   @override
   bool operator ==(other) {
-    return (other is DeviceWifiSettings) &&
+    return (other is ESPMWifiSettings) &&
         other.enabled == enabled &&
         other.apEnabled == apEnabled &&
         other.apSSID == apSSID &&

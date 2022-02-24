@@ -1,12 +1,15 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:page_transition/page_transition.dart';
 
 import 'ble.dart';
 import 'device_route.dart';
 import 'device.dart';
 import 'scanner.dart';
+import 'preferences.dart';
 import 'util.dart';
 
 class ScannerRoute extends StatefulWidget {
@@ -19,9 +22,9 @@ class ScannerRoute extends StatefulWidget {
 class ScannerRouteState extends State<ScannerRoute> {
   final String tag = "[ScannerState]";
   final String defaultTitle = "Devices";
-  final GlobalKey<ScannerRouteState> _scannerStateKey =
-      GlobalKey<ScannerRouteState>();
+  final GlobalKey<ScannerRouteState> _scannerStateKey = GlobalKey<ScannerRouteState>();
   Scanner get scanner => Scanner();
+  late AlwaysNotifier<List<String>> savedDevices;
 
   ScannerRouteState() {
     print("$tag construct");
@@ -29,8 +32,13 @@ class ScannerRouteState extends State<ScannerRoute> {
 
   @override
   void initState() {
-    print("$tag initState()");
     super.initState();
+    print("$tag initState()");
+    _loadSavedDevices();
+  }
+
+  void _loadSavedDevices() async {
+    savedDevices = await Preferences().getDevices();
   }
 
   @override
@@ -51,7 +59,7 @@ class ScannerRouteState extends State<ScannerRoute> {
       ),
       body: Container(
         margin: EdgeInsets.all(6),
-        child: _deviceList(),
+        child: _resultList(),
       ),
     );
   }
@@ -91,12 +99,7 @@ class ScannerRouteState extends State<ScannerRoute> {
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
         String status = "";
         if (snapshot.hasData)
-          status = snapshot.data!
-              ? "Scanning..."
-              : scanner.devices.length.toString() +
-                  " device" +
-                  (scanner.devices.length == 1 ? "" : "s") +
-                  " found";
+          status = snapshot.data! ? "Scanning..." : scanner.resultList.length.toString() + " device" + (scanner.resultList.length == 1 ? "" : "s") + " found";
         return Text(
           status,
           style: TextStyle(fontSize: 10),
@@ -111,26 +114,24 @@ class ScannerRouteState extends State<ScannerRoute> {
       initialData: scanner.scanning,
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
         bool scanning = snapshot.hasData ? snapshot.data! : false;
-        return EspmuiElevatedButton("Scan",
-            action: scanning ? null : scanner.startScan);
+        return EspmuiElevatedButton("Scan", action: scanning ? null : scanner.startScan);
       },
     );
   }
 
-  Widget _deviceList() {
-    return StreamBuilder<Device>(
-      stream: scanner.devicesStream,
+  Widget _resultList() {
+    return StreamBuilder<ScanResult>(
+      stream: scanner.resultStream,
       //initialData: availableDevices,
-      builder: (BuildContext context, AsyncSnapshot<Device> snapshot) {
+      builder: (BuildContext context, AsyncSnapshot<ScanResult> snapshot) {
         // TODO don't rebuild the whole list, just the changed items
-        print("[_deviceList()] rebuilding");
+        print("[_resultList()] rebuilding");
         List<Widget> items = [];
-        if (scanner.devices.length < 1)
-          items.add(Center(child: Text("No devices found")));
-        scanner.devices.forEach(
-          (_, device) {
-            print("[_deviceList()] adding ${device.name} ${device.rssi}");
-            items.add(_deviceListItem(device));
+        if (scanner.resultList.length < 1) items.add(Center(child: Text("No devices found")));
+        scanner.resultList.forEach(
+          (identifier, result) {
+            print("[_resultList()] adding ${result.advertisementData.localName} ${result.rssi}");
+            items.add(_resultListItem(result));
           },
         );
         return RefreshIndicator(
@@ -148,10 +149,12 @@ class ScannerRouteState extends State<ScannerRoute> {
     );
   }
 
-  Widget _deviceListItem(Device device) {
+  Widget _resultListItem(ScanResult result) {
     void openDevice() async {
       //await Navigator.push(context,
       //    MaterialPageRoute(builder: (context) => DeviceRoute(device)));
+
+      var device = createDevice(result);
 
       Navigator.push(
         context,
@@ -184,12 +187,19 @@ class ScannerRouteState extends State<ScannerRoute> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    device.name ?? "Unnamed device",
-                    style: TextStyle(fontSize: 18),
+                  ValueListenableBuilder<List<String>>(
+                    valueListenable: savedDevices,
+                    builder: (_, devices, __) {
+                      dev.log('$tag devicesNotifier fired');
+                      return Text(
+                        (devices.any((item) => item.endsWith(result.peripheral.identifier)) ? 'AC ' : '   ') +
+                            (result.advertisementData.localName ?? "Unnamed device"),
+                        style: TextStyle(fontSize: 18),
+                      );
+                    },
                   ),
                   Text(
-                    "rssi: " + device.rssi.toString(),
+                    "rssi: " + result.rssi.toString(),
                     style: TextStyle(fontSize: 10),
                   ),
                 ],

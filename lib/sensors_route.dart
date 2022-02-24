@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:developer' as dev;
 
+import 'package:espmui/preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:page_transition/page_transition.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutter_circle_color_picker/flutter_circle_color_picker.dart';
 
@@ -387,20 +387,19 @@ class _SensorTileListState extends State<SensorTileList> {
       tilePrefs.add(jsonEncode(tile));
     });
     dev.log('$tag saving prefs: ${tilePrefs.join(', ')}');
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.setStringList('tiles', tilePrefs);
+    Preferences().setTiles(tilePrefs);
     _saveToPreferencesTimer = null;
   }
 
   Future<bool> _loadFromPreferences() async {
     dev.log('$tag loadFromPreferences');
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String>? tilePrefs = prefs.getStringList('tiles');
+    var tiles = await Preferences().getTiles();
+    dev.log('$tag tiles: $tiles');
     setState(() {
       _tiles.clear();
-      tilePrefs?.forEach((tileString) {
+      tiles.forEach((tileString) {
         SensorTile tile = SensorTile.fromJson(jsonDecode(tileString));
-        //dev.log('$tag loading $tileString');
+        dev.log('$tag loading $tileString');
         //dev.log('$tag loading ${tile.toJson().toString()}');
         _tiles.add(tile);
       });

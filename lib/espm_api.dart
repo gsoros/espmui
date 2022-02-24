@@ -5,7 +5,7 @@ import 'ble_characteristic.dart';
 import 'util.dart';
 import 'device.dart';
 
-enum ApiCommand {
+enum EspmApiCommand {
   invalid,
   wifi,
   hostName,
@@ -39,7 +39,7 @@ enum ApiCommand {
   autoTareRangeG,
 }
 
-enum ApiResult {
+enum EspmApiResult {
   success,
   error,
   unknownCommand,
@@ -53,16 +53,16 @@ enum ApiResult {
   argInvalid,
 }
 
-typedef void ApiCallback(ApiMessage message);
+typedef void EspmApiCallback(EspmApiMessage message);
 
-class ApiMessage {
-  final tag = "[ApiMessage]";
+class EspmApiMessage {
+  final tag = "[EspmApiMessage]";
 
   String command;
   String? commandStr;
   int? commandCode;
   String? arg;
-  ApiCallback? onDone;
+  EspmApiCallback? onDone;
   int maxAttempts = 3;
   int minDelayMs = 1000;
   int maxAgeMs = 5000;
@@ -75,7 +75,7 @@ class ApiMessage {
   String? value;
   bool? isDone;
 
-  ApiMessage(
+  EspmApiMessage(
     this.command,
     this.onDone, {
     int? maxAttempts,
@@ -107,7 +107,7 @@ class ApiMessage {
       if (command.length > 0) commandStr = command.toString();
     }
     var intParsed = int.tryParse(command);
-    for (ApiCommand code in ApiCommand.values) {
+    for (EspmApiCommand code in EspmApiCommand.values) {
       var valStr = code.toString().split('.').last;
       //print("$tag checking $valStr");
       if (code.index == intParsed || valStr == command) {
@@ -181,20 +181,20 @@ class ApiMessage {
   String? get valueAsString => value;
 }
 
-class Api {
-  final tag = "[Api]";
+class EspmApi {
+  final tag = "[EspmApi]";
 
-  Device device;
+  ESPM device;
   ApiCharacteristic? get _characteristic => device.apiCharacteristic;
   late StreamSubscription<String>? _subscription;
-  final _doneController = StreamController<ApiMessage>.broadcast();
-  Stream<ApiMessage> get messageDoneStream => _doneController.stream;
-  final _queue = Queue<ApiMessage>();
+  final _doneController = StreamController<EspmApiMessage>.broadcast();
+  Stream<EspmApiMessage> get messageDoneStream => _doneController.stream;
+  final _queue = Queue<EspmApiMessage>();
   bool _running = false;
   Timer? _timer;
   final int queueDelayMs;
 
-  Api(this.device, {this.queueDelayMs = 200}) {
+  EspmApi(this.device, {this.queueDelayMs = 200}) {
     //_characteristic?.subscribe();
     _subscription = _characteristic?.stream.listen((reply) => _onNotify(reply));
   }
@@ -254,7 +254,7 @@ class Api {
     //String commandStr = commandStrWithValue.substring(0, eq);
     String value = commandStrWithValue.substring(eq + 1);
     int matches = 0;
-    for (ApiMessage message in _queue) {
+    for (EspmApiMessage message in _queue) {
       if (message.commandCode == commandCode) {
         matches++;
         message.resultCode = resultCode;
@@ -267,35 +267,35 @@ class Api {
     if (matches == 0) print("$tag did not find a matching queued message for the reply $reply");
   }
 
-  void _onDone(ApiMessage message) {
+  void _onDone(EspmApiMessage message) {
     //print("$tag onDone $message");
     streamSendIfNotClosed(_doneController, message);
     var onDone = message.onDone;
     if (onDone == null) return;
-    if (onDone is ApiCallback) {
-      message.onDone = null;
-      onDone(message);
-      return;
-    }
-    print("$tag Incorrect callback type: $onDone");
+    //if (onDone is ApiCallback) {
+    message.onDone = null;
+    onDone(message);
+    //return;
+    //}
+    //print("$tag Incorrect callback type: $onDone");
   }
 
   /// Sends a command to the API.
   ///
   /// Command format: commandCode|commandStr[=[arg]]
   ///
-  /// If supplied, [onDone] will be called with the [ApiMessage] containing the
+  /// If supplied, [onDone] will be called with the [EspmApiMessage] containing the
   /// [resultCode] on completion.
   ///
-  /// Note the returned [ApiMessage] does not yet contain the reply.
-  ApiMessage sendCommand(
+  /// Note the returned [EspmApiMessage] does not yet contain the reply.
+  EspmApiMessage sendCommand(
     String command, {
-    ApiCallback? onDone,
+    EspmApiCallback? onDone,
     int? maxAttempts,
     int? minDelayMs,
     int? maxAgeMs,
   }) {
-    var message = ApiMessage(
+    var message = EspmApiMessage(
       command,
       onDone,
       maxAttempts: maxAttempts,
@@ -327,7 +327,7 @@ class Api {
       maxAgeMs: maxAgeMs,
     );
     await isDone(message);
-    if (T == ApiMessage) return message as T?;
+    if (T == EspmApiMessage) return message as T?;
     if (T == String) return message.valueAsString as T?;
     if (T == double) return message.valueAsDouble as T?;
     if (T == int) return message.valueAsInt as T?;
@@ -355,7 +355,7 @@ class Api {
 
   /// Polls the message while [isDone] != true && [resultCode] == null
   /// TODO use a stream (each message could have an onChangedStream?)
-  Future<void> isDone(ApiMessage message) async {
+  Future<void> isDone(EspmApiMessage message) async {
     await Future.doWhile(() async {
       if (message.isDone != true && message.resultCode == null) {
         //print("$tag polling...");
@@ -368,8 +368,8 @@ class Api {
     });
   }
 
-  bool queueContainsCommand({String? commandStr, ApiCommand? command}) {
-    for (ApiMessage message in _queue) if (message.commandStr == commandStr || message.commandCode == command?.index) return true;
+  bool queueContainsCommand({String? commandStr, EspmApiCommand? command}) {
+    for (EspmApiMessage message in _queue) if (message.commandStr == commandStr || message.commandCode == command?.index) return true;
     return false;
   }
 
@@ -402,7 +402,7 @@ class Api {
     _running = false;
   }
 
-  void _send(ApiMessage message) async {
+  void _send(EspmApiMessage message) async {
     int now = uts();
     if (now < (message.lastSentAt ?? 0) + message.minDelayMs) return;
     //var device = Scanner().selected;

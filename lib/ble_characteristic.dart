@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
+import 'dart:developer' as dev;
 
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:mutex/mutex.dart';
@@ -14,7 +15,8 @@ abstract class BleCharacteristic<T> {
   Peripheral _peripheral;
   final serviceUUID = "";
   final characteristicUUID = "";
-  CharacteristicWithValue? _characteristic;
+  //CharacteristicWithValue? _characteristic;
+  Characteristic? _characteristic;
   Stream<Uint8List>? _rawStream;
   StreamSubscription<Uint8List>? _subscription;
   final _controller = StreamController<T>.broadcast();
@@ -43,10 +45,11 @@ abstract class BleCharacteristic<T> {
       return fromUint8List(Uint8List.fromList([]));
     }
     await _exclusiveAccess.protect(() async {
-      lastValue = fromUint8List(await _characteristic!.read().catchError((e) {
+      var value = await _characteristic?.read().catchError((e) {
         bleError(tag, "read()", e);
         return Uint8List.fromList([]);
-      }));
+      });
+      if (value != null) lastValue = fromUint8List(value);
     });
     return lastValue;
   }
@@ -71,6 +74,7 @@ abstract class BleCharacteristic<T> {
     }
     //print("$tag write($value)");
     await _exclusiveAccess.protect(() async {
+      if (null == _characteristic) return;
       _characteristic!
           .write(
         toUint8List(value),
@@ -124,6 +128,7 @@ abstract class BleCharacteristic<T> {
     await _init();
     if (_subscription == null) return;
     print("$tag unsubscribe");
+    streamSendIfNotClosed(_controller, fromUint8List(Uint8List.fromList([])));
     await _subscription?.cancel();
     _subscription = null;
   }
@@ -135,11 +140,12 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "_init() peripheral not connected");
       return Future.value(null);
     }
-    //print("$tag _init()");
     try {
-      _characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
+      //_characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
+      var chars = await _peripheral.characteristics(serviceUUID);
+      _characteristic = chars.firstWhere((char) => char.uuid == characteristicUUID);
     } catch (e) {
-      bleError(tag, "readCharacteristic()", e);
+      bleError(tag, "_init() readCharacteristic()", e);
       _characteristic = null;
       //  print("$tag readCharacteristic() serviceUUID: $serviceUUID, characteristicUUID: $characteristicUUID, $e");
     }
@@ -252,8 +258,8 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
 
 class ApiCharacteristic extends BleCharacteristic<String> {
   final tag = "[ApiCharacteristic]";
-  final serviceUUID = BleConstants.API_SERVICE_UUID;
-  final characteristicUUID = BleConstants.API_CHAR_UUID;
+  final serviceUUID = BleConstants.ESPM_API_SERVICE_UUID;
+  final characteristicUUID = BleConstants.ESPM_API_CHAR_UUID;
 
   ApiCharacteristic(Peripheral peripheral) : super(peripheral);
 
@@ -302,8 +308,8 @@ class WeightScaleCharacteristic extends BleCharacteristic<double> {
 
 class HallCharacteristic extends BleCharacteristic<int> {
   final tag = "[HallCharacteristic]";
-  final serviceUUID = BleConstants.API_SERVICE_UUID;
-  final characteristicUUID = BleConstants.HALL_CHAR_UUID;
+  final serviceUUID = BleConstants.ESPM_API_SERVICE_UUID;
+  final characteristicUUID = BleConstants.ESPM_HALL_CHAR_UUID;
 
   HallCharacteristic(Peripheral peripheral) : super(peripheral);
 
@@ -315,4 +321,34 @@ class HallCharacteristic extends BleCharacteristic<int> {
 
   @override
   Uint8List toUint8List(int value) => Uint8List(2)..buffer.asByteData().setInt16(0, (value).round(), Endian.little);
+}
+
+class HeartRateCharacteristic extends BleCharacteristic<int> {
+  final tag = "[HeartRateCharacteristic]";
+  final serviceUUID = BleConstants.HEART_RATE_SERVICE_UUID;
+  final characteristicUUID = BleConstants.HEART_RATE_MEASUREMENT_CHAR_UUID;
+
+  HeartRateCharacteristic(Peripheral peripheral) : super(peripheral);
+
+  @override
+  int fromUint8List(Uint8List list) {
+    /// Format: little-endian
+    /// Bytes: [Flags: 1][Heart rate: 1 or 2, depending on bit 0 of the Flags field]
+    if (list.isEmpty) return 0;
+    int byteCount = list.last & 0 == 0 ? 1 : 2;
+    var byteData = list.buffer.asByteData();
+    int heartRate = 0;
+    if (byteData.lengthInBytes < byteCount + 1) {
+      dev.log('$tag fromUint8List() not enough bytes in $list');
+      return heartRate;
+    }
+    if (byteCount == 1)
+      heartRate = byteData.getUint8(1);
+    else if (byteCount == 2) heartRate = byteData.getUint16(1, Endian.little);
+    dev.log('$tag got list: $list byteCount: $byteCount hr: $heartRate');
+    return heartRate;
+  }
+
+  @override
+  Uint8List toUint8List(int value) => Uint8List(2); // we are not writing
 }

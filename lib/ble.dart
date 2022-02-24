@@ -93,6 +93,7 @@ class BLE {
   Future<void> _init() async {
     if (_initDone) return;
     await _exclusiveAccess.protect(() async {
+      if (_initDone) return;
       print("$tag _init()");
       await _checkPermissions();
       await _checkClient();
@@ -169,6 +170,15 @@ class BLE {
     );
     return Future.value(null);
   }
+
+  Future<void> discover(Peripheral peripheral) async {
+    await _exclusiveAccess.protect(() async {
+      print("$tag discover($peripheral)");
+      await peripheral.discoverAllServicesAndCharacteristics().catchError((e) {
+        bleError(tag, "discoverAllServicesAndCharacteristics()", e);
+      });
+    });
+  }
 }
 
 /// https://github.com/dotintent/FlutterBleLib/blob/develop/lib/error/ble_error.dart
@@ -191,6 +201,9 @@ void bleError(String tag, String message, [dynamic error]) {
             break;
           case BleErrorCode.operationTimedOut: // 3
             info += ": operationTimedOut";
+            break;
+          case BleErrorCode.operationStartFailed: // 4
+            info += ": operationStartFailed";
             break;
           case BleErrorCode.bluetoothPoweredOff: // 102
             info += ": bluetoothPoweredOff";
@@ -229,8 +242,7 @@ void bleError(String tag, String message, [dynamic error]) {
       List<String> nonNull = [];
       params.split(", ").forEach((param) {
         List<String> kv = param.split(": ");
-        if ((kv.length != 2 || kv.last != "null") && kv.first != "Error code")
-          nonNull.add(param);
+        if ((kv.length != 2 || kv.last != "null") && kv.first != "Error code") nonNull.add(param);
       });
       info += " {" + nonNull.join(", ") + "}";
     }
@@ -253,9 +265,7 @@ class BleAdapterCheck extends StatelessWidget {
       stream: ble.stateStream,
       initialData: ble.currentStateSync(),
       builder: (BuildContext context, AsyncSnapshot<BluetoothState> snapshot) {
-        return (snapshot.data == BluetoothState.POWERED_ON)
-            ? ifEnabled
-            : ifDisabled!(snapshot.data);
+        return (snapshot.data == BluetoothState.POWERED_ON) ? ifEnabled : ifDisabled!(snapshot.data);
       },
     );
   }

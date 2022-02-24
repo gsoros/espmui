@@ -27,11 +27,11 @@ class Scanner {
   Stream<bool> get scanningStream => _scanningController.stream;
 
   /// Available devices
-  DeviceList devices = DeviceList();
+  var resultList = ScanResultList();
   Device? selected;
-  final _devicesController = StreamController<Device>.broadcast();
-  StreamSubscription? _devicesSubscription;
-  Stream<Device> get devicesStream => _devicesController.stream;
+  final _resultController = StreamController<ScanResult>.broadcast();
+  StreamSubscription? _resultSubscription;
+  Stream<ScanResult> get resultStream => _resultController.stream;
 
   BLE get ble => BLE();
 
@@ -49,11 +49,11 @@ class Scanner {
         if (!scanning) selected?.connect();
       },
     );
-    _devicesSubscription = devicesStream.listen(
-      (device) {
-        bool isNew = !devices.containsIdentifier(device.identifier);
+    _resultSubscription = resultStream.listen(
+      (result) {
+        bool isNew = !resultList.containsIdentifier(result.peripheral.identifier);
         //availableDevices.addOrUpdate(device);
-        print("$tag devicesSubscription: " + device.identifier + " new=$isNew rssi=${device.rssi}");
+        print("$tag _resultSubscription: ${result.peripheral.identifier} new=$isNew rssi=${result.rssi}");
       },
     );
     startScan();
@@ -65,9 +65,9 @@ class Scanner {
     await _scanResultSubscription?.cancel();
     await _scanningController.close();
     await _scanningSubscription?.cancel();
-    await _devicesController.close();
-    await _devicesSubscription?.cancel();
-    await devices.dispose();
+    await _resultController.close();
+    await _resultSubscription?.cancel();
+    await resultList.dispose();
     await selected?.dispose();
     await ble.dispose();
   }
@@ -85,20 +85,24 @@ class Scanner {
       Duration(seconds: 3),
       () async {
         await stopScan();
-        if (devices.isEmpty) print("$tag No devices found");
+        if (resultList.isEmpty) print("$tag No devices found");
       },
     );
     streamSendIfNotClosed(_scanningController, true);
     _scanResultSubscription = ble.manager
         .startPeripheralScan(
-          uuids: [BleConstants.CYCLING_POWER_SERVICE_UUID],
+          uuids: [
+            BleConstants.CYCLING_POWER_SERVICE_UUID,
+            BleConstants.ESPM_API_SERVICE_UUID,
+            BleConstants.HEART_RATE_SERVICE_UUID,
+          ],
         )
         .asBroadcastStream()
         .listen(
           (scanResult) {
-            Device? device = devices.addOrUpdate(scanResult);
-            print("$tag Device found: ${device?.name} ${device?.identifier}");
-            streamSendIfNotClosed(_devicesController, device);
+            ScanResult? updatedResult = resultList.addOrUpdate(scanResult);
+            print("$tag Device found: ${updatedResult?.advertisementData.localName} ${updatedResult?.peripheral.identifier}");
+            streamSendIfNotClosed(_resultController, updatedResult);
           },
           onError: (e) => bleError(tag, "scanResultSubscription", e),
         );

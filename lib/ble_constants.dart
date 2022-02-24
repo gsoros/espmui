@@ -8,15 +8,11 @@ class BleConstants {
   static const BATTERY_SERVICE_UUID = "0000180f-0000-1000-8000-00805f9b34fb";
   static const BATTERY_LEVEL_CHAR_UUID = "00002a19-0000-1000-8000-00805f9b34fb";
 
-  static const API_SERVICE_UUID = "55bebab5-1857-4b14-a07b-d4879edad159";
-  static const API_CHAR_UUID = "da34811a-03c0-4efe-a266-ed014e181b65";
+  static const HEART_RATE_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb";
+  static const HEART_RATE_MEASUREMENT_CHAR_UUID = "00002a37-0000-1000-8000-00805f9b34fb";
 
-  static const HALL_CHAR_UUID = "e43fb4d4-1dc7-4ecd-9409-fb9d65dc7187";
+  static const ESPM_API_SERVICE_UUID = "55bebab5-1857-4b14-a07b-d4879edad159";
+  static const ESPM_API_CHAR_UUID = "da34811a-03c0-4efe-a266-ed014e181b65";
 
-  /*
-  static const  = "";
-  static const  = "";
-  static const  = "";
-  static const  = "";
-  */
+  static const ESPM_HALL_CHAR_UUID = "e43fb4d4-1dc7-4ecd-9409-fb9d65dc7187";
 }

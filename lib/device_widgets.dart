@@ -2,20 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'api.dart';
+import 'espm_api.dart';
 import 'device.dart';
 import 'ble_characteristic.dart';
 import 'util.dart';
 
 class Battery extends StatelessWidget {
-  final BatteryCharacteristic? char;
-  Battery(this.char);
+  final Device device;
+  Battery(this.device);
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<int>(
-      stream: char?.stream,
-      initialData: char?.lastValue,
+      stream: device.battery?.stream,
+      initialData: device.battery?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
         return Container(
           child: Column(
@@ -27,7 +27,7 @@ class Battery extends StatelessWidget {
                 fit: FlexFit.loose,
                 child: Align(
                   child: Text(
-                    "${snapshot.data}",
+                    snapshot.hasData && snapshot.data! > 0 ? "${snapshot.data}" : "--",
                     style: const TextStyle(fontSize: 40),
                   ),
                 ),
@@ -47,11 +47,11 @@ class Battery extends StatelessWidget {
   }
 }
 
-class StrainStreamListener extends StatelessWidget {
-  final Device device;
+class EspmWeightScaleStreamListener extends StatelessWidget {
+  final ESPM device;
   final ExtendedBool enabled;
 
-  StrainStreamListener(this.device, this.enabled);
+  EspmWeightScaleStreamListener(this.device, this.enabled);
 
   @override
   Widget build(BuildContext context) {
@@ -59,20 +59,20 @@ class StrainStreamListener extends StatelessWidget {
       stream: device.weightScale?.stream,
       initialData: device.weightScale?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
-        String strain = snapshot.hasData && enabled != ExtendedBool.False ? snapshot.data!.toStringAsFixed(2) : "0.00";
-        if (strain.length > 6) strain = strain.substring(0, 6);
-        if (strain == "-0.00") strain = "0.00";
+        String weight = snapshot.hasData && enabled != ExtendedBool.False ? snapshot.data!.toStringAsFixed(2) : "--";
+        if (weight.length > 6) weight = weight.substring(0, 6);
+        if (weight == "-0.00") weight = "0.00";
         const styleEnabled = TextStyle(fontSize: 30);
         const styleDisabled = TextStyle(fontSize: 30, color: Colors.white12);
-        return Text(strain, style: (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
+        return Text(weight, style: (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
       },
     );
   }
 }
 
-class WeightScale extends StatelessWidget {
-  final Device device;
-  WeightScale(this.device);
+class EspmWeightScale extends StatelessWidget {
+  final ESPM device;
+  EspmWeightScale(this.device);
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +112,7 @@ class WeightScale extends StatelessWidget {
             content: Container(
               child: Column(
                 children: [
-                  StrainStreamListener(device, ExtendedBool.True),
+                  EspmWeightScaleStreamListener(device, ExtendedBool.True),
                   TextField(
                     maxLength: 10,
                     maxLines: 1,
@@ -158,15 +158,15 @@ class WeightScale extends StatelessWidget {
     void tare() async {
       var resultCode = await device.api.requestResultCode("tare");
       snackbar(
-        "Tare " + (resultCode == ApiResult.success.index ? "success" : "failed"),
+        "Tare " + (resultCode == EspmApiResult.success.index ? "success" : "failed"),
         context,
       );
     }
 
     return ValueListenableBuilder<ExtendedBool>(
       valueListenable: device.weightServiceEnabled,
-      builder: (context, enabled, child) {
-        var strainOutput = StrainStreamListener(device, enabled);
+      builder: (_, enabled, __) {
+        var strainOutput = EspmWeightScaleStreamListener(device, enabled);
 
         return InkWell(
           onTap: () {
@@ -206,11 +206,11 @@ class WeightScale extends StatelessWidget {
   }
 }
 
-class HallStreamListener extends StatelessWidget {
-  final Device device;
+class EspmHallStreamListener extends StatelessWidget {
+  final ESPM device;
   final ExtendedBool enabled;
 
-  HallStreamListener(this.device, this.enabled);
+  EspmHallStreamListener(this.device, this.enabled);
 
   @override
   Widget build(BuildContext context) {
@@ -218,7 +218,7 @@ class HallStreamListener extends StatelessWidget {
       stream: device.hall?.stream,
       initialData: device.hall?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
-        String value = snapshot.hasData && enabled != ExtendedBool.False ? snapshot.data!.toString() : "0";
+        String value = snapshot.hasData && enabled != ExtendedBool.False ? (snapshot.data! > 0 ? snapshot.data!.toString() : '--') : "--";
         const styleEnabled = TextStyle(fontSize: 30);
         const styleDisabled = TextStyle(fontSize: 30, color: Colors.white12);
         return Text(value, style: (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
@@ -227,9 +227,9 @@ class HallStreamListener extends StatelessWidget {
   }
 }
 
-class HallSensor extends StatelessWidget {
-  final Device device;
-  HallSensor(this.device);
+class EspmHallSensor extends StatelessWidget {
+  final ESPM device;
+  EspmHallSensor(this.device);
 
   @override
   Widget build(BuildContext context) {
@@ -247,37 +247,37 @@ class HallSensor extends StatelessWidget {
             content: Container(
               child: Column(
                 children: [
-                  HallStreamListener(device, ExtendedBool.True),
+                  EspmHallStreamListener(device, ExtendedBool.True),
                   Row(
                     children: [
-                      ApiSettingInput(
+                      EspmApiSettingInput(
                         name: "Offset",
                         value: hallOffset.toString(),
                         keyboardType: TextInputType.number,
                         device: device,
-                        command: ApiCommand.hallOffset,
+                        command: EspmApiCommand.hallOffset,
                       ),
                     ],
                   ),
                   Row(
                     children: [
-                      ApiSettingInput(
+                      EspmApiSettingInput(
                         name: "High Threshold",
                         value: hallThreshold.toString(),
                         keyboardType: TextInputType.number,
                         device: device,
-                        command: ApiCommand.hallThreshold,
+                        command: EspmApiCommand.hallThreshold,
                       ),
                     ],
                   ),
                   Row(
                     children: [
-                      ApiSettingInput(
+                      EspmApiSettingInput(
                         name: "Low Threshold",
                         value: hallThresLow.toString(),
                         keyboardType: TextInputType.number,
                         device: device,
-                        command: ApiCommand.hallThresLow,
+                        command: EspmApiCommand.hallThresLow,
                       ),
                     ],
                   ),
@@ -309,7 +309,7 @@ class HallSensor extends StatelessWidget {
 
     return ValueListenableBuilder<ExtendedBool>(
       valueListenable: device.hallEnabled,
-      builder: (context, enabled, child) {
+      builder: (_, enabled, __) {
         return InkWell(
           onLongPress: () {
             if (enabled == ExtendedBool.True) settings();
@@ -326,7 +326,7 @@ class HallSensor extends StatelessWidget {
                 Flexible(
                   fit: FlexFit.loose,
                   child: Align(
-                    child: (enabled == ExtendedBool.Waiting) ? CircularProgressIndicator() : HallStreamListener(device, enabled),
+                    child: (enabled == ExtendedBool.Waiting) ? CircularProgressIndicator() : EspmHallStreamListener(device, enabled),
                   ),
                 ),
               ],
@@ -339,20 +339,36 @@ class HallSensor extends StatelessWidget {
 }
 
 class PowerCadence extends StatelessWidget {
-  final PowerCharacteristic? char;
+  final PowerMeter device;
   final String mode;
 
   /// [mode] = "power" | "cadence"
-  PowerCadence(this.char, {this.mode = "power"});
+  PowerCadence(this.device, {this.mode = "power"});
 
   @override
   Widget build(BuildContext context) {
+    BleCharacteristic? tmpChar = device.power;
+    if (!(tmpChar is PowerCharacteristic)) return Text('Error: no power char');
+    PowerCharacteristic char = tmpChar;
+    Stream<int> stream;
+    int lastValue;
+    switch (mode) {
+      case 'power':
+        stream = char.powerStream;
+        lastValue = char.lastPower;
+        break;
+      default: // cadence
+        stream = char.cadenceStream;
+        lastValue = char.lastCadence;
+        break;
+    }
+
     var value = StreamBuilder<int>(
-      stream: mode == "power" ? char?.powerStream : char?.cadenceStream,
-      initialData: mode == "power" ? char?.lastPower : char?.lastCadence,
+      stream: stream,
+      initialData: lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
         return Text(
-          snapshot.hasData ? snapshot.data.toString() : "0",
+          snapshot.hasData ? (snapshot.data! > 0 ? snapshot.data.toString() : "--") : "--",
           style: const TextStyle(fontSize: 60),
         );
       },
@@ -380,9 +396,53 @@ class PowerCadence extends StatelessWidget {
   }
 }
 
-class ApiStream extends StatelessWidget {
-  final Device device;
-  ApiStream(this.device);
+class HeartRate extends StatelessWidget {
+  final HeartRateMonitor device;
+
+  HeartRate(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    BleCharacteristic? tmpChar = device.heartRate;
+    if (!(tmpChar is HeartRateCharacteristic)) return Text('Error: not HR char');
+    HeartRateCharacteristic char = tmpChar;
+
+    var value = StreamBuilder<int>(
+      stream: char.stream,
+      initialData: char.lastValue,
+      builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
+        return Text(
+          snapshot.hasData ? (snapshot.data! > 0 ? snapshot.data.toString() : "--") : "--",
+          style: const TextStyle(fontSize: 60),
+        );
+      },
+    );
+    return Container(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("HR"),
+          Flexible(
+            fit: FlexFit.loose,
+            child: Align(child: value),
+          ),
+          Align(
+            child: Text(
+              "bpm",
+              style: TextStyle(color: Colors.white24),
+            ),
+            alignment: Alignment.bottomRight,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class EspmApiStream extends StatelessWidget {
+  final ESPM device;
+  EspmApiStream(this.device);
 
   @override
   Widget build(BuildContext context) {
@@ -396,9 +456,9 @@ class ApiStream extends StatelessWidget {
   }
 }
 
-class ApiCli extends StatelessWidget {
-  final Device device;
-  ApiCli(this.device);
+class EspmApiCli extends StatelessWidget {
+  final ESPM device;
+  EspmApiCli(this.device);
 
   @override
   Widget build(BuildContext context) {
@@ -421,10 +481,10 @@ class ApiCli extends StatelessWidget {
   }
 }
 
-class ApiInterface extends StatelessWidget {
-  final Device device;
+class EspmApiInterface extends StatelessWidget {
+  final ESPM device;
 
-  ApiInterface(this.device);
+  EspmApiInterface(this.device);
 
   @override
   Widget build(BuildContext context) {
@@ -435,18 +495,18 @@ class ApiInterface extends StatelessWidget {
           fit: FlexFit.loose,
           child: Align(
             alignment: Alignment.topLeft,
-            child: ApiStream(device),
+            child: EspmApiStream(device),
           ),
         ),
-        ApiCli(device),
+        EspmApiCli(device),
       ],
     );
   }
 }
 
-class ApiSettingInput extends StatelessWidget {
-  final Device device;
-  final ApiCommand command;
+class EspmApiSettingInput extends StatelessWidget {
+  final ESPM device;
+  final EspmApiCommand command;
   final String? value;
   final bool enabled;
   final String? name;
@@ -455,7 +515,7 @@ class ApiSettingInput extends StatelessWidget {
   final Widget? suffix;
   final TextInputType? keyboardType;
 
-  ApiSettingInput({
+  EspmApiSettingInput({
     required this.device,
     required this.command,
     this.value,
@@ -494,7 +554,7 @@ class ApiSettingInput extends StatelessWidget {
             "${command.index}=$edited",
             minDelayMs: 2000,
           );
-          if (name != null) snackbar("$name update${result == ApiResult.success.index ? "d" : " failed"}", context);
+          if (name != null) snackbar("$name update${result == EspmApiResult.success.index ? "d" : " failed"}", context);
           print("[ApiSettingInput] api.request($command): $result");
         },
       ),
@@ -502,14 +562,48 @@ class ApiSettingInput extends StatelessWidget {
   }
 }
 
-class ApiSettingSwitch extends StatelessWidget {
-  final Device device;
-  final ApiCommand command;
+class SettingSwitch extends StatelessWidget {
+  final ExtendedBool value;
+  final String? name;
+  final void Function(bool)? onChanged;
+
+  SettingSwitch({
+    required this.value,
+    this.name,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    var toggler = value == ExtendedBool.Waiting
+        ? CircularProgressIndicator()
+        : Switch(
+            value: value == ExtendedBool.True ? true : false,
+            activeColor: Colors.red,
+            onChanged: (bool enabled) async {
+              if (onChanged != null) onChanged!(enabled);
+              print("[SettingSwitch] $name changed to $enabled");
+            });
+    return (name == null)
+        ? toggler
+        : Row(children: [
+            Flexible(
+              fit: FlexFit.tight,
+              child: Text(name!),
+            ),
+            toggler,
+          ]);
+  }
+}
+
+class EspmApiSettingSwitch extends StatelessWidget {
+  final ESPM device;
+  final EspmApiCommand command;
   final ExtendedBool value;
   final String? name;
   final void Function()? onChanged;
 
-  ApiSettingSwitch({
+  EspmApiSettingSwitch({
     required this.device,
     required this.command,
     required this.value,
@@ -519,6 +613,7 @@ class ApiSettingSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // TODO use SettingSwitch
     var onOff = value == ExtendedBool.Waiting
         ? CircularProgressIndicator()
         : Switch(
@@ -530,8 +625,8 @@ class ApiSettingSwitch extends StatelessWidget {
                 "${command.index}=${enabled ? "1" : "0"}",
                 minDelayMs: 2000,
               );
-              if (name != null) snackbar("$name ${enabled ? "en" : "dis"}able${result == ApiResult.success.index ? "d" : " failed"}", context);
-              print("[ApiSettingSwitch] api.requestResultCode($command): $result");
+              if (name != null) snackbar("$name ${enabled ? "en" : "dis"}able${result == EspmApiResult.success.index ? "d" : " failed"}", context);
+              print("[EspmApiSettingSwitch] api.requestResultCode($command): $result");
             });
     return (name == null)
         ? onOff
@@ -545,15 +640,15 @@ class ApiSettingSwitch extends StatelessWidget {
   }
 }
 
-class ApiSettingDropdown extends StatelessWidget {
-  final Device device;
-  final ApiCommand command;
+class EspmApiSettingDropdown extends StatelessWidget {
+  final ESPM device;
+  final EspmApiCommand command;
   final String? value;
   final List<DropdownMenuItem<String>>? items;
   final String? name;
   final void Function(String?)? onChanged;
 
-  ApiSettingDropdown({
+  EspmApiSettingDropdown({
     required this.device,
     required this.command,
     required this.value,
@@ -586,7 +681,7 @@ class ApiSettingDropdown extends StatelessWidget {
                 "${command.index}=${value ?? value.toString()}",
                 minDelayMs: 2000,
               );
-              if (name != null) snackbar("$name ${value ?? value.toString()} ${result == ApiResult.success.index ? "success" : " failure"}", context);
+              if (name != null) snackbar("$name ${value ?? value.toString()} ${result == EspmApiResult.success.index ? "success" : " failure"}", context);
               print("[ApiSettingDropdown] api.requestResultCode($command): $result");
             },
           ),
@@ -608,10 +703,10 @@ class ApiSettingDropdown extends StatelessWidget {
   }
 }
 
-class SettingsWidget extends StatelessWidget {
-  final Device device;
+class EspmSettingsWidget extends StatelessWidget {
+  final ESPM device;
 
-  SettingsWidget(this.device);
+  EspmSettingsWidget(this.device);
 
   @override
   Widget build(BuildContext context) {
@@ -627,15 +722,15 @@ class SettingsWidget extends StatelessWidget {
       );
     }
 
-    final wifiSettings = ValueListenableBuilder<DeviceWifiSettings>(
+    final wifiSettings = ValueListenableBuilder<ESPMWifiSettings>(
       valueListenable: device.wifiSettings,
       builder: (context, settings, child) {
         //print("changed: $settings");
         var widgets = <Widget>[
-          ApiSettingSwitch(
+          EspmApiSettingSwitch(
             device: device,
             name: "Wifi",
-            command: ApiCommand.wifi,
+            command: EspmApiCommand.wifi,
             value: settings.enabled,
             onChanged: () {
               device.wifiSettings.value.enabled = ExtendedBool.Waiting;
@@ -645,10 +740,10 @@ class SettingsWidget extends StatelessWidget {
         ];
         if (settings.enabled == ExtendedBool.True) {
           widgets.add(
-            ApiSettingSwitch(
+            EspmApiSettingSwitch(
               device: device,
               name: "Access Point",
-              command: ApiCommand.wifiApEnabled,
+              command: EspmApiCommand.wifiApEnabled,
               value: settings.apEnabled,
               onChanged: () {
                 device.wifiSettings.value.apEnabled = ExtendedBool.Waiting;
@@ -660,18 +755,18 @@ class SettingsWidget extends StatelessWidget {
             widgets.add(
               Row(
                 children: [
-                  ApiSettingInput(
+                  EspmApiSettingInput(
                     device: device,
                     name: "SSID",
-                    command: ApiCommand.wifiApSSID,
+                    command: EspmApiCommand.wifiApSSID,
                     value: settings.apSSID,
                     enabled: settings.apEnabled == ExtendedBool.True ? true : false,
                   ),
                   Text(' '),
-                  ApiSettingInput(
+                  EspmApiSettingInput(
                     device: device,
                     name: "Password",
-                    command: ApiCommand.wifiApPassword,
+                    command: EspmApiCommand.wifiApPassword,
                     value: "",
                     isPassword: true,
                     enabled: settings.apEnabled == ExtendedBool.True ? true : false,
@@ -682,10 +777,10 @@ class SettingsWidget extends StatelessWidget {
         }
         if (settings.enabled == ExtendedBool.True) {
           widgets.add(
-            ApiSettingSwitch(
+            EspmApiSettingSwitch(
               device: device,
               name: "Station",
-              command: ApiCommand.wifiStaEnabled,
+              command: EspmApiCommand.wifiStaEnabled,
               value: settings.staEnabled,
               onChanged: () {
                 device.wifiSettings.value.staEnabled = ExtendedBool.Waiting;
@@ -697,18 +792,18 @@ class SettingsWidget extends StatelessWidget {
             widgets.add(
               Row(
                 children: [
-                  ApiSettingInput(
+                  EspmApiSettingInput(
                     device: device,
                     name: "SSID",
-                    command: ApiCommand.wifiStaSSID,
+                    command: EspmApiCommand.wifiStaSSID,
                     value: settings.staSSID,
                     enabled: settings.staEnabled == ExtendedBool.True ? true : false,
                   ),
                   Text(' '),
-                  ApiSettingInput(
+                  EspmApiSettingInput(
                     device: device,
                     name: "Password",
-                    command: ApiCommand.wifiStaPassword,
+                    command: EspmApiCommand.wifiStaPassword,
                     value: "",
                     isPassword: true,
                     enabled: settings.staEnabled == ExtendedBool.True ? true : false,
@@ -725,43 +820,43 @@ class SettingsWidget extends StatelessWidget {
       },
     );
 
-    final deviceSettings = ValueListenableBuilder<DeviceSettings>(
+    final deviceSettings = ValueListenableBuilder<ESPMSettings>(
       valueListenable: device.deviceSettings,
-      builder: (context, settings, child) {
+      builder: (_, settings, __) {
         //print("changed: $settings");
         var widgets = <Widget>[
-          ApiSettingInput(
+          EspmApiSettingInput(
             device: device,
             name: "Crank Length",
-            command: ApiCommand.crankLength,
+            command: EspmApiCommand.crankLength,
             value: settings.cranklength == null ? "" : settings.cranklength.toString(),
             suffix: Text("mm"),
             keyboardType: TextInputType.number,
           ),
-          ApiSettingSwitch(
+          EspmApiSettingSwitch(
             device: device,
             name: "Reverse Strain",
-            command: ApiCommand.reverseStrain,
+            command: EspmApiCommand.reverseStrain,
             value: settings.reverseStrain,
             onChanged: () {
               device.deviceSettings.value.reverseStrain = ExtendedBool.Waiting;
               device.deviceSettings.notifyListeners();
             },
           ),
-          ApiSettingSwitch(
+          EspmApiSettingSwitch(
             device: device,
             name: "Double Power",
-            command: ApiCommand.doublePower,
+            command: EspmApiCommand.doublePower,
             value: settings.doublePower,
             onChanged: () {
               device.deviceSettings.value.doublePower = ExtendedBool.Waiting;
               device.deviceSettings.notifyListeners();
             },
           ),
-          ApiSettingInput(
+          EspmApiSettingInput(
             device: device,
             name: "Sleep Delay",
-            command: ApiCommand.sleepDelay,
+            command: EspmApiCommand.sleepDelay,
             value: settings.sleepDelay == null ? "" : settings.sleepDelay.toString(),
             transformInput: (value) {
               var ms = int.tryParse(value);
@@ -770,10 +865,10 @@ class SettingsWidget extends StatelessWidget {
             suffix: Text("minutes"),
             keyboardType: TextInputType.number,
           ),
-          ApiSettingDropdown(
+          EspmApiSettingDropdown(
             name: "Negative Torque Method",
             device: device,
-            command: ApiCommand.negativeTorqueMethod,
+            command: EspmApiCommand.negativeTorqueMethod,
             value: settings.negativeTorqueMethod.toString(),
             onChanged: (value) {
               print("Negative Torque Method: $value");
@@ -791,10 +886,10 @@ class SettingsWidget extends StatelessWidget {
                         ))
                     .toList(),
           ),
-          ApiSettingDropdown(
+          EspmApiSettingDropdown(
             name: "Motion Detection Method",
             device: device,
-            command: ApiCommand.motionDetectionMethod,
+            command: EspmApiCommand.motionDetectionMethod,
             value: settings.motionDetectionMethod.toString(),
             onChanged: (value) {
               print("Motion Detection Method: $value");
@@ -819,20 +914,20 @@ class SettingsWidget extends StatelessWidget {
           widgets.add(
             Row(
               children: [
-                ApiSettingInput(
+                EspmApiSettingInput(
                   device: device,
                   name: "Low Threshold",
-                  command: ApiCommand.strainThresLow,
+                  command: EspmApiCommand.strainThresLow,
                   value: settings.strainThresLow == null ? null : settings.strainThresLow.toString(),
                   keyboardType: TextInputType.number,
                   enabled: settings.strainThresLow != null,
                   suffix: Text("kg"),
                 ),
                 Text(' '),
-                ApiSettingInput(
+                EspmApiSettingInput(
                   device: device,
                   name: "High Threshold",
-                  command: ApiCommand.strainThreshold,
+                  command: EspmApiCommand.strainThreshold,
                   value: settings.strainThreshold == null ? null : settings.strainThreshold.toString(),
                   keyboardType: TextInputType.number,
                   enabled: settings.strainThreshold != null,
@@ -844,10 +939,10 @@ class SettingsWidget extends StatelessWidget {
         }
 
         widgets.add(
-          ApiSettingSwitch(
+          EspmApiSettingSwitch(
             device: device,
             name: "Auto Tare",
-            command: ApiCommand.autoTare,
+            command: EspmApiCommand.autoTare,
             value: settings.autoTare,
             onChanged: () {
               device.deviceSettings.value.autoTare = ExtendedBool.Waiting;
@@ -859,20 +954,20 @@ class SettingsWidget extends StatelessWidget {
           widgets.add(
             Row(
               children: [
-                ApiSettingInput(
+                EspmApiSettingInput(
                   device: device,
                   name: "Delay",
-                  command: ApiCommand.autoTareDelayMs,
+                  command: EspmApiCommand.autoTareDelayMs,
                   value: settings.autoTareDelayMs == null ? null : settings.autoTareDelayMs.toString(),
                   keyboardType: TextInputType.number,
                   enabled: settings.autoTareDelayMs != null,
                   suffix: Text("ms"),
                 ),
                 Text(' '),
-                ApiSettingInput(
+                EspmApiSettingInput(
                   device: device,
                   name: "Max. Range",
-                  command: ApiCommand.autoTareRangeG,
+                  command: EspmApiCommand.autoTareRangeG,
                   value: settings.autoTareRangeG == null ? null : settings.autoTareRangeG.toString(),
                   keyboardType: TextInputType.number,
                   enabled: settings.autoTareRangeG != null,
@@ -900,7 +995,7 @@ class SettingsWidget extends StatelessWidget {
           children: [
             frame(wifiSettings),
             frame(deviceSettings),
-            frame(ApiInterface(device)),
+            frame(EspmApiInterface(device)),
           ],
         )
       ],

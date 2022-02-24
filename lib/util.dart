@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 
+/// bool plus Unknown and Waiting
 enum ExtendedBool {
   False,
   True,
@@ -9,11 +11,22 @@ enum ExtendedBool {
   Waiting,
 }
 
-/// Workaround for "The member 'notifyListeners' can only be used within
-/// 'package:flutter/src/foundation/change_notifier.dart' or a test.dart
-/// (invalid_use_of_visible_for_testing_member)""
-class PropertyValueNotifier<T> extends ValueNotifier<T> {
-  PropertyValueNotifier(T value) : super(value);
+/// converts bool to extended
+ExtendedBool extendedBoolFrom(bool value) => value ? ExtendedBool.True : ExtendedBool.False;
+
+/// A [ValueNotifier] that notifies listeners in the setter even when [value] is replaced
+/// with something that is equal to the old value as evaluated by the equality operator ==.
+///
+/// After modifying a value indirectly (e.g. "alwaysNotifier.value.x = y;"), call [notifyListeners()].
+class AlwaysNotifier<T> extends ValueNotifier<T> {
+  AlwaysNotifier(T value) : super(value);
+
+  @override
+  set value(T newValue) {
+    dev.log('AlwaysNotifier set value');
+    if (super.value == value) notifyListeners();
+    super.value = newValue;
+  }
 
   @override
   void notifyListeners() {
@@ -27,10 +40,11 @@ int uts() {
 }
 
 void streamSendIfNotClosed(StreamController stream, dynamic value) {
-  if (stream.isClosed)
+  if (stream.isClosed) {
     print("[streamSendIfNotClosed] Stream ${stream.toString()} is closed");
-  else
-    stream.sink.add(value);
+    return;
+  }
+  stream.sink.add(value);
 }
 
 class EspmuiElevatedButton extends StatelessWidget {
@@ -46,14 +60,10 @@ class EspmuiElevatedButton extends StatelessWidget {
       child: Text(label),
       style: ButtonStyle(
         backgroundColor: MaterialStateProperty.resolveWith((state) {
-          return state.contains(MaterialState.disabled)
-              ? Colors.red.shade400
-              : Colors.red.shade900;
+          return state.contains(MaterialState.disabled) ? Colors.red.shade400 : Colors.red.shade900;
         }),
         foregroundColor: MaterialStateProperty.resolveWith((state) {
-          return state.contains(MaterialState.disabled)
-              ? Colors.grey
-              : Colors.white;
+          return state.contains(MaterialState.disabled) ? Colors.grey : Colors.white;
         }),
       ),
     );
@@ -72,9 +82,7 @@ void snackbar(String s, BuildContext context) {
   sms.removeCurrentSnackBar();
   sms.showSnackBar(SnackBar(
     backgroundColor: Colors.black45,
-    content: Text(s,
-        textAlign: TextAlign.center,
-        style: const TextStyle(color: Colors.white)),
+    content: Text(s, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
   ));
 }
 

@@ -20,7 +20,14 @@ class DeviceRoute extends StatefulWidget {
   @override
   DeviceRouteState createState() {
     print("$tag createState()");
-    return DeviceRouteState(device);
+    if (device is ESPM)
+      return ESPMRouteState(device as ESPM);
+    else if (device is PowerMeter)
+      return PowerMeterRouteState(device as PowerMeter);
+    else if (device is HeartRateMonitor)
+      return HeartRateMonitorRouteState(device as HeartRateMonitor);
+    else
+      return DeviceRouteState(device);
   }
 }
 
@@ -70,33 +77,33 @@ class DeviceRouteState extends State<DeviceRoute> {
     );
   }
 
-  Widget _deviceProperties() {
-    var items = <StaggeredGridItem>[
+  List<StaggeredGridItem> _devicePropertyItems() {
+    return [
       StaggeredGridItem(
-        value: PowerCadence(device.power, mode: "power"),
-        colSpan: 3,
+        value: ValueListenableBuilder<bool>(
+          valueListenable: device.autoConnect,
+          builder: (_, value, __) {
+            print("$tag autoconnect changed: $value");
+            return SettingSwitch(
+              name: "Auto Connect",
+              value: extendedBoolFrom(value),
+              onChanged: (value) {
+                device.setAutoConnect(value);
+              },
+            );
+          },
+        ),
+        colSpan: 4,
       ),
       StaggeredGridItem(
-        value: PowerCadence(device.power, mode: "cadence"),
-        colSpan: 3,
-      ),
-      StaggeredGridItem(
-        value: WeightScale(device),
+        value: Battery(device),
         colSpan: 2,
-      ),
-      StaggeredGridItem(
-        value: HallSensor(device),
-        colSpan: 2,
-      ),
-      StaggeredGridItem(
-        value: Battery(device.battery),
-        colSpan: 2,
-      ),
-      StaggeredGridItem(
-        value: SettingsWidget(device),
-        colSpan: 6,
       ),
     ];
+  }
+
+  Widget _deviceProperties() {
+    var items = _devicePropertyItems();
 
     return StaggeredGridView.countBuilder(
       crossAxisCount: 6,
@@ -135,6 +142,70 @@ class DeviceRouteState extends State<DeviceRoute> {
   }
 }
 
+class PowerMeterRouteState extends DeviceRouteState {
+  final String tag = "[PowerMeterRouteState]";
+  PowerMeter powerMeter;
+
+  PowerMeterRouteState(this.powerMeter) : super(powerMeter);
+
+  @override
+  _devicePropertyItems() {
+    return [
+      StaggeredGridItem(
+        value: PowerCadence(powerMeter, mode: "power"),
+        colSpan: 3,
+      ),
+      StaggeredGridItem(
+        value: PowerCadence(powerMeter, mode: "cadence"),
+        colSpan: 3,
+      ),
+    ]..addAll(super._devicePropertyItems());
+  }
+}
+
+class ESPMRouteState extends PowerMeterRouteState {
+  final String tag = "[ESPMRouteState]";
+  ESPM espm;
+
+  ESPMRouteState(this.espm) : super(espm);
+
+  @override
+  _devicePropertyItems() {
+    return super._devicePropertyItems()
+      ..addAll([
+        StaggeredGridItem(
+          value: EspmWeightScale(espm),
+          colSpan: 2,
+        ),
+        StaggeredGridItem(
+          value: EspmHallSensor(espm),
+          colSpan: 2,
+        ),
+        StaggeredGridItem(
+          value: EspmSettingsWidget(espm),
+          colSpan: 6,
+        ),
+      ]);
+  }
+}
+
+class HeartRateMonitorRouteState extends DeviceRouteState {
+  final String tag = "[HeartRateMonitorRouteState]";
+  HeartRateMonitor hrm;
+
+  HeartRateMonitorRouteState(this.hrm) : super(hrm);
+
+  @override
+  _devicePropertyItems() {
+    return [
+      StaggeredGridItem(
+        value: HeartRate(hrm),
+        colSpan: 3,
+      ),
+    ]..addAll(super._devicePropertyItems());
+  }
+}
+
 class StaggeredGridItem {
   Widget value;
   int colSpan;
@@ -142,17 +213,6 @@ class StaggeredGridItem {
     required this.value,
     required this.colSpan,
   });
-}
-
-class StatelessWidgetBoilerplate extends StatelessWidget {
-  final Device device;
-
-  StatelessWidgetBoilerplate(this.device);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text("StatelessWidgetBoilerplate");
-  }
 }
 
 class Status extends StatelessWidget {
@@ -185,8 +245,11 @@ class AppBarTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     void editDeviceName() async {
+      if (!(device is ESPM)) return;
+
       Future<bool> apiDeviceName(String name) async {
-        var api = device.api;
+        var espm = device as ESPM;
+        var api = espm.api;
         snackbar("Sending new device name: $name", context);
         String? value = await api.request<String>("hostName=$name");
         if (value != name) {
@@ -246,7 +309,7 @@ class AppBarTitle extends StatelessWidget {
                           padding: MaterialStateProperty.all<EdgeInsets>(const EdgeInsets.all(0)),
                         ),
                         onPressed: () {},
-                        onLongPress: editDeviceName,
+                        onLongPress: (device is ESPM) ? editDeviceName : null,
                         child: Text(
                           device.name ?? "",
                           style: Theme.of(context).textTheme.headline6,
