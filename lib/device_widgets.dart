@@ -156,7 +156,7 @@ class EspmWeightScale extends StatelessWidget {
     }
 
     void tare() async {
-      var resultCode = await device.api.requestResultCode("tare");
+      var resultCode = await device.api.requestResultCode("tare=0");
       snackbar(
         "Tare " + (resultCode == EspmApiResult.success.index ? "success" : "failed"),
         context,

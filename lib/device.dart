@@ -38,6 +38,9 @@ class Device {
         bleError(tag, "could not get connection state", e);
       });
 
+  bool _subscribed = false;
+  bool _discovered = false;
+
   // Connection state stream controller
   final _stateController = StreamController<PeripheralConnectionState>.broadcast();
 
@@ -68,6 +71,32 @@ class Device {
     });
     await _stateSubscription?.cancel();
     _stateSubscription = null;
+  }
+
+  Future<bool> ready() async {
+    if (!await discovered()) return false;
+    if (!await subscribed()) return false;
+    return true;
+  }
+
+  Future<bool> discovered() async {
+    if (!await connected) return false;
+    var stopwatch = Stopwatch();
+    while (!_discovered) {
+      await Future.delayed(Duration(milliseconds: 500));
+      if (3000 < stopwatch.elapsedMilliseconds) return false;
+    }
+    return true;
+  }
+
+  Future<bool> subscribed() async {
+    if (!await connected) return false;
+    var stopwatch = Stopwatch();
+    while (!_subscribed) {
+      await Future.delayed(Duration(milliseconds: 500));
+      if (3000 < stopwatch.elapsedMilliseconds) return false;
+    }
+    return true;
   }
 
   Future<void> _onConnected() async {
@@ -163,18 +192,27 @@ class Device {
       bleError(tag, "discoverCharacteristics()", e);
     });
     print("$tag discoverCharacteristics() end conn=${await connected}");
+    _discovered = true;
   }
 
   Future<void> _subscribeCharacteristics() async {
-    if (!await connected) return;
-    _characteristics.forEachListItem((_, item) async {
-      if (item.subscribeOnConnect) await item.characteristic?.subscribe();
+    dev.log('$tag _subscribeCharacteristics start');
+    if (!await discovered()) return;
+    await _characteristics.forEachListItem((_, item) async {
+      if (item.subscribeOnConnect) {
+        dev.log('$tag _subscribeCharacteristics ${item.characteristic?.characteristicUUID} start');
+        await item.characteristic?.subscribe();
+        dev.log('$tag _subscribeCharacteristics ${item.characteristic?.characteristicUUID} end');
+      }
     });
+    _subscribed = true;
+    dev.log('$tag _subscribeCharacteristics end');
   }
 
   Future<void> _unsubscribeCharacteristics() async {
     _characteristics.forEachCharacteristic((_, char) async {
       await char?.unsubscribe();
+      _subscribed = false;
     });
   }
 
@@ -182,6 +220,8 @@ class Device {
     _characteristics.forEachCharacteristic((_, char) {
       char?.deinit();
     });
+    _discovered = false;
+    _subscribed = false;
   }
 
   Future<void> disconnect() async {
@@ -201,6 +241,7 @@ class Device {
           //stateController, PeripheralConnectionState.disconnected);
         }
       }
+      _discovered = false;
     });
   }
 
@@ -275,9 +316,10 @@ class ESPM extends PowerMeter {
 
   /// Processes "done" messages sent by the API
   void _onApiDone(EspmApiMessage message) async {
+    //print("$tag onApiDone parsing message: $message");
     if (message.resultCode != EspmApiResult.success.index) return;
     //print("$tag onApiDone parsing successful message: $message");
-    // switch does not work with non-consant case :(
+    // switch does not work with non-constant case :(
 
     // hostName
     if (EspmApiCommand.hostName.index == message.commandCode) {
@@ -402,6 +444,23 @@ class ESPM extends PowerMeter {
         deviceSettings.notifyListeners();
       }
     }
+    // config
+    else if (EspmApiCommand.config.index == message.commandCode) {
+      dev.log('$tag _onApiDone got config');
+      if (message.valueAsString != null) {
+        message.valueAsString!.split(';').forEach((chunk) {
+          var pair = chunk.split('=');
+          if (2 != pair.length) return;
+          var message = EspmApiMessage(pair.first);
+          message.commandCode = int.tryParse(pair.first);
+          if (null == message.commandCode) return;
+          message.resultCode = EspmApiResult.success.index;
+          message.value = pair.last;
+          dev.log('$tag _onApiDone config calling _onApiDone(${message.commandCode})');
+          _onApiDone(message);
+        });
+      }
+    }
   }
 
   Future<void> dispose() async {
@@ -425,10 +484,12 @@ class ESPM extends PowerMeter {
   /// request initial values, returned values are discarded
   /// because the message.done subscription will handle them
   void _requestInit() async {
-    if (!await connected) return;
+    print("$tag Requesting init start");
+    if (!await ready()) return;
+    print("$tag Requesting init ready to go");
     weightServiceEnabled.value = ExtendedBool.Waiting;
-    print("$tag Requesting init");
     [
+      /*
       "weightService",
       "hallChar",
       "hostName",
@@ -451,6 +512,8 @@ class ESPM extends PowerMeter {
       "autoTare",
       "autoTareDelayMs",
       "autoTareRangeG",
+      */
+      "config",
     ].forEach((key) async {
       await api.request<String>(
         key,
@@ -568,7 +631,9 @@ class CharacteristicList {
   void forEachCharacteristic(void Function(String, BleCharacteristic?) f) =>
       _items.forEach((String name, CharacteristicListItem item) => f(name, item.characteristic));
 
-  void forEachListItem(void Function(String, CharacteristicListItem) f) => _items.forEach(f);
+  Future<void> forEachListItem(Future<void> Function(String, CharacteristicListItem) f) async {
+    for (MapEntry e in _items.entries) await f(e.key, e.value);
+  }
 }
 
 class CharacteristicListItem {

@@ -37,6 +37,7 @@ enum EspmApiCommand {
   autoTare,
   autoTareDelayMs,
   autoTareRangeG,
+  config,
 }
 
 enum EspmApiResult {
@@ -76,8 +77,8 @@ class EspmApiMessage {
   bool? isDone;
 
   EspmApiMessage(
-    this.command,
-    this.onDone, {
+    this.command, {
+    this.onDone,
     int? maxAttempts,
     int? minDelayMs,
     int? maxAgeMs,
@@ -173,6 +174,10 @@ class EspmApiMessage {
   bool? get valueAsBool {
     if ("1:true" == value) return true;
     if ("0:false" == value) return false;
+    if ("1" == value) return true;
+    if ("0" == value) return false;
+    if ("true" == value) return true;
+    if ("false" == value) return false;
     return null;
   }
 
@@ -297,7 +302,7 @@ class EspmApi {
   }) {
     var message = EspmApiMessage(
       command,
-      onDone,
+      onDone: onDone,
       maxAttempts: maxAttempts,
       minDelayMs: minDelayMs,
       maxAgeMs: maxAgeMs,
@@ -406,8 +411,8 @@ class EspmApi {
     int now = uts();
     if (now < (message.lastSentAt ?? 0) + message.minDelayMs) return;
     //var device = Scanner().selected;
-    if (!await device.connected) {
-      print("$tag _send() not connected");
+    if (!await device.ready()) {
+      print("$tag _send() not ready");
       return;
     }
     message.lastSentAt = now;
@@ -415,7 +420,7 @@ class EspmApi {
     String toWrite = message.commandCode.toString();
     var arg = message.arg;
     if (arg != null) toWrite += "=$arg";
-    //print("$tag _send() calling char.write($toWrite)");
+    print("$tag _send() calling char.write($toWrite)");
     _characteristic?.write(toWrite);
   }
 
