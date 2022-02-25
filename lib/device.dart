@@ -210,18 +210,18 @@ class Device {
   }
 
   Future<void> _unsubscribeCharacteristics() async {
-    _characteristics.forEachCharacteristic((_, char) async {
-      await char?.unsubscribe();
-      _subscribed = false;
+    _subscribed = false;
+    await _characteristics.forEachListItem((_, item) async {
+      await item.characteristic?.unsubscribe();
     });
   }
 
-  void _deinitCharacteristics() {
-    _characteristics.forEachCharacteristic((_, char) {
-      char?.deinit();
-    });
+  Future<void> _deinitCharacteristics() async {
     _discovered = false;
     _subscribed = false;
+    await _characteristics.forEachListItem((_, item) async {
+      await item.characteristic?.deinit();
+    });
   }
 
   Future<void> disconnect() async {

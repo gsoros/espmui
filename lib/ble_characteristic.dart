@@ -151,7 +151,7 @@ abstract class BleCharacteristic<T> {
     }
   }
 
-  void deinit() {
+  Future<void> deinit() async {
     print("$tag deinit()");
     _characteristic = null;
   }

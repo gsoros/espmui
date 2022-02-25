@@ -269,7 +269,7 @@ class EspmApi {
         // don't return on the first match, process all matching messages
       }
     }
-    if (matches == 0) print("$tag did not find a matching queued message for the reply $reply");
+    if (matches == 0) print("$tag Warning: did not find a matching queued message for the reply $reply");
   }
 
   void _onDone(EspmApiMessage message) {
