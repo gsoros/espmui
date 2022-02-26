@@ -8,7 +8,6 @@ import 'package:mutex/mutex.dart';
 import 'util.dart';
 
 class Preferences {
-  final tag = '[Preferences]';
   static final Preferences _instance = Preferences._construct();
   late final SharedPreferences _sharedPreferences;
   bool _initDone = false;
@@ -24,7 +23,7 @@ class Preferences {
 
   void setDevices(List<String> devices) async {
     await _init();
-    dev.log('$tag setDevices($devices)');
+    dev.log('$runtimeType setDevices($devices)');
     _devices.value = devices;
     _sharedPreferences.setStringList('devices', devices);
   }
@@ -41,18 +40,18 @@ class Preferences {
     await _init();
     _tiles = tiles;
     _sharedPreferences.setStringList('tiles', tiles);
-    dev.log('$tag saved tiles: $tiles');
+    dev.log('$runtimeType saved tiles: $tiles');
   }
 
   Future<void> _init() async {
-    dev.log('$tag init step 1');
+    dev.log('$runtimeType init step 1');
     if (_initDone) return;
     await _exclusiveAccess.protect(() async {
       if (_initDone) return;
       _sharedPreferences = await SharedPreferences.getInstance();
       _devices.value = _sharedPreferences.getStringList('devices') ?? [];
       _devices.addListener(() {
-        dev.log('$tag _devicesNotifier listener ${_devices.value}');
+        dev.log('$runtimeType _devicesNotifier listener ${_devices.value}');
       });
       _tiles = _sharedPreferences.getStringList('tiles') ?? [];
       _initDone = true;
@@ -65,7 +64,7 @@ class Preferences {
   }
 
   Preferences._construct() {
-    dev.log('$tag _construct()');
+    dev.log('$runtimeType _construct()');
     _init();
   }
 }

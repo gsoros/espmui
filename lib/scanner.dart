@@ -10,7 +10,6 @@ import 'util.dart';
 /// singleton class
 class Scanner {
   static final Scanner _instance = Scanner._construct();
-  final String tag = "[Scanner]";
 
   /// returns a singleton
   factory Scanner() {
@@ -26,104 +25,137 @@ class Scanner {
   StreamSubscription? _scanningSubscription;
   Stream<bool> get scanningStream => _scanningController.stream;
 
-  /// Available devices
-  var resultList = ScanResultList();
-  Device? selected;
+  var devices = DeviceList();
   final _resultController = StreamController<ScanResult>.broadcast();
-  StreamSubscription? _resultSubscription;
+  StreamSubscription<ScanResult>? _resultSubscription;
   Stream<ScanResult> get resultStream => _resultController.stream;
 
   BLE get ble => BLE();
 
   Scanner._construct() {
-    print("$tag _construct()");
+    print("$runtimeType _construct()");
     _init();
   }
 
   void _init() async {
-    print("$tag _init()");
+    print("$runtimeType _init()");
     _scanningSubscription = scanningStream.listen(
       (value) {
         scanning = value;
-        print("$tag scanningSubscription: $value");
-        if (!scanning) selected?.connect();
+        print("$runtimeType scanningSubscription: $value");
       },
     );
     _resultSubscription = resultStream.listen(
       (result) {
-        bool isNew = !resultList.containsIdentifier(result.peripheral.identifier);
-        //availableDevices.addOrUpdate(device);
-        print("$tag _resultSubscription: ${result.peripheral.identifier} new=$isNew rssi=${result.rssi}");
+        devices.addFromScanResult(result);
+        //bool isNew = !devices.containsIdentifier(result.peripheral.identifier);
+        //print("$runtimeType _resultSubscription: ${result.peripheral.identifier} new=$isNew rssi=${result.rssi}");
       },
     );
-    startScan();
-    print("$tag _init() done");
+    print("$runtimeType _init() done");
   }
 
   void dispose() async {
-    print("$tag dispose()");
+    print("$runtimeType dispose()");
     await _scanResultSubscription?.cancel();
     await _scanningController.close();
     await _scanningSubscription?.cancel();
     await _resultController.close();
     await _resultSubscription?.cancel();
-    await resultList.dispose();
-    await selected?.dispose();
-    await ble.dispose();
+    await devices.dispose();
+    //await ble.dispose();
   }
 
   void startScan() async {
     if (scanning) {
-      print("$tag startScan() already scanning");
+      print("$runtimeType startScan() already scanning");
       return;
     }
     if (await ble.currentState() != BluetoothState.POWERED_ON) {
-      bleError(tag, "startScan() adapter not powered on, state is: " + (await ble.currentState()).toString());
+      bleError(runtimeType.toString(), "startScan() adapter not powered on, state is: " + (await ble.currentState()).toString());
       return;
     }
     Timer(
-      Duration(seconds: 3),
+      Duration(seconds: 10),
       () async {
         await stopScan();
-        if (resultList.isEmpty) print("$tag No devices found");
       },
     );
     streamSendIfNotClosed(_scanningController, true);
     _scanResultSubscription = ble.manager
         .startPeripheralScan(
           uuids: [
-            BleConstants.CYCLING_POWER_SERVICE_UUID,
             BleConstants.ESPM_API_SERVICE_UUID,
+            BleConstants.CYCLING_POWER_SERVICE_UUID,
             BleConstants.HEART_RATE_SERVICE_UUID,
           ],
         )
         .asBroadcastStream()
         .listen(
-          (scanResult) {
-            ScanResult? updatedResult = resultList.addOrUpdate(scanResult);
-            print("$tag Device found: ${updatedResult?.advertisementData.localName} ${updatedResult?.peripheral.identifier}");
-            streamSendIfNotClosed(_resultController, updatedResult);
+          (result) {
+            // devices.addFromScanResult(result);
+            //print("$runtimeType Device found: ${result.advertisementData.localName} ${result.peripheral.identifier}");
+            streamSendIfNotClosed(_resultController, result);
           },
-          onError: (e) => bleError(tag, "scanResultSubscription", e),
+          onError: (e) => bleError(runtimeType.toString(), "scanResultSubscription", e),
         );
   }
 
   Future<void> stopScan() async {
-    print("$tag stopScan()");
+    print("$runtimeType stopScan()");
     await _scanResultSubscription?.cancel();
     await ble.manager.stopPeripheralScan();
     streamSendIfNotClosed(_scanningController, false);
   }
-
-  void select(Device device) {
-    print("$tag Selected " + (device.name ?? "!!unnamed device!!"));
-    if (selected?.identifier != device.identifier) {
-      selected?.disconnect();
-      selected?.shouldConnect = false;
-    }
-    selected = device;
-    selected?.shouldConnect = true;
-    //print("$tag select() calling connect()");
-    //device.connect();
-  }
 }
+
+/*
+class ScanResultList {
+  Map<String, ScanResult> _items = {};
+
+  ScanResultList() {
+    print("$runtimeType construct");
+  }
+
+  bool containsIdentifier(String identifier) {
+    return _items.containsKey(identifier);
+  }
+
+  /// Adds or updates an item from a [ScanResult]
+  ///
+  /// If an item with the same identifier already exists, updates the item,
+  /// otherwise adds new item.
+  /// Returns the new or updated [ScanResult] or null on error.
+  ScanResult? addOrUpdate(ScanResult scanResult) {
+    final subject = scanResult.peripheral.name.toString() + " rssi=" + scanResult.rssi.toString();
+    _items.update(
+      scanResult.peripheral.identifier,
+      (existing) {
+        print("$runtimeType updating $subject");
+        existing = scanResult;
+        return existing;
+      },
+      ifAbsent: () {
+        print("$runtimeType adding $subject");
+        return scanResult;
+      },
+    );
+    return _items[scanResult.peripheral.identifier];
+  }
+
+  ScanResult? byIdentifier(String identifier) {
+    if (containsIdentifier(identifier)) return _items[identifier];
+    return null;
+  }
+
+  Future<void> dispose() async {
+    print("$runtimeType dispose");
+    //_items.forEach((_, scanResult) => scanResult.dispose());
+    _items.clear();
+  }
+
+  int get length => _items.length;
+  bool get isEmpty => _items.isEmpty;
+  void forEach(void Function(String, ScanResult) f) => _items.forEach(f);
+}
+*/

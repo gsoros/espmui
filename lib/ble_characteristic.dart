@@ -11,7 +11,6 @@ import 'ble.dart';
 import 'ble_constants.dart';
 
 abstract class BleCharacteristic<T> {
-  final tag = "[Characteristic]";
   Peripheral _peripheral;
   final serviceUUID = "";
   final characteristicUUID = "";
@@ -22,12 +21,14 @@ abstract class BleCharacteristic<T> {
   final _controller = StreamController<T>.broadcast();
   T? lastValue;
   final _exclusiveAccess = Mutex();
+  late final String tag;
 
   Stream<T> get stream => _controller.stream;
 
   BleCharacteristic(this._peripheral) {
     lastValue = fromUint8List(Uint8List.fromList([]));
-    print("$tag construct " + _peripheral.identifier);
+    print("$runtimeType construct " + _peripheral.identifier);
+    tag = runtimeType.toString();
   }
 
   T fromUint8List(Uint8List list);
@@ -72,7 +73,7 @@ abstract class BleCharacteristic<T> {
       bleError(tag, "write() characteristic not writableWithResponse");
       return Future.value(null);
     }
-    //print("$tag write($value)");
+    //print("$runtimeType write($value)");
     await _exclusiveAccess.protect(() async {
       if (null == _characteristic) return;
       _characteristic!
@@ -88,7 +89,7 @@ abstract class BleCharacteristic<T> {
   }
 
   Future<void> subscribe() async {
-    print("$tag subscribe()");
+    print("$runtimeType subscribe()");
     if (_subscription != null) {
       bleError(tag, "already subscribed");
       return;
@@ -113,21 +114,21 @@ abstract class BleCharacteristic<T> {
       _subscription = _rawStream?.listen(
         (value) async {
           lastValue = await onNotify(fromUint8List(value));
-          //print("$tag $lastValue");
+          //print("$runtimeType $lastValue");
           streamSendIfNotClosed(_controller, lastValue);
         },
         onError: (e) => bleError(tag, "subscription", e),
       );
     });
     await read();
-    print("$tag subscribe() initial value: $lastValue");
+    print("$runtimeType subscribe() initial value: $lastValue");
     streamSendIfNotClosed(_controller, lastValue);
   }
 
   Future<void> unsubscribe() async {
     await _init();
     if (_subscription == null) return;
-    print("$tag unsubscribe");
+    print("$runtimeType unsubscribe");
     streamSendIfNotClosed(_controller, fromUint8List(Uint8List.fromList([])));
     await _subscription?.cancel();
     _subscription = null;
@@ -147,12 +148,12 @@ abstract class BleCharacteristic<T> {
     } catch (e) {
       bleError(tag, "_init() readCharacteristic()", e);
       _characteristic = null;
-      //  print("$tag readCharacteristic() serviceUUID: $serviceUUID, characteristicUUID: $characteristicUUID, $e");
+      //  print("$runtimeType readCharacteristic() serviceUUID: $serviceUUID, characteristicUUID: $characteristicUUID, $e");
     }
   }
 
   Future<void> deinit() async {
-    print("$tag deinit()");
+    print("$runtimeType deinit()");
     _characteristic = null;
   }
 
@@ -168,7 +169,6 @@ abstract class BleCharacteristic<T> {
 }
 
 class BatteryCharacteristic extends BleCharacteristic<int> {
-  final tag = "[BatteryCharacteristic]";
   final serviceUUID = BleConstants.BATTERY_SERVICE_UUID;
   final characteristicUUID = BleConstants.BATTERY_LEVEL_CHAR_UUID;
 
@@ -187,7 +187,6 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
 }
 
 class PowerCharacteristic extends BleCharacteristic<Uint8List> {
-  final tag = "[PowerCharacteristic]";
   final serviceUUID = BleConstants.CYCLING_POWER_SERVICE_UUID;
   final characteristicUUID = BleConstants.CYCLING_POWER_MEASUREMENT_CHAR_UUID;
 
@@ -257,7 +256,6 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
 }
 
 class ApiCharacteristic extends BleCharacteristic<String> {
-  final tag = "[ApiCharacteristic]";
   final serviceUUID = BleConstants.ESPM_API_SERVICE_UUID;
   final characteristicUUID = BleConstants.ESPM_API_CHAR_UUID;
 
@@ -272,7 +270,7 @@ class ApiCharacteristic extends BleCharacteristic<String> {
     try {
       list = ascii.encode(value);
     } catch (e) {
-      print("$tag error: failed to ascii encode '$value': $e");
+      print("$runtimeType error: failed to ascii encode '$value': $e");
       List<int> valid = [];
       for (int code in value.codeUnits) if (code < 256) valid.add(code);
       list = Uint8List.fromList(valid);
@@ -289,7 +287,6 @@ class ApiCharacteristic extends BleCharacteristic<String> {
 }
 
 class WeightScaleCharacteristic extends BleCharacteristic<double> {
-  final tag = "[WeightScaleCharacteristic]";
   final serviceUUID = BleConstants.WEIGHT_SCALE_SERVICE_UUID;
   final characteristicUUID = BleConstants.WEIGHT_MEASUREMENT_CHAR_UUID;
 
@@ -307,7 +304,6 @@ class WeightScaleCharacteristic extends BleCharacteristic<double> {
 }
 
 class HallCharacteristic extends BleCharacteristic<int> {
-  final tag = "[HallCharacteristic]";
   final serviceUUID = BleConstants.ESPM_API_SERVICE_UUID;
   final characteristicUUID = BleConstants.ESPM_HALL_CHAR_UUID;
 
@@ -324,7 +320,6 @@ class HallCharacteristic extends BleCharacteristic<int> {
 }
 
 class HeartRateCharacteristic extends BleCharacteristic<int> {
-  final tag = "[HeartRateCharacteristic]";
   final serviceUUID = BleConstants.HEART_RATE_SERVICE_UUID;
   final characteristicUUID = BleConstants.HEART_RATE_MEASUREMENT_CHAR_UUID;
 
@@ -339,16 +334,55 @@ class HeartRateCharacteristic extends BleCharacteristic<int> {
     var byteData = list.buffer.asByteData();
     int heartRate = 0;
     if (byteData.lengthInBytes < byteCount + 1) {
-      dev.log('$tag fromUint8List() not enough bytes in $list');
+      dev.log('$runtimeType fromUint8List() not enough bytes in $list');
       return heartRate;
     }
     if (byteCount == 1)
       heartRate = byteData.getUint8(1);
     else if (byteCount == 2) heartRate = byteData.getUint16(1, Endian.little);
-    dev.log('$tag got list: $list byteCount: $byteCount hr: $heartRate');
+    dev.log('$runtimeType got list: $list byteCount: $byteCount hr: $heartRate');
     return heartRate;
   }
 
   @override
   Uint8List toUint8List(int value) => Uint8List(2); // we are not writing
+}
+
+class CharacteristicList {
+  Map<String, CharacteristicListItem> _items = {};
+
+  BleCharacteristic? get(String name) {
+    return _items.containsKey(name) ? _items[name]!.characteristic : null;
+  }
+
+  void set(String name, CharacteristicListItem item) => _items[name] = item;
+
+  void addAll(Map<String, CharacteristicListItem> items) => _items.addAll(items);
+
+  void dispose() {
+    print("$runtimeType dispose");
+    _items.forEach((_, item) => item.dispose());
+    _items.clear();
+  }
+
+  void forEachCharacteristic(void Function(String, BleCharacteristic?) f) =>
+      _items.forEach((String name, CharacteristicListItem item) => f(name, item.characteristic));
+
+  Future<void> forEachListItem(Future<void> Function(String, CharacteristicListItem) f) async {
+    for (MapEntry e in _items.entries) await f(e.key, e.value);
+  }
+}
+
+class CharacteristicListItem {
+  bool subscribeOnConnect;
+  BleCharacteristic? characteristic;
+
+  CharacteristicListItem(
+    this.characteristic, {
+    this.subscribeOnConnect = true,
+  });
+
+  void dispose() {
+    characteristic?.dispose();
+  }
 }

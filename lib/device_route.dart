@@ -10,16 +10,15 @@ import 'device.dart';
 import 'device_widgets.dart';
 
 class DeviceRoute extends StatefulWidget {
-  final String tag = "[DeviceRoute]";
   final Device device;
 
   DeviceRoute(this.device) {
-    print("$tag construct");
+    print("$runtimeType construct");
   }
 
   @override
   DeviceRouteState createState() {
-    print("$tag createState()");
+    print("$runtimeType createState()");
     if (device is ESPM)
       return ESPMRouteState(device as ESPM);
     else if (device is PowerMeter)
@@ -32,29 +31,27 @@ class DeviceRoute extends StatefulWidget {
 }
 
 class DeviceRouteState extends State<DeviceRoute> {
-  final String tag = "[DeviceRouteState]";
   Device device;
 
   DeviceRouteState(this.device) {
-    print("$tag construct");
+    print("$runtimeType construct");
   }
 
   @override
   void initState() {
-    print("$tag initState");
+    print("$runtimeType initState");
     super.initState();
   }
 
   @override
   void dispose() async {
-    print("$tag ${device.name} dispose");
-    device.disconnect();
+    print("$runtimeType dispose");
+    if (!device.autoConnect.value) device.disconnect();
     super.dispose();
   }
 
   Future<bool> _onBackPressed() {
-    device.shouldConnect = false;
-    device.disconnect();
+    if (!device.autoConnect.value) device.disconnect();
     return Future.value(true);
   }
 
@@ -83,7 +80,7 @@ class DeviceRouteState extends State<DeviceRoute> {
         value: ValueListenableBuilder<bool>(
           valueListenable: device.autoConnect,
           builder: (_, value, __) {
-            print("$tag autoconnect changed: $value");
+            print("$runtimeType autoconnect changed: $value");
             return SettingSwitch(
               name: "Auto Connect",
               value: extendedBoolFrom(value),
@@ -143,7 +140,6 @@ class DeviceRouteState extends State<DeviceRoute> {
 }
 
 class PowerMeterRouteState extends DeviceRouteState {
-  final String tag = "[PowerMeterRouteState]";
   PowerMeter powerMeter;
 
   PowerMeterRouteState(this.powerMeter) : super(powerMeter);
@@ -164,7 +160,6 @@ class PowerMeterRouteState extends DeviceRouteState {
 }
 
 class ESPMRouteState extends PowerMeterRouteState {
-  final String tag = "[ESPMRouteState]";
   ESPM espm;
 
   ESPMRouteState(this.espm) : super(espm);
@@ -190,7 +185,6 @@ class ESPMRouteState extends PowerMeterRouteState {
 }
 
 class HeartRateMonitorRouteState extends DeviceRouteState {
-  final String tag = "[HeartRateMonitorRouteState]";
   HeartRateMonitor hrm;
 
   HeartRateMonitorRouteState(this.hrm) : super(hrm);
@@ -348,20 +342,18 @@ class ConnectButton extends StatelessWidget {
       stream: device.stateStream,
       initialData: null,
       builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
+        print("$runtimeType $snapshot");
         var action;
         var label = "Connect";
         if (snapshot.data == PeripheralConnectionState.connected) {
-          action = () {
-            device.shouldConnect = false;
-            device.disconnect();
-          };
+          if (!device.autoConnect.value) action = device.disconnect;
           label = "Disconnect";
-        }
-        if (snapshot.data == PeripheralConnectionState.disconnected)
-          action = () {
-            device.shouldConnect = true;
-            device.connect();
-          };
+        } else if (snapshot.data == PeripheralConnectionState.connecting)
+          label = "Connecting";
+        else if (snapshot.data == PeripheralConnectionState.disconnecting)
+          label = "Disonnecting";
+        else //if (snapshot.data == PeripheralConnectionState.disconnected)
+          action = device.connect;
         return EspmuiElevatedButton(label, action: action);
       },
     );

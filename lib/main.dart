@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 //import 'package:flutter/rendering.dart';
 
 //import 'scanner_route.dart';
-import 'sensors_route.dart';
+import 'tiles_route.dart';
 
 void main() {
   //debugRepaintRainbowEnabled = true;
@@ -32,7 +32,7 @@ class EspmUiApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       //showPerformanceOverlay: true,
       //home: ScannerRoute(),
-      home: SensorsRoute(),
+      home: TilesRoute(),
     );
   }
 }

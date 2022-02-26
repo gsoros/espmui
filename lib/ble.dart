@@ -7,16 +7,16 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:mutex/mutex.dart';
 
 import 'util.dart';
-import 'scanner.dart';
+//import 'scanner.dart';
 
 /// singleton class
 class BLE {
   static final BLE _instance = BLE._construct();
-  final tag = "[BLE]";
   bool _createClientRequested = false;
   bool _createClientCompleted = false;
   bool _initDone = false;
   final _exclusiveAccess = Mutex();
+  late final String tag;
 
   /// returns a singleton
   factory BLE() {
@@ -46,38 +46,38 @@ class BLE {
   }
 
   Future<void> _checkClient() async {
-    print("$tag _checkClient() start");
+    print("$runtimeType _checkClient() start");
     if (!_createClientCompleted) {
       while (!await BleManager().isClientCreated()) {
         // make sure createClient() is called only once
         if (!_createClientRequested) {
           _createClientRequested = true;
-          print("$tag _checkClient() waiting for createClient");
+          print("$runtimeType _checkClient() waiting for createClient");
           await BleManager().createClient();
-          print("$tag _checkClient() createClient done");
+          print("$runtimeType _checkClient() createClient done");
           /*
           await Future.delayed(Duration(milliseconds: 500));
           // cycling radio
-          print("$tag _checkClient() disabling radio");
+          print("$runtimeType _checkClient() disabling radio");
           // don't await, the future never completes
           BleManager().disableRadio();
           await Future.delayed(Duration(milliseconds: 500));
-          print("$tag _checkClient() enabling radio");
+          print("$runtimeType _checkClient() enabling radio");
           await BleManager().enableRadio();
-          print("$tag _checkClient() enabled radio");
+          print("$runtimeType _checkClient() enabled radio");
           */
         }
         await Future.delayed(Duration(milliseconds: 500));
       }
       _createClientCompleted = true;
     }
-    print("$tag _checkClient() end");
+    print("$runtimeType _checkClient() end");
     //return Future.value(null);
   }
 
   BleManager get manager {
     if (!_initDone) {
-      print("$tag get manager calling _init()");
+      print("$runtimeType get manager calling _init()");
       _init();
       sleep(Duration(milliseconds: 1000));
     }
@@ -86,7 +86,8 @@ class BLE {
   }
 
   BLE._construct() {
-    print("$tag _construct()");
+    print("$runtimeType _construct()");
+    tag = runtimeType.toString();
     _init();
   }
 
@@ -94,19 +95,19 @@ class BLE {
     if (_initDone) return;
     await _exclusiveAccess.protect(() async {
       if (_initDone) return;
-      print("$tag _init()");
+      print("$runtimeType _init()");
       await _checkPermissions();
       await _checkClient();
-      print("$tag _init() _checkClient() done");
+      print("$runtimeType _init() _checkClient() done");
       await _checkAdapter();
       _initDone = true;
-      print("$tag _init() done");
+      print("$runtimeType _init() done");
       //return Future.value(null);
     });
   }
 
   Future<void> dispose() async {
-    print("$tag dispose()");
+    print("$runtimeType dispose()");
     await stateController.close();
     await stateSubscription?.cancel();
     await manager.destroyClient();
@@ -120,20 +121,20 @@ class BLE {
 
   Future<void> _checkPermissions() async {
     if (!Platform.isAndroid) return;
-    print("$tag Checking permissions");
+    print("$runtimeType Checking permissions");
     if (!await Permission.location.request().isGranted) {
       bleError(tag, "No location permission");
-      return Future.error(Exception("$tag Location permission not granted"));
+      return Future.error(Exception("$runtimeType Location permission not granted"));
     }
     if (!await Permission.bluetooth.request().isGranted) {
       bleError(tag, "No blootueth permission");
-      return Future.error(Exception("$tag Bluetooth permission not granted"));
+      return Future.error(Exception("$runtimeType Bluetooth permission not granted"));
     }
-    print("$tag Checking permissions done");
+    print("$runtimeType Checking permissions done");
   }
 
   Future<void> _checkAdapter() async {
-    print("$tag _checkAdaper()");
+    print("$runtimeType _checkAdaper()");
     await stateSubscription?.cancel();
     stateSubscription = BleManager()
         .observeBluetoothState()
@@ -142,7 +143,7 @@ class BLE {
         )
         .listen(
       (state) async {
-        print("$tag " + state.toString());
+        print("$runtimeType " + state.toString());
         _currentState = state;
         _currentStateInitialized = true;
         streamSendIfNotClosed(stateController, state);
@@ -150,9 +151,8 @@ class BLE {
           // Probably not a good idea to automatically scan, as of Android 7,
           // starting and stopping scans more than 5 times in a window of
           // 30 seconds will temporarily disable scanning
-          //print("$tag Adapter powered on, starting scan");
+          //print("$runtimeType Adapter powered on, starting scan");
           //startScan();
-          Scanner().selected?.connect();
         } else {
           bleError(tag, "Adapter not powered on");
           /*
@@ -163,7 +163,6 @@ class BLE {
                 .catchError((e) => bleError(tag, "enableRadio()", e));
           }
           */
-          Scanner().selected?.disconnect();
         }
       },
       onError: (e) => bleError(tag, "stateSubscription", e),
@@ -173,7 +172,7 @@ class BLE {
 
   Future<void> discover(Peripheral peripheral) async {
     await _exclusiveAccess.protect(() async {
-      print("$tag discover($peripheral)");
+      print("$runtimeType discover($peripheral)");
       await peripheral.discoverAllServicesAndCharacteristics().catchError((e) {
         bleError(tag, "discoverAllServicesAndCharacteristics()", e);
       });
