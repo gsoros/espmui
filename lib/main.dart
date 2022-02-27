@@ -9,6 +9,9 @@ void main() {
   runApp(EspmUiApp());
 }
 
+/// TODO move to some globals class
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
 class EspmUiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -29,6 +32,7 @@ class EspmUiApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
+      scaffoldMessengerKey: scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       //showPerformanceOverlay: true,
       //home: ScannerRoute(),

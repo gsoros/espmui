@@ -1,6 +1,7 @@
 import 'dart:async';
 //import 'dart:developer' as dev;
 
+import 'package:espmui/main.dart';
 import 'package:flutter/material.dart';
 
 /// bool plus Unknown and Waiting
@@ -72,11 +73,15 @@ class EspmuiElevatedButton extends StatelessWidget {
   }
 }
 
-void snackbar(String s, BuildContext context) {
+void snackbar(String s, [BuildContext? context]) {
   print("[Snackbar] message: $s");
-  ScaffoldMessengerState sms;
+  ScaffoldMessengerState? sms;
   try {
-    sms = ScaffoldMessenger.of(context);
+    if (null != context)
+      sms = ScaffoldMessenger.of(context);
+    else
+      sms = scaffoldMessengerKey.currentState;
+    if (null == sms) throw ("ScaffoldMessengerState is null");
   } catch (e) {
     print("[Snackbar] error: $e");
     return;
@@ -84,7 +89,11 @@ void snackbar(String s, BuildContext context) {
   sms.removeCurrentSnackBar();
   sms.showSnackBar(SnackBar(
     backgroundColor: Colors.black45,
-    content: Text(s, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
+    content: Text(
+      s,
+      textAlign: TextAlign.center,
+      style: const TextStyle(color: Colors.white),
+    ),
   ));
 }
 

@@ -27,6 +27,8 @@ class DeviceList {
     //_controller
   }
 
+  Map<String, Device> where(bool filter(String k, Device v)) => Map.from(_items)..removeWhere((k, v) => !filter(k, v));
+
   Future<void> _loadSaved() async {
     (await Preferences().getDevices()).value.forEach((str) {
       var device = Device.fromSaved(str);

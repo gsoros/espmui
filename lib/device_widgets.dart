@@ -640,17 +640,17 @@ class EspmApiSettingSwitch extends StatelessWidget {
   }
 }
 
-class EspmApiSettingDropdown extends StatelessWidget {
-  final ESPM device;
-  final EspmApiCommand command;
+class EspmuiDropdown extends StatelessWidget {
   final String? value;
   final List<DropdownMenuItem<String>>? items;
   final String? name;
   final void Function(String?)? onChanged;
 
-  EspmApiSettingDropdown({
-    required this.device,
-    required this.command,
+  /// Creates a dropdown button.
+  /// The [items] must have distinct values. If [value] isn't null then it must be
+  /// equal to one of the [DropdownMenuItem] values. If [items] or [onChanged] is
+  /// null, the button will be disabled, the down arrow will be greyed out.
+  EspmuiDropdown({
     required this.value,
     required this.items,
     this.name,
@@ -675,15 +675,7 @@ class EspmApiSettingDropdown extends StatelessWidget {
             value: value,
             items: items,
             underline: SizedBox(),
-            onChanged: (String? value) async {
-              if (onChanged != null) onChanged!(value);
-              final result = await device.api.requestResultCode(
-                "${command.index}=${value ?? value.toString()}",
-                minDelayMs: 2000,
-              );
-              if (name != null) snackbar("$name ${value ?? value.toString()} ${result == EspmApiResult.success.index ? "success" : " failure"}", context);
-              print("[ApiSettingDropdown] api.requestResultCode($command): $result");
-            },
+            onChanged: onChanged,
           ),
         ),
       );
@@ -701,6 +693,33 @@ class EspmApiSettingDropdown extends StatelessWidget {
             ]),
     );
   }
+}
+
+class EspmApiSettingDropdown extends EspmuiDropdown {
+  final ESPM device;
+  final EspmApiCommand command;
+
+  EspmApiSettingDropdown({
+    required this.device,
+    required this.command,
+    required String? value,
+    required List<DropdownMenuItem<String>>? items,
+    String? name,
+    void Function(String?)? onChanged,
+  }) : super(
+          value: value,
+          items: items,
+          name: name,
+          onChanged: (String? value) async {
+            if (onChanged != null) onChanged(value);
+            final result = await device.api.requestResultCode(
+              "${command.index}=${value ?? value.toString()}",
+              minDelayMs: 2000,
+            );
+            if (name != null) snackbar("$name ${value ?? value.toString()} ${result == EspmApiResult.success.index ? "success" : " failure"}");
+            print("[ApiSettingDropdown] api.requestResultCode($command): $result");
+          },
+        );
 }
 
 class EspmSettingsWidget extends StatelessWidget {

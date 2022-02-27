@@ -378,6 +378,11 @@ class PowerMeter extends Device {
     _characteristics.addAll({
       'power': CharacteristicListItem(PowerCharacteristic(peripheral)),
     });
+    tileStreams.add(TileStream(
+      "power",
+      "Power",
+      power?.stream.map<String>((value) => "$value"),
+    ));
   }
 
   /// Hack: the 128-bit api service uuid is sometimes not detected from the

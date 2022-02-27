@@ -10,8 +10,10 @@ import 'package:page_transition/page_transition.dart';
 import 'package:flutter_circle_color_picker/flutter_circle_color_picker.dart';
 
 //import 'preferences.dart';
+//import 'device.dart';
 import 'device_list.dart';
 import 'device_list_route.dart';
+import 'device_widgets.dart';
 import 'tile.dart';
 //import 'tile_route.dart';
 
@@ -192,7 +194,7 @@ class _TileGridState extends State<TileGrid> {
   @override
   Widget build(BuildContext context) {
     double sizeUnit = MediaQuery.of(context).size.width / 10;
-    Widget Function(int) tileSizeAndColor = (index) {
+    Widget Function(int) sizeAndColor = (index) {
       return StatefulBuilder(
         builder: (context, setChildState) {
           void Function(void Function() f) setStates = (f) {
@@ -328,9 +330,52 @@ class _TileGridState extends State<TileGrid> {
       );
     };
 
+    Widget Function(int) source = (index) {
+      Tile tile = _tiles[index];
+      String value = "${tile.sourceDevice};${tile.sourceStream}";
+      bool valuePresent = false;
+      var items = <DropdownMenuItem<String>>[];
+      DeviceList().forEach((_, device) {
+        if (device.tileStreams.length < 1) return;
+        device.tileStreams.forEach((stream) {
+          String itemValue = "${device.peripheral?.identifier};${stream.name}";
+          if (itemValue == value) valuePresent = true;
+          items.add(DropdownMenuItem(
+            value: itemValue,
+            child: Text("${stream.label} (${device.name ?? 'unnamed device'})"),
+          ));
+        });
+      });
+      if (items.length < 1)
+        items.add(
+          DropdownMenuItem(
+            value: value,
+            child: Text("No valid sources"),
+          ),
+        );
+      else if (!valuePresent)
+        items.insert(
+          0,
+          DropdownMenuItem(
+            value: value,
+            child: Text("Select Source"),
+          ),
+        );
+      return EspmuiDropdown(
+        value: value,
+        items: items,
+        onChanged: (value) {
+          print("New source for ${tile.name}: $value");
+          var chunks = value?.split(";");
+          //tile.sourceDevice = chunks[0];
+          //tile.sourceStream = chunks[1];
+        },
+      );
+    };
+
     return ValueListenableBuilder<List<Tile>>(
         valueListenable: _tiles.notifier,
-        builder: (context, tileList, widget) {
+        builder: (context, _, __) {
           return StaggeredGridView.countBuilder(
             crossAxisCount: 10,
             //mainAxisSpacing: 4,
@@ -396,7 +441,12 @@ class _TileGridState extends State<TileGrid> {
                                     child: Center(
                                       child: Dialog(
                                         backgroundColor: Colors.black87,
-                                        child: tileSizeAndColor(index),
+                                        child: Column(
+                                          children: [
+                                            sizeAndColor(index),
+                                            source(index),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   );
