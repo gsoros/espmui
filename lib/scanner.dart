@@ -4,7 +4,7 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
 import 'ble.dart';
 import 'ble_constants.dart';
-import 'device.dart';
+import 'device_list.dart';
 import 'util.dart';
 
 /// singleton class
@@ -31,6 +31,8 @@ class Scanner {
   Stream<ScanResult> get resultStream => _resultController.stream;
 
   BLE get ble => BLE();
+
+  Timer? _stopTimer;
 
   Scanner._construct() {
     print("$runtimeType _construct()");
@@ -62,7 +64,7 @@ class Scanner {
     await _scanningSubscription?.cancel();
     await _resultController.close();
     await _resultSubscription?.cancel();
-    await devices.dispose();
+    //await devices.dispose();
     //await ble.dispose();
   }
 
@@ -75,8 +77,9 @@ class Scanner {
       bleError(runtimeType.toString(), "startScan() adapter not powered on, state is: " + (await ble.currentState()).toString());
       return;
     }
-    Timer(
-      Duration(seconds: 10),
+    if (_stopTimer != null) _stopTimer!.cancel();
+    _stopTimer = Timer(
+      Duration(seconds: 5),
       () async {
         await stopScan();
       },
@@ -103,6 +106,10 @@ class Scanner {
 
   Future<void> stopScan() async {
     print("$runtimeType stopScan()");
+    if (_stopTimer != null) {
+      _stopTimer!.cancel();
+      _stopTimer = null;
+    }
     await _scanResultSubscription?.cancel();
     await ble.manager.stopPeripheralScan();
     streamSendIfNotClosed(_scanningController, false);

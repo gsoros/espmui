@@ -10,7 +10,7 @@ import 'util.dart';
 //import 'scanner.dart';
 
 /// singleton class
-class BLE {
+class BLE with DebugHelper {
   static final BLE _instance = BLE._construct();
   bool _createClientRequested = false;
   bool _createClientCompleted = false;
@@ -46,7 +46,7 @@ class BLE {
   }
 
   Future<void> _checkClient() async {
-    print("$runtimeType _checkClient() start");
+    //print("$runtimeType _checkClient() start");
     if (!_createClientCompleted) {
       while (!await BleManager().isClientCreated()) {
         // make sure createClient() is called only once
@@ -71,7 +71,7 @@ class BLE {
       }
       _createClientCompleted = true;
     }
-    print("$runtimeType _checkClient() end");
+    //print("$runtimeType _checkClient() end");
     //return Future.value(null);
   }
 
@@ -178,6 +178,24 @@ class BLE {
       });
     });
   }
+
+  Future<int> requestMtu(Peripheral peripheral, int mtu) async {
+    String call = "requestMtu(${peripheral.name}, $mtu)";
+    //print("$debugTag $call");
+    await _exclusiveAccess.protect(() async {
+      int result = await peripheral.requestMtu(mtu).catchError((e) {
+        bleError(debugTag, call, e);
+        return 0;
+      }).then((mtu) {
+        print("$debugTag $call got MTU=$mtu");
+        return mtu;
+      });
+      return result;
+    });
+    return 0;
+  }
+
+  Mutex get mutex => _exclusiveAccess;
 }
 
 /// https://github.com/dotintent/FlutterBleLib/blob/develop/lib/error/ble_error.dart

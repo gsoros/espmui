@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'util.dart';
 import 'ble.dart';
 import 'device.dart';
+import 'device_list.dart';
 import 'device_widgets.dart';
 
 class DeviceRoute extends StatefulWidget {
@@ -30,7 +32,7 @@ class DeviceRoute extends StatefulWidget {
   }
 }
 
-class DeviceRouteState extends State<DeviceRoute> {
+class DeviceRouteState extends State<DeviceRoute> with DebugHelper {
   Device device;
 
   DeviceRouteState(this.device) {
@@ -40,7 +42,20 @@ class DeviceRouteState extends State<DeviceRoute> {
   @override
   void initState() {
     print("$runtimeType initState");
+    _checkCorrectType();
     super.initState();
+  }
+
+  Future<void> _checkCorrectType() async {
+    //dev.log("$debugTag _checkCorrectType() $device");
+    if (await device.isCorrectType()) return;
+    var newDevice = await device.copyToCorrectType();
+    device.peripheral = null;
+    device.dispose();
+    device = newDevice;
+    DeviceList().addOrUpdate(device);
+    dev.log("$debugTag _checkCorrectType() reloading DeviceRoute($device)");
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => DeviceRoute(device)));
   }
 
   @override
@@ -80,7 +95,7 @@ class DeviceRouteState extends State<DeviceRoute> {
         value: ValueListenableBuilder<bool>(
           valueListenable: device.autoConnect,
           builder: (_, value, __) {
-            print("$runtimeType autoconnect changed: $value");
+            //print("$runtimeType autoconnect changed: $value");
             return SettingSwitch(
               name: "Auto Connect",
               value: extendedBoolFrom(value),
@@ -332,25 +347,27 @@ class AppBarTitle extends StatelessWidget {
   }
 }
 
-class ConnectButton extends StatelessWidget {
+class ConnectButton extends StatelessWidget with DebugHelper {
   final Device device;
   ConnectButton(this.device);
 
   @override
   Widget build(BuildContext context) {
+    //print("$debugTag initialState: ${device.lastConnectionState}");
     return StreamBuilder<PeripheralConnectionState?>(
       stream: device.stateStream,
-      initialData: null,
+      initialData: device.lastConnectionState,
       builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
-        print("$runtimeType $snapshot");
+        //print("$debugTag $snapshot");
         var action;
         var label = "Connect";
         if (snapshot.data == PeripheralConnectionState.connected) {
           if (!device.autoConnect.value) action = device.disconnect;
           label = "Disconnect";
-        } else if (snapshot.data == PeripheralConnectionState.connecting)
-          label = "Connecting";
-        else if (snapshot.data == PeripheralConnectionState.disconnecting)
+        } else if (snapshot.data == PeripheralConnectionState.connecting) {
+          action = device.disconnect;
+          label = "Cancel";
+        } else if (snapshot.data == PeripheralConnectionState.disconnecting)
           label = "Disonnecting";
         else //if (snapshot.data == PeripheralConnectionState.disconnected)
           action = device.connect;

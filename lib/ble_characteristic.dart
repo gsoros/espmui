@@ -4,7 +4,7 @@ import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
-import 'package:mutex/mutex.dart';
+//import 'package:mutex/mutex.dart';
 
 import 'util.dart';
 import 'ble.dart';
@@ -20,7 +20,8 @@ abstract class BleCharacteristic<T> {
   StreamSubscription<Uint8List>? _subscription;
   final _controller = StreamController<T>.broadcast();
   T? lastValue;
-  final _exclusiveAccess = Mutex();
+  // shared mutex
+  final _exclusiveAccess = BLE().mutex;
   late final String tag;
 
   Stream<T> get stream => _controller.stream;
@@ -138,12 +139,15 @@ abstract class BleCharacteristic<T> {
     if (_characteristic != null) return; // already init'd
     bool connected = await _peripheral.isConnected();
     if (!connected) {
-      bleError(tag, "_init() peripheral not connected");
-      return Future.value(null);
+      //bleError(tag, "_init() peripheral not connected");
+      return;
     }
     try {
       //_characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
-      var chars = await _peripheral.characteristics(serviceUUID);
+      List<Characteristic> chars = [];
+      await _exclusiveAccess.protect(() async {
+        chars = await _peripheral.characteristics(serviceUUID);
+      });
       _characteristic = chars.firstWhere((char) => char.uuid == characteristicUUID);
     } catch (e) {
       bleError(tag, "_init() readCharacteristic()", e);
@@ -153,7 +157,7 @@ abstract class BleCharacteristic<T> {
   }
 
   Future<void> deinit() async {
-    print("$runtimeType deinit()");
+    //print("$runtimeType deinit()");
     _characteristic = null;
   }
 
@@ -340,7 +344,7 @@ class HeartRateCharacteristic extends BleCharacteristic<int> {
     if (byteCount == 1)
       heartRate = byteData.getUint8(1);
     else if (byteCount == 2) heartRate = byteData.getUint16(1, Endian.little);
-    dev.log('$runtimeType got list: $list byteCount: $byteCount hr: $heartRate');
+    //dev.log('$runtimeType got list: $list byteCount: $byteCount hr: $heartRate');
     return heartRate;
   }
 

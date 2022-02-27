@@ -8,8 +8,9 @@ import 'package:page_transition/page_transition.dart';
 import 'ble.dart';
 import 'device_route.dart';
 import 'device.dart';
+import 'device_list.dart';
 import 'scanner.dart';
-import 'preferences.dart';
+//import 'preferences.dart';
 import 'util.dart';
 
 class DeviceListRoute extends StatefulWidget {
@@ -23,8 +24,6 @@ class DeviceListRouteState extends State<DeviceListRoute> {
   final String defaultTitle = "Devices";
   final _key = GlobalKey<DeviceListRouteState>();
   Scanner get scanner => Scanner();
-  late AlwaysNotifier<List<String>> savedDevices;
-  late DeviceList devices;
 
   DeviceListRouteState() {
     print("$runtimeType construct");
@@ -34,18 +33,12 @@ class DeviceListRouteState extends State<DeviceListRoute> {
   void initState() {
     super.initState();
     print("$runtimeType initState()");
-    _loadSavedDevices();
-    devices = DeviceList();
-  }
-
-  void _loadSavedDevices() async {
-    savedDevices = await Preferences().getDevices();
   }
 
   @override
   void dispose() {
     print("$runtimeType dispose()");
-    scanner.dispose();
+    //scanner.dispose();
     super.dispose();
   }
 
@@ -121,20 +114,22 @@ class DeviceListRouteState extends State<DeviceListRoute> {
   }
 
   Widget _list() {
-    return StreamBuilder<ScanResult>(
-      stream: scanner.resultStream,
-      //initialData: availableDevices,
-      builder: (BuildContext context, AsyncSnapshot<ScanResult> snapshot) {
-        // TODO don't rebuild the whole list, just the changed items
+    var devices = DeviceList().devices;
+    return StreamBuilder<Map<String, Device>>(
+      stream: DeviceList().stream,
+      initialData: devices,
+      builder: (BuildContext context, AsyncSnapshot<Map<String, Device>> snapshot) {
         print("$runtimeType _list() rebuilding");
         List<Widget> items = [];
-        if (scanner.devices.length < 1) items.add(Center(child: Text("No devices found")));
-        scanner.devices.forEach(
-          (identifier, device) {
-            //print("$runtimeType _list() adding ${device.runtimeType} ${device.name} ${snapshot.data?.rssi}");
-            items.add(_availableListItem(device));
-          },
-        );
+        if (devices.length < 1)
+          items.add(Center(child: Text("No devices")));
+        else
+          devices.forEach(
+            (identifier, device) {
+              //print("$runtimeType _list() adding ${device.runtimeType} ${device.name} ${device.lastScanRssi}");
+              items.add(_listItem(device));
+            },
+          );
         return RefreshIndicator(
           key: _key,
           onRefresh: () {
@@ -150,77 +145,10 @@ class DeviceListRouteState extends State<DeviceListRoute> {
     );
   }
 
-/*
-  Widget _scanResultListItem(ScanResult result) {
-    void openDevice() async {
-      //await Navigator.push(context,
-      //    MaterialPageRoute(builder: (context) => DeviceRoute(device)));
-
-      var device = Device.fromScanResult(result);
-
-      Navigator.push(
-        context,
-        PageTransition(
-          type: PageTransitionType.rightToLeft,
-          child: DeviceRoute(device),
-        ),
-      );
-      print("[_deviceListItem] openDevice(): stopScan() and connect()");
-      //Some phones have an issue with connecting while scanning
-      await scanner.stopScan();
-      device.connect();
-    }
-
-    return InkWell(
-      onTap: openDevice,
-      child: Container(
-        padding: EdgeInsets.all(10),
-        margin: EdgeInsets.fromLTRB(0, 0, 0, 6),
-        decoration: BoxDecoration(
-          color: Colors.black38,
-          borderRadius: BorderRadius.all(
-            Radius.circular(10),
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ValueListenableBuilder<List<String>>(
-                    valueListenable: savedDeviceNames,
-                    builder: (_, devices, __) {
-                      dev.log('$runtimeType devicesNotifier fired');
-                      return Text(
-                        (devices.any((item) => item.endsWith(result.peripheral.identifier)) ? 'AC ' : '   ') +
-                            (result.advertisementData.localName ?? "Unnamed device"),
-                        style: TextStyle(fontSize: 18),
-                      );
-                    },
-                  ),
-                  Text(
-                    "rssi: " + result.rssi.toString(),
-                    style: TextStyle(fontSize: 10),
-                  ),
-                ],
-              ),
-            ),
-            ElevatedButton(
-              onPressed: openDevice,
-              child: Icon(Icons.arrow_forward),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-*/
-
-  Widget _availableListItem(Device device) {
-    void openDevice() async {
+  Widget _listItem(Device device) {
+    void openDevice() {
       if (scanner.scanning) scanner.stopScan();
-      device.connect();
+      if (PeripheralConnectionState.connected != device.lastConnectionState) device.connect();
       Navigator.push(
         context,
         PageTransition(

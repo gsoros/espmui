@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:developer' as dev;
 
-import 'package:espmui/ble_constants.dart';
-import 'package:espmui/preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
+import 'ble_constants.dart';
 import 'ble.dart';
 import 'ble_characteristic.dart';
+import 'preferences.dart';
 import 'espm_api.dart';
 import 'util.dart';
 
@@ -20,8 +20,8 @@ Device: Battery
   └─ TODO SpeedSensor: Speed
 */
 
-class Device {
-  Peripheral peripheral;
+class Device with DebugHelper {
+  Peripheral? peripheral;
 
   /// whether the device should be kept connected
   final autoConnect = ValueNotifier<bool>(false);
@@ -32,43 +32,41 @@ class Device {
   /// Signal strength in dBm at the time of the last scan
   int lastScanRssi = 0;
 
-  /// helper
-  late final String tag;
-
-  String? get name => peripheral.name;
-  set name(String? name) => peripheral.name = name;
-  String get identifier => peripheral.identifier;
+  String? get name => peripheral?.name;
+  set name(String? name) => peripheral?.name = name;
+  String get identifier => peripheral?.identifier ?? "";
   BatteryCharacteristic? get battery => characteristic("battery") as BatteryCharacteristic?;
 
-  Future<bool> get connected => peripheral.isConnected().catchError((e) {
-        bleError(tag, "could not get connection state", e);
-      });
+  Future<bool> get connected async {
+    if (null == peripheral) return false;
+    return await peripheral!.isConnected().catchError((e) {
+      bleError(debugTag, "could not get connection state", e);
+    });
+  }
 
   bool _subscribed = false;
   bool _discovered = false;
 
-  /// Connection state stream controller
+  // Connection state
+  PeripheralConnectionState lastConnectionState = PeripheralConnectionState.disconnected;
   final _stateController = StreamController<PeripheralConnectionState>.broadcast();
-
-  /// Connection state stream
   Stream<PeripheralConnectionState> get stateStream => _stateController.stream;
-
-  /// Connection state subscription
   StreamSubscription<PeripheralConnectionState>? _stateSubscription;
 
+  /// Streams which can be selected on the tiles
+  List<TileStream> tileStreams = [];
+
   Device(this.peripheral) {
-    tag = runtimeType.toString();
-    _characteristics.addAll({
-      'battery': CharacteristicListItem(BatteryCharacteristic(peripheral)),
-    });
+    dev.log("$debugTag construct");
+    if (null != peripheral)
+      _characteristics.addAll({
+        'battery': CharacteristicListItem(BatteryCharacteristic(peripheral!)),
+      });
     init();
   }
 
   static Device fromScanResult(ScanResult scanResult) {
     var uuids = scanResult.advertisementData.serviceUuids ?? [];
-    scanResult.peripheral.discoverAllServicesAndCharacteristics().catchError((e) {
-      bleError("[Device.fromScanResult]", "discovery error: $e");
-    });
     if (0 == uuids.length) {
       dev.log('[Device] fromScanResult: no serviceUuids in scanResult.advertisementData');
       return Device(scanResult.peripheral);
@@ -100,6 +98,7 @@ class Device {
     else
       return null;
     device.name = chunks[1];
+    dev.log("Device.fromSaved($savedDevice): $device");
     return device;
   }
 
@@ -107,8 +106,8 @@ class Device {
     autoConnect.value = await isSaved();
     final connectedState = PeripheralConnectionState.connected;
     final disconnectedState = PeripheralConnectionState.disconnected;
-    if (_stateSubscription == null) {
-      _stateSubscription = peripheral
+    if (_stateSubscription == null && peripheral != null) {
+      _stateSubscription = peripheral!
           .observeConnectionState(
         emitCurrentValue: true,
         completeOnDisconnect: false,
@@ -116,12 +115,13 @@ class Device {
           .listen(
         (state) async {
           print("$runtimeType new connection state: $state");
+          lastConnectionState = state;
           if (state == connectedState)
             await _onConnected();
           else if (state == disconnectedState) await _onDisconnected();
           streamSendIfNotClosed(_stateController, state);
         },
-        onError: (e) => bleError(tag, "connectionStateSubscription", e),
+        onError: (e) => bleError(debugTag, "connectionStateSubscription", e),
       );
     }
   }
@@ -165,27 +165,21 @@ class Device {
   }
 
   Future<void> _onConnected() async {
-    print("$runtimeType _onConnected()");
-    // api char can use values longer than 20 bytes
-    peripheral.requestMtu(512).catchError((e) {
-      bleError(tag, "requestMtu()", e);
-      return 0;
-    }).then((mtu) async {
-      print("$runtimeType got MTU=$mtu");
-      await discoverCharacteristics();
-      await _subscribeCharacteristics();
-    });
+    await discoverCharacteristics();
+    await _subscribeCharacteristics();
   }
 
   Future<void> _onDisconnected() async {
-    print("$runtimeType _onDisconnected()");
+    //print("$debugTag _onDisconnected()");
     await _unsubscribeCharacteristics();
     _deinitCharacteristics();
     //streamSendIfNotClosed(stateController, newState);
-    if (autoConnect.value) {
-      await Future.delayed(Duration(milliseconds: 1000)).then((_) async {
-        print("$runtimeType Autoconnect calling connect()");
-        await connect();
+    if (autoConnect.value && !await connected) {
+      await Future.delayed(Duration(seconds: 15)).then((_) async {
+        if (autoConnect.value && !await connected) {
+          print("$debugTag Autoconnect calling connect()");
+          await connect();
+        }
       });
     }
   }
@@ -197,29 +191,34 @@ class Device {
     if (await connected) {
       print("$runtimeType Not connecting to $name, already connected");
       streamSendIfNotClosed(_stateController, connectedState);
-      await discoverCharacteristics();
-      await _subscribeCharacteristics();
+      //await discoverCharacteristics();
+      //await _subscribeCharacteristics();
       //_requestInit();
+      return;
     }
     if (await BLE().currentState() != BluetoothState.POWERED_ON) {
-      print("$runtimeType connect() Adapter is off, not connecting");
+      print("$debugTag connect() Adapter is off, not connecting");
+    } else if (null == peripheral) {
+      print("$debugTag peripheral is null)");
     } else {
-      print("$runtimeType Connecting to $name");
-      await peripheral
+      print("$debugTag Connecting to $name(${peripheral!.identifier})");
+      await peripheral!
           .connect(
-        isAutoConnect: false,
+        isAutoConnect: true,
         refreshGatt: true,
+        timeout: Duration(seconds: 10),
       )
           .catchError(
         (e) async {
-          bleError(tag, "peripheral.connect()", e);
+          bleError(debugTag, "peripheral.connect()", e);
           if (e is BleError) {
             BleError be = e;
             if (be.errorCode.value == BleErrorCode.deviceAlreadyConnected) {
-              //await disconnect();
-              //await Future.delayed(Duration(milliseconds: 3000));
-              //connect();
-              streamSendIfNotClosed(_stateController, connectedState);
+              await disconnect();
+              await Future.delayed(Duration(milliseconds: 3000));
+              connect();
+              //dev.log("$runtimeType $name already connected, sending message to stateController");
+              //streamSendIfNotClosed(_stateController, connectedState);
             }
           }
         },
@@ -228,13 +227,26 @@ class Device {
   }
 
   Future<void> discoverCharacteristics() async {
-    print("$runtimeType discoverCharacteristics() start conn=${await connected}");
+    String subject = "$debugTag discoverCharacteristics()";
+    //print("$subject conn=${await connected}");
     if (!await connected) return;
-    print("$runtimeType discoverCharacteristics()");
-    await peripheral.discoverAllServicesAndCharacteristics().catchError((e) {
-      bleError(tag, "discoverCharacteristics()", e);
+    if (null == peripheral) return;
+    //print("$subject discoverAllServicesAndCharacteristics() start");
+    await peripheral!.discoverAllServicesAndCharacteristics().catchError((e) {
+      bleError(debugTag, "discoverAllServicesAndCharacteristics()", e);
     });
-    print("$runtimeType discoverCharacteristics() end conn=${await connected}");
+    //print("$subject discoverAllServicesAndCharacteristics() end");
+    //print("$subject services() start");
+    var services = await peripheral!.services().catchError((e) {
+      bleError(debugTag, "services()", e);
+      return <Service>[];
+    });
+    //print("$subject services() end");
+    var serviceUuids = <String>[];
+    services.forEach((s) {
+      serviceUuids.add(s.uuid);
+    });
+    print("$subject end services: $serviceUuids");
     _discovered = true;
   }
 
@@ -269,13 +281,14 @@ class Device {
 
   Future<void> disconnect() async {
     print("$runtimeType disconnect() $name");
-    if (!await peripheral.isConnected()) {
-      //bleError(tag, "disconnect(): not connected, but proceeding anyway");
-      return;
+    if (null == peripheral) return;
+    if (!await peripheral!.isConnected()) {
+      dev.log("$debugTag disconnect(): not connected, but proceeding anyway");
+      //return;
     }
-    await _unsubscribeCharacteristics();
-    await peripheral.disconnectOrCancelConnection().catchError((e) {
-      bleError(tag, "peripheral.disconnectOrCancelConnection()", e);
+    //await _unsubscribeCharacteristics();
+    await peripheral!.disconnectOrCancelConnection().catchError((e) {
+      bleError(debugTag, "peripheral.disconnectOrCancelConnection()", e);
       if (e is BleError) {
         BleError be = e;
         // 205
@@ -294,25 +307,42 @@ class Device {
 
   void setAutoConnect(bool value) async {
     autoConnect.value = value;
-    updatePreferences();
+    await updatePreferences();
+    // resend last connection state to trigger connect button update
+    streamSendIfNotClosed(_stateController, lastConnectionState);
+    if (value && !(await connected)) connect();
   }
 
-  void updatePreferences() async {
+  Future<void> updatePreferences() async {
+    if (null == peripheral) return;
     List<String> devices = (await Preferences().getDevices()).value;
     dev.log('$runtimeType updatePreferences savedDevices before: $devices');
-    String item = runtimeType.toString() + ';' + (name?.replaceAll(RegExp(r';'), '') ?? '') + ';' + peripheral.identifier;
+    String item = runtimeType.toString() + ';' + (name?.replaceAll(RegExp(r';'), '') ?? '') + ';' + peripheral!.identifier;
     dev.log('$runtimeType updatePreferences item: $item');
     if (autoConnect.value)
       devices.add(item);
     else
-      devices.removeWhere((item) => item.endsWith(peripheral.identifier));
+      devices.removeWhere((item) => item.endsWith(peripheral!.identifier));
     Preferences().setDevices(devices);
     dev.log('$runtimeType updatePreferences savedDevices after: $devices');
   }
 
   Future<bool> isSaved() async {
+    if (null == peripheral) return false;
     var devices = (await Preferences().getDevices()).value;
-    return devices.any((item) => item.endsWith(peripheral.identifier));
+    return devices.any((item) => item.endsWith(peripheral!.identifier));
+  }
+
+  Future<Type> _correctType() async {
+    return runtimeType;
+  }
+
+  Future<bool> isCorrectType() async {
+    return runtimeType == await _correctType();
+  }
+
+  Future<Device> copyToCorrectType() async {
+    return this;
   }
 }
 
@@ -323,6 +353,37 @@ class PowerMeter extends Device {
     _characteristics.addAll({
       'power': CharacteristicListItem(PowerCharacteristic(peripheral)),
     });
+  }
+
+  /// Hack: the 128-bit api service uuid is sometimes not detected from the
+  /// advertisement packet, only after discovery
+  Future<Type> _correctType() async {
+    Type t = runtimeType;
+    dev.log("$debugTag _correctType peripheral: $peripheral");
+    if (null == peripheral || !await discovered()) return t;
+    dev.log("$debugTag _correctType 2");
+    (await peripheral!.services()).forEach((s) {
+      if (s.uuid == BleConstants.ESPM_API_SERVICE_UUID) {
+        dev.log("$debugTag _correctType() ESPM detected");
+        t = ESPM;
+        return;
+      }
+    });
+    return t;
+  }
+
+  Future<Device> copyToCorrectType() async {
+    if (null == peripheral) return this;
+    Type t = await _correctType();
+    dev.log("$debugTag copyToCorrectType $t");
+    Device device = this;
+    if (ESPM == t) {
+      device = ESPM(peripheral!);
+      device.name = name;
+      device.autoConnect.value = autoConnect.value;
+    } else
+      return this;
+    return device;
   }
 }
 
@@ -511,7 +572,10 @@ class ESPM extends PowerMeter {
   }
 
   Future<void> _onConnected() async {
-    print("$runtimeType _onConnected()");
+    print("$debugTag _onConnected()");
+    if (null == peripheral) return;
+    // api char can use values longer than 20 bytes
+    await BLE().requestMtu(peripheral!, 512);
     await super._onConnected();
     _requestInit();
   }
@@ -570,6 +634,14 @@ class ESPM extends PowerMeter {
     wifiSettings.value = ESPMWifiSettings();
     deviceSettings.value = ESPMSettings();
   }
+
+  Future<Type> _correctType() async {
+    return ESPM;
+  }
+
+  Future<Device> copyToCorrectType() async {
+    return this;
+  }
 }
 
 class HeartRateMonitor extends Device {
@@ -579,95 +651,12 @@ class HeartRateMonitor extends Device {
     _characteristics.addAll({
       'heartRate': CharacteristicListItem(HeartRateCharacteristic(peripheral)),
     });
+    tileStreams.add(TileStream(
+      "heartRate",
+      "Heart Rate",
+      heartRate?.stream.map<String>((value) => "$value"),
+    ));
   }
-}
-
-/// Singleton class
-class DeviceList {
-  static final DeviceList _instance = DeviceList._construct();
-  Map<String, Device> _items = {};
-
-  /// returns a singleton
-  factory DeviceList() {
-    return _instance;
-  }
-
-  DeviceList._construct() {
-    dev.log('$runtimeType _construct()');
-    _loadSaved();
-  }
-
-  Future<void> _loadSaved() async {
-    (await Preferences().getDevices()).value.forEach((str) {
-      var device = Device.fromSaved(str);
-      if (null != device) addOrUpdate(device);
-    });
-  }
-
-  bool containsIdentifier(String identifier) {
-    return _items.containsKey(identifier);
-  }
-
-  /// Adds or updates an item
-  ///
-  /// If an item with the same identifier already exists, updates the item disposing of the old one,
-  /// otherwise adds new item.
-  /// Returns the new or updated [Device] or null on error.
-  Device? addOrUpdate(Device device) {
-    _items.update(
-      device.peripheral.identifier,
-      (existing) {
-        dev.log("$runtimeType addOrUpdate Warning: updating ${device.peripheral.name}, calling dispose() on old device");
-        existing.dispose();
-        existing = device;
-        return existing;
-      },
-      ifAbsent: () {
-        print("$runtimeType addOrUpdate adding ${device.peripheral.name}");
-        return device;
-      },
-    );
-    return _items[device.peripheral.identifier];
-  }
-
-  /// Adds a [Device] from a [ScanResult]
-  ///
-  /// If a [Device] with the same identifier already exists, updates [lastScanRssi]
-  /// and returns the existing item, otherwise adds new item.
-  /// Returns the new or updated [Device] or null on error.
-  Device? addFromScanResult(ScanResult result) {
-    _items.update(
-      result.peripheral.identifier,
-      (existing) {
-        //print("$runtimeType addFromScanResult already exists: ${existing.peripheral.name}");
-        existing.lastScanRssi = result.rssi;
-        //var device = Device.fromScanResult(result);
-        //if (existing.runtimeType != device.runtimeType) dev.log("$runtimeType type mismatch: existing: ${existing.runtimeType} new: ${existing.runtimeType}");
-        return existing;
-      },
-      ifAbsent: () {
-        Device device = Device.fromScanResult(result);
-        print("$runtimeType addFromScanResult adding ${device.peripheral.name}");
-        return device;
-      },
-    );
-    return _items[result.peripheral.identifier];
-  }
-
-  Device? byIdentifier(String identifier) {
-    if (containsIdentifier(identifier)) return _items[identifier];
-    return null;
-  }
-
-  Future<void> dispose() async {
-    print("$runtimeType dispose");
-    _items.forEach((_, device) => device.dispose());
-    _items.clear();
-  }
-
-  int get length => _items.length;
-  bool get isEmpty => _items.isEmpty;
-  void forEach(void Function(String, Device) f) => _items.forEach(f);
 }
 
 class ESPMSettings {
@@ -777,4 +766,12 @@ class ESPMWifiSettings {
         "staSSID: $staSSID, "
         "staPassword: $staPassword)";
   }
+}
+
+class TileStream {
+  String name;
+  String label;
+  Stream<String>? stream;
+
+  TileStream(this.name, this.label, this.stream);
 }

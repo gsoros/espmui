@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:developer' as dev;
+//import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 
@@ -23,7 +23,7 @@ class AlwaysNotifier<T> extends ValueNotifier<T> {
 
   @override
   set value(T newValue) {
-    dev.log('AlwaysNotifier set value');
+    //dev.log('AlwaysNotifier set value: $newValue');
     if (super.value == value) notifyListeners();
     super.value = newValue;
   }
@@ -97,4 +97,8 @@ class DebugBorder extends StatelessWidget {
       child: child,
     );
   }
+}
+
+class DebugHelper {
+  String get debugTag => "[$runtimeType(${identityHashCode(this)})]";
 }
