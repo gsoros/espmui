@@ -65,6 +65,7 @@ class Tile extends StatelessWidget {
           colSpan: colSpan ?? other.colSpan,
           height: height ?? other.height,
           value: value ?? other.value,
+          background: background ?? other.background,
           sourceDevice: sourceDevice ?? other.sourceDevice,
           sourceStream: sourceStream ?? other.sourceStream,
         );
@@ -78,6 +79,8 @@ class Tile extends StatelessWidget {
     int? height,
     Widget? value,
     Widget? background,
+    String? sourceDevice,
+    String? sourceStream,
   ) {
     return Tile.from(
       this,
@@ -89,6 +92,8 @@ class Tile extends StatelessWidget {
       height: height ?? this.height,
       value: value ?? this.value,
       background: background ?? this.background,
+      sourceDevice: sourceDevice ?? this.sourceDevice,
+      sourceStream: sourceStream ?? this.sourceStream,
     );
   }
 
@@ -98,8 +103,8 @@ class Tile extends StatelessWidget {
         textColor = Color(json['textColor']),
         colSpan = json['colSpan'] ?? 3,
         height = json['height'] ?? 3,
-        background = Graph(),
         value = Text('Loading...'),
+        background = Graph(),
         sourceDevice = json['sourceDevice'] ?? "",
         sourceStream = json['sourceStream'] ?? "";
 
@@ -225,7 +230,7 @@ class Graph extends StatelessWidget {
 }
 
 /// Singleton class
-class TileList {
+class TileList with DebugHelper {
   static final TileList _instance = TileList._construct();
   var notifier = AlwaysNotifier<List<Tile>>([]);
   List<Tile> get tiles => notifier.value;
@@ -235,6 +240,30 @@ class TileList {
   }
 
   Tile operator [](int i) => tiles[i];
+  operator []=(int i, Tile tile) {
+    tiles[i] = tile;
+    notifier.notifyListeners();
+  }
+
+  void clear() {
+    tiles.clear();
+    notifier.notifyListeners();
+  }
+
+  void add(Tile tile) {
+    tiles.add(tile);
+    notifier.notifyListeners();
+  }
+
+  void removeWhere(bool Function(Tile) test) {
+    tiles.removeWhere(test);
+    notifier.notifyListeners();
+  }
+
+  void insert(int index, Tile tile) {
+    tiles.insert(index, tile);
+    notifier.notifyListeners();
+  }
 
   Timer? _saveTimer;
 
@@ -249,7 +278,10 @@ class TileList {
   }
 
   Future<void> load() async {
+    dev.log("$debugTag load() start");
     _fromJsonStringList((await Preferences().getTiles()).value);
+    dev.log("$debugTag load() end");
+    notifier.notifyListeners();
   }
 
   void save([bool delayed = true]) async {

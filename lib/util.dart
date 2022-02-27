@@ -18,7 +18,7 @@ ExtendedBool extendedBoolFrom(bool value) => value ? ExtendedBool.True : Extende
 /// with something that is equal to the old value as evaluated by the equality operator ==.
 ///
 /// After modifying a value indirectly (e.g. "alwaysNotifier.value.x = y;"), call [notifyListeners()].
-class AlwaysNotifier<T> extends ValueNotifier<T> {
+class AlwaysNotifier<T> extends ValueNotifier<T> with DebugHelper {
   AlwaysNotifier(T value) : super(value);
 
   @override
@@ -31,6 +31,7 @@ class AlwaysNotifier<T> extends ValueNotifier<T> {
   @override
   void notifyListeners() {
     super.notifyListeners();
+    //print("$debugTag notifyListeners");
   }
 }
 
@@ -44,6 +45,7 @@ void streamSendIfNotClosed(StreamController stream, dynamic value) {
     print("[streamSendIfNotClosed] Stream ${stream.toString()} is closed");
     return;
   }
+  //print("[streamSendIfNotClosed] Stream ${stream.toString()} sending value: $value");
   stream.sink.add(value);
 }
 

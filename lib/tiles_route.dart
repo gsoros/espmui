@@ -7,13 +7,13 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:page_transition/page_transition.dart';
-//import 'package:flutter_circle_color_picker/flutter_circle_color_picker.dart';
+import 'package:flutter_circle_color_picker/flutter_circle_color_picker.dart';
 
 //import 'preferences.dart';
 import 'device_list.dart';
 import 'device_list_route.dart';
 import 'tile.dart';
-import 'tile_route.dart';
+//import 'tile_route.dart';
 
 class TilesRoute extends StatefulWidget {
   const TilesRoute({Key? key}) : super(key: key);
@@ -161,6 +161,9 @@ class TileGrid extends StatefulWidget {
 class _TileGridState extends State<TileGrid> {
   late TileList _tiles;
   double dialogOpacity = 1;
+  bool colorPicker = false;
+  void Function(Color)? colorPickerCallback;
+  Color? colorPickerInitialColor;
 
   _TileGridState() {
     _tiles = TileList();
@@ -174,25 +177,157 @@ class _TileGridState extends State<TileGrid> {
 
   void _randomize() {
     dev.log('$runtimeType _randomize');
-    _tiles.tiles.clear();
-    for (var i = 0; i < 5; i++) {
-      Tile tile = Tile.random();
-      _tiles.tiles.add(tile);
-    }
+    _tiles.clear();
+    for (var i = 0; i < 5; i++) _tiles.add(Tile.random());
   }
 
   void _moveTile(Tile tile, int index) {
     dev.log('$runtimeType reorder tile:${tile.name} newIndex:$index');
     setState(() {
-      _tiles.tiles.removeWhere((existing) => existing.hashCode == tile.hashCode);
-      _tiles.tiles.insert(index, tile);
+      _tiles.removeWhere((existing) => existing.hashCode == tile.hashCode);
+      _tiles.insert(index, tile);
     });
-    //_savePreferences();
   }
 
   @override
   Widget build(BuildContext context) {
-    var sizeUnit = MediaQuery.of(context).size.width / 10;
+    double sizeUnit = MediaQuery.of(context).size.width / 10;
+    Widget Function(int) tileSizeAndColor = (index) {
+      return StatefulBuilder(
+        builder: (context, setChildState) {
+          void Function(void Function() f) setStates = (f) {
+            setState(() {
+              setChildState(() {
+                f();
+              });
+            });
+          };
+          if (colorPicker && colorPickerInitialColor != null && colorPickerCallback != null) {
+            var colorPickerController = CircleColorPickerController(initialColor: colorPickerInitialColor!);
+            return CircleColorPicker(
+              controller: colorPickerController,
+              textStyle: TextStyle(color: Colors.transparent),
+              onChanged: (color) {
+                dev.log("colorpicker $color");
+                colorPickerController.color = color;
+                setStates(() {
+                  colorPickerCallback!(color);
+                });
+              },
+              onEnded: (color) {
+                setStates(() {
+                  colorPicker = false;
+                });
+              },
+            );
+          }
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Column(
+                children: [
+                  Slider(
+                    value: _tiles[index].colSpan.toDouble(),
+                    min: 2,
+                    max: 10,
+                    divisions: 8,
+                    onChangeStart: (_) {
+                      setChildState(() {
+                        dialogOpacity = .5;
+                      });
+                    },
+                    onChangeEnd: (_) {
+                      setChildState(() {
+                        dialogOpacity = 1;
+                      });
+                      _tiles.save();
+                    },
+                    onChanged: (value) {
+                      dev.log("colspan changed");
+                      setStates(() {
+                        _tiles[index] = Tile.from(
+                          _tiles[index],
+                          colSpan: value.round(),
+                        );
+                      });
+                    },
+                  ),
+                  Row(
+                    children: [
+                      RotatedBox(
+                        quarterTurns: 1,
+                        child: Slider(
+                          value: _tiles[index].height.toDouble(),
+                          min: 2,
+                          max: 6,
+                          divisions: 4,
+                          onChangeStart: (_) {
+                            setChildState(() {
+                              dialogOpacity = .5;
+                            });
+                          },
+                          onChangeEnd: (_) {
+                            setChildState(() {
+                              dialogOpacity = 1;
+                            });
+                            _tiles.save();
+                          },
+                          onChanged: (value) {
+                            dev.log("height changed");
+                            setStates(() {
+                              _tiles[index] = Tile.from(
+                                _tiles[index],
+                                height: value.round(),
+                              );
+                            });
+                          },
+                        ),
+                      ),
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Hero(
+                            tag: _tiles[index].hashCode,
+                            child: Opacity(
+                                opacity: dialogOpacity,
+                                child: GestureDetector(
+                                  child: _tiles[index],
+                                  onTap: () {
+                                    dev.log("colorpicker bg");
+                                    setStates(() {
+                                      colorPicker = true;
+                                      colorPickerInitialColor = _tiles[index].color;
+                                      colorPickerCallback = (color) {
+                                        _tiles[index] = Tile.from(_tiles[index], color: color);
+                                        _tiles.save();
+                                      };
+                                    });
+                                  },
+                                  onDoubleTap: () {
+                                    dev.log("colorpicker textColor");
+                                    setStates(() {
+                                      colorPicker = true;
+                                      colorPickerInitialColor = _tiles[index].textColor;
+                                      colorPickerCallback = (color) {
+                                        _tiles[index] = Tile.from(_tiles[index], textColor: color);
+                                        _tiles.save();
+                                      };
+                                    });
+                                  },
+                                )),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      );
+    };
+
     return ValueListenableBuilder<List<Tile>>(
         valueListenable: _tiles.notifier,
         builder: (context, tileList, widget) {
@@ -204,8 +339,8 @@ class _TileGridState extends State<TileGrid> {
             itemCount: _tiles.length,
             staggeredTileBuilder: (index) {
               return StaggeredTile.extent(
-                _tiles.tiles[index].colSpan,
-                _tiles.tiles[index].height * sizeUnit,
+                _tiles[index].colSpan,
+                _tiles[index].height * sizeUnit,
               );
               /*
             return StaggeredTile.fit(
@@ -221,7 +356,7 @@ class _TileGridState extends State<TileGrid> {
                 },
                 onWillAccept: (tile) {
                   if (tile == null) return false;
-                  if (_tiles.tiles[index] == tile) return false;
+                  if (_tiles[index] == tile) return false;
                   dev.log("onWillAccept $index ${tile.name} ${_tiles[index].name}");
                   _moveTile(tile, index);
                   return true;
@@ -235,177 +370,41 @@ class _TileGridState extends State<TileGrid> {
                   List<dynamic> rejected,
                 ) {
                   return LongPressDraggable<Tile>(
-                    data: _tiles.tiles[index],
+                    data: _tiles[index],
                     feedback: Opacity(child: Material(color: Colors.transparent, child: _tiles[index]), opacity: .5),
                     child: Hero(
                       placeholderBuilder: (_, __, child) => child,
-                      tag: _tiles.tiles[index].hashCode,
+                      tag: _tiles[index].hashCode,
                       child: Material(
                         child: InkWell(
-                          child: _tiles.tiles[index],
+                          child: _tiles[index],
                           onTap: () => print("tile ${_tiles[index].name} tap"),
                           onDoubleTap: () {
                             print("tile ${_tiles[index].name} doubleTap");
-                            /*
-                          Navigator.push(
-                            context,
-                            HeroDialogRoute(
-                              builder: (context) {
-                                return WillPopScope(
-                                  onWillPop: () async {
-                                    setState(() {
-                                      colorPicker = false;
-                                    });
-                                    return true;
-                                  },
-                                  child: Center(
-                                    child: Dialog(
-                                      backgroundColor: Colors.black38,
-                                      child: StatefulBuilder(
-                                        builder: (context, setDialogState) {
-                                          if (colorPicker && colorPickerInitialColor != null && colorPickerCallback != null) {
-                                            var colorPickerController = CircleColorPickerController(initialColor: colorPickerInitialColor!);
-                                            return CircleColorPicker(
-                                              controller: colorPickerController,
-                                              textStyle: TextStyle(color: Colors.transparent),
-                                              onChanged: (color) {
-                                                dev.log("colorpicker $color");
-                                                colorPickerController.color = color;
-                                                setState(() {
-                                                  setDialogState(() {
-                                                    colorPickerCallback!(color);
-                                                  });
-                                                });
-                                              },
-                                              onEnded: (color) {
-                                                setState(() {
-                                                  setDialogState(() {
-                                                    colorPicker = false;
-                                                  });
-                                                });
-                                              },
-                                            );
-                                          }
-                                          return Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Column(
-                                                children: [
-                                                  Slider(
-                                                    value: _tiles[index].colSpan.toDouble(),
-                                                    min: 2,
-                                                    max: 10,
-                                                    divisions: 8,
-                                                    onChangeStart: (_) {
-                                                      setDialogState(() {
-                                                        dialogOpacity = .5;
-                                                      });
-                                                    },
-                                                    onChangeEnd: (_) {
-                                                      setDialogState(() {
-                                                        dialogOpacity = 1;
-                                                      });
-                                                      _saveToPreferences();
-                                                    },
-                                                    onChanged: (value) {
-                                                      dev.log("colspan changed");
-                                                      setState(() {
-                                                        setDialogState(() {
-                                                          _tiles[index] = Tile.from(
-                                                            _tiles[index],
-                                                            colSpan: value.round(),
-                                                          );
-                                                        });
-                                                      });
-                                                    },
-                                                  ),
-                                                  Row(
-                                                    children: [
-                                                      RotatedBox(
-                                                        quarterTurns: 1,
-                                                        child: Slider(
-                                                          value: _tiles[index].height.toDouble(),
-                                                          min: 2,
-                                                          max: 6,
-                                                          divisions: 4,
-                                                          onChangeStart: (_) {
-                                                            setDialogState(() {
-                                                              dialogOpacity = .5;
-                                                            });
-                                                          },
-                                                          onChangeEnd: (_) {
-                                                            setDialogState(() {
-                                                              dialogOpacity = 1;
-                                                            });
-                                                            _saveToPreferences();
-                                                          },
-                                                          onChanged: (value) {
-                                                            dev.log("height changed");
-                                                            setState(() {
-                                                              setDialogState(() {
-                                                                _tiles[index] = Tile.from(
-                                                                  _tiles[index],
-                                                                  height: value.round(),
-                                                                );
-                                                              });
-                                                            });
-                                                          },
-                                                        ),
-                                                      ),
-                                                      Expanded(
-                                                        child: FittedBox(
-                                                          fit: BoxFit.scaleDown,
-                                                          child: Hero(
-                                                            tag: _tiles[index].hashCode,
-                                                            child: Opacity(
-                                                                opacity: dialogOpacity,
-                                                                child: GestureDetector(
-                                                                  child: _tiles[index],
-                                                                  onTap: () {
-                                                                    dev.log("colorpicker bg");
-                                                                    setState(() {
-                                                                      setDialogState(() {
-                                                                        colorPicker = true;
-                                                                        colorPickerInitialColor = _tiles[index].color;
-                                                                        colorPickerCallback = (color) {
-                                                                          _tiles[index] = Tile.from(_tiles[index], color: color);
-                                                                          _saveToPreferences();
-                                                                        };
-                                                                      });
-                                                                    });
-                                                                  },
-                                                                  onDoubleTap: () {
-                                                                    dev.log("colorpicker textColor");
-                                                                    setState(() {
-                                                                      setDialogState(() {
-                                                                        colorPicker = true;
-                                                                        colorPickerInitialColor = _tiles[index].textColor;
-                                                                        colorPickerCallback = (color) {
-                                                                          _tiles[index] = Tile.from(_tiles[index], textColor: color);
-                                                                          _saveToPreferences();
-                                                                        };
-                                                                      });
-                                                                    });
-                                                                  },
-                                                                )),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          );
-                                        },
+
+                            Navigator.push(
+                              context,
+                              HeroDialogRoute(
+                                builder: (context) {
+                                  return WillPopScope(
+                                    onWillPop: () async {
+                                      setState(() {
+                                        colorPicker = false;
+                                      });
+                                      return true;
+                                    },
+                                    child: Center(
+                                      child: Dialog(
+                                        backgroundColor: Colors.black87,
+                                        child: tileSizeAndColor(index),
                                       ),
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                          */
+                                  );
+                                },
+                              ),
+                            );
+
+                            /*
                             Navigator.push(
                               context,
                               PageTransition(
@@ -413,6 +412,7 @@ class _TileGridState extends State<TileGrid> {
                                 child: TileRoute(index: index, json: _tiles[index].toJson()),
                               ),
                             );
+                            */
                           },
                         ),
                       ),

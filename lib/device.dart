@@ -46,12 +46,14 @@ class Device with DebugHelper {
 
   bool _subscribed = false;
   bool _discovered = false;
+  bool _connectionInitiated = false;
 
   // Connection state
   PeripheralConnectionState lastConnectionState = PeripheralConnectionState.disconnected;
   final _stateController = StreamController<PeripheralConnectionState>.broadcast();
   Stream<PeripheralConnectionState> get stateStream => _stateController.stream;
   StreamSubscription<PeripheralConnectionState>? _stateSubscription;
+  StreamSubscription<PeripheralConnectionState>? _stateChangeSubscription;
 
   /// Streams which can be selected on the tiles
   List<TileStream> tileStreams = [];
@@ -116,14 +118,25 @@ class Device with DebugHelper {
         (state) async {
           print("$runtimeType new connection state: $state");
           lastConnectionState = state;
+          /*
           if (state == connectedState)
             await _onConnected();
           else if (state == disconnectedState) await _onDisconnected();
+          */
           streamSendIfNotClosed(_stateController, state);
         },
-        onError: (e) => bleError(debugTag, "connectionStateSubscription", e),
+        onError: (e) => bleError(debugTag, "_stateSubscription", e),
       );
     }
+    if (_stateChangeSubscription == null)
+      _stateChangeSubscription = stateStream.listen(
+        (state) async {
+          if (state == connectedState)
+            await _onConnected();
+          else if (state == disconnectedState) await _onDisconnected();
+        },
+        onError: (e) => bleError(debugTag, "_stateChangeSubscription", e),
+      );
   }
 
   Future<void> dispose() async {
@@ -136,6 +149,8 @@ class Device with DebugHelper {
     });
     await _stateSubscription?.cancel();
     _stateSubscription = null;
+    await _stateChangeSubscription?.cancel();
+    _stateChangeSubscription = null;
   }
 
   Future<bool> ready() async {
@@ -170,7 +185,7 @@ class Device with DebugHelper {
   }
 
   Future<void> _onDisconnected() async {
-    //print("$debugTag _onDisconnected()");
+    print("$debugTag _onDisconnected()");
     await _unsubscribeCharacteristics();
     _deinitCharacteristics();
     //streamSendIfNotClosed(stateController, newState);
@@ -186,7 +201,7 @@ class Device with DebugHelper {
 
   Future<void> connect() async {
     final connectedState = PeripheralConnectionState.connected;
-    //final disconnectedState = PeripheralConnectionState.disconnected;
+    final disconnectedState = PeripheralConnectionState.disconnected;
 
     if (await connected) {
       print("$runtimeType Not connecting to $name, already connected");
@@ -198,32 +213,42 @@ class Device with DebugHelper {
     }
     if (await BLE().currentState() != BluetoothState.POWERED_ON) {
       print("$debugTag connect() Adapter is off, not connecting");
-    } else if (null == peripheral) {
-      print("$debugTag peripheral is null)");
-    } else {
-      print("$debugTag Connecting to $name(${peripheral!.identifier})");
-      await peripheral!
-          .connect(
-        isAutoConnect: true,
-        refreshGatt: true,
-        timeout: Duration(seconds: 10),
-      )
-          .catchError(
-        (e) async {
-          bleError(debugTag, "peripheral.connect()", e);
-          if (e is BleError) {
-            BleError be = e;
-            if (be.errorCode.value == BleErrorCode.deviceAlreadyConnected) {
-              await disconnect();
-              await Future.delayed(Duration(milliseconds: 3000));
-              connect();
-              //dev.log("$runtimeType $name already connected, sending message to stateController");
-              //streamSendIfNotClosed(_stateController, connectedState);
-            }
-          }
-        },
-      );
+      streamSendIfNotClosed(_stateController, disconnectedState);
+      return;
     }
+    if (null == peripheral) {
+      print("$debugTag connect() Peripheral is null)");
+      return;
+    }
+    if (_connectionInitiated) {
+      print("$debugTag connect() Connection already initiated");
+      return;
+    }
+    print("$debugTag connect() Connecting to $name(${peripheral!.identifier})");
+    _connectionInitiated = true;
+    await peripheral!
+        .connect(
+      isAutoConnect: true,
+      refreshGatt: true,
+      timeout: Duration(seconds: 10),
+    )
+        .catchError(
+      (e) async {
+        bleError(debugTag, "peripheral.connect()", e);
+        if (e is BleError) {
+          BleError be = e;
+          if (be.errorCode.value == BleErrorCode.deviceAlreadyConnected) {
+            await disconnect();
+            await Future.delayed(Duration(milliseconds: 3000));
+            connect();
+            //dev.log("$runtimeType $name already connected, sending message to stateController");
+            //streamSendIfNotClosed(_stateController, connectedState);
+          }
+        }
+      },
+    );
+    print("$debugTag peripheral.connect() returned");
+    _connectionInitiated = false;
   }
 
   Future<void> discoverCharacteristics() async {
