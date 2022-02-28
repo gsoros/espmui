@@ -93,7 +93,7 @@ class DeviceListRouteState extends State<DeviceListRoute> {
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
         String status = "";
         if (snapshot.hasData)
-          status = snapshot.data! ? "Scanning..." : scanner.devices.length.toString() + " device" + (scanner.devices.length == 1 ? "" : "s") + " found";
+          status = snapshot.data! ? "Scanning..." : scanner.devices.length.toString() + " device" + (scanner.devices.length == 1 ? "" : "s");
         return Text(
           status,
           style: TextStyle(fontSize: 10),
@@ -180,7 +180,7 @@ class DeviceListRouteState extends State<DeviceListRoute> {
                     style: TextStyle(fontSize: 18),
                   ),
                   Text(
-                    "rssi: ${device.lastScanRssi}",
+                    0 < device.lastScanRssi ? "rssi: ${device.lastScanRssi}" : " ",
                     style: TextStyle(fontSize: 10),
                   ),
                 ],

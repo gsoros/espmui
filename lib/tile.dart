@@ -19,6 +19,7 @@ class Tile extends StatelessWidget {
   final Widget background;
   final String device;
   final String stream;
+  final String tap;
 
   Tile({
     Key? key,
@@ -29,6 +30,7 @@ class Tile extends StatelessWidget {
     this.background = const Text(" "),
     this.device = "",
     this.stream = "",
+    this.tap = "",
   }) : super(key: key);
 
   Tile.random({Key? key})
@@ -52,6 +54,7 @@ class Tile extends StatelessWidget {
     Widget? background,
     String? device,
     String? stream,
+    String? tap,
   }) : this(
           key: key ?? other.key,
           color: color ?? other.color,
@@ -61,6 +64,7 @@ class Tile extends StatelessWidget {
           background: background ?? other.background,
           device: device ?? other.device,
           stream: stream ?? other.stream,
+          tap: tap ?? other.tap,
         );
 
   Tile copyWith(
@@ -72,6 +76,7 @@ class Tile extends StatelessWidget {
     Widget? background,
     String? device,
     String? stream,
+    String? tap,
   ) {
     return Tile.from(
       this,
@@ -83,6 +88,7 @@ class Tile extends StatelessWidget {
       background: background ?? this.background,
       device: device ?? this.device,
       stream: stream ?? this.stream,
+      tap: tap ?? this.tap,
     );
   }
 
@@ -91,17 +97,20 @@ class Tile extends StatelessWidget {
         textColor = Color(json['textColor']),
         width = json['colSpan'] ?? 3,
         height = json['height'] ?? 3,
-        background = Graph(),
+        background = Text(" "), //json['background'],
         device = json['device'] ?? "",
-        stream = json['stream'] ?? "";
+        stream = json['stream'] ?? "",
+        tap = json['tap'] ?? "";
 
   Map<String, dynamic> toJson() => {
         'color': color.value,
         'textColor': textColor.value,
         'colSpan': width,
         'height': height,
+        //'background': background.toJson(),
         'device': device,
         'stream': stream,
+        'tap': tap,
       };
 
   @override

@@ -58,6 +58,9 @@ class Device with DebugHelper {
   /// Streams which can be selected on the tiles
   Map<String, TileStream> tileStreams = {};
 
+  /// Actions which can be initiated by tapping on the tiles
+  Map<String, TileAction> tileActions = {};
+
   Device(this.peripheral) {
     dev.log("$debugTag construct");
     if (null != peripheral)
@@ -476,6 +479,15 @@ class ESPM extends PowerMeter {
         units: "kg",
       ),
     });
+    tileActions.addAll({
+      "tare": TileAction(
+        label: "Tare",
+        action: () async {
+          var resultCode = await api.requestResultCode("tare=0");
+          snackbar("Tare " + (resultCode == EspmApiResult.success.index ? "success" : "failed"));
+        },
+      ),
+    });
   }
 
   /// Processes "done" messages sent by the API
@@ -846,4 +858,18 @@ class TileStream {
     required this.initialData,
     required this.units,
   });
+}
+
+class TileAction {
+  String label;
+  Function action;
+
+  TileAction({
+    required this.label,
+    required this.action,
+  });
+
+  void call() {
+    action();
+  }
 }

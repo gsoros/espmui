@@ -9,7 +9,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:flutter_circle_color_picker/flutter_circle_color_picker.dart';
 
-//import 'preferences.dart';
+import 'device.dart';
 import 'util.dart';
 import 'device_list.dart';
 import 'device_list_route.dart';
@@ -354,7 +354,7 @@ class _TileGridState extends State<TileGrid> {
           builder: (context, List<Tile> tiles, _) {
             if (tiles.length <= index || index < 0) return Text("Cannot find tile $index");
             Tile tile = tiles[index];
-            print("builder called: ${tile.stream}");
+            //print("source builder called: ${tile.stream}");
             String value = "${tile.device};${tile.stream}";
             bool valuePresent = false;
             var items = <DropdownMenuItem<String>>[];
@@ -381,13 +381,13 @@ class _TileGridState extends State<TileGrid> {
               items.insert(
                 0,
                 DropdownMenuItem(
-                  value: value,
+                  value: "",
                   child: Text("Select Source"),
                 ),
               );
 
             return EspmuiDropdown(
-              value: value,
+              value: valuePresent ? value : "",
               items: items,
               onChanged: (value) {
                 print("New source $value");
@@ -405,6 +405,63 @@ class _TileGridState extends State<TileGrid> {
               },
             );
           });
+    }
+
+    Widget tapAction(int index) {
+      return ValueListenableBuilder(
+          valueListenable: _tiles.notifier,
+          builder: (context, List<Tile> tiles, _) {
+            if (tiles.length <= index || index < 0) return Text("Cannot find tile $index");
+            Tile tile = tiles[index];
+            //print("tapAction builder called: ${tile.tap}");
+            bool valuePresent = false;
+            var items = <DropdownMenuItem<String>>[];
+            DeviceList().forEach((_, device) {
+              if (device.tileActions.length < 1) return;
+              device.tileActions.forEach((name, action) {
+                String itemValue = "${device.peripheral?.identifier};$name";
+                //print("${device.name ?? 'unnamed device'} ${action.label} $itemValue");
+                if (itemValue == tile.tap) valuePresent = true;
+                items.add(DropdownMenuItem(
+                  value: itemValue,
+                  child: Text("${device.name ?? 'unnamed device'} ${action.label}"),
+                ));
+              });
+            });
+            items.sort((a, b) => a.child.toString().compareTo(b.child.toString()));
+            items.insert(
+              0,
+              DropdownMenuItem(
+                value: "",
+                child: Text("No Tap Action"),
+              ),
+            );
+            return EspmuiDropdown(
+              value: valuePresent ? tile.tap : "",
+              items: items,
+              onChanged: (value) {
+                print("New tapAction $value");
+                _tiles[index] = Tile.from(
+                  tile,
+                  tap: value ?? "",
+                );
+                _tiles.save();
+              },
+            );
+          });
+    }
+
+    void onTap(Tile? tile) {
+      if (null == tile) return;
+      print("onTap: ${tile.tap}");
+      if (tile.tap.length < 3) return;
+      var chunks = tile.tap.split(";");
+      if (chunks.length != 2) return;
+      Device? device = DeviceList().byIdentifier(chunks[0]);
+      if (null == device) return;
+      TileAction? action = device.tileActions[chunks[1]];
+      if (null == action) return;
+      action.call();
     }
 
     return ValueListenableBuilder<List<Tile>>(
@@ -434,7 +491,7 @@ class _TileGridState extends State<TileGrid> {
                 },
                 onWillAccept: (tile) {
                   if (tile == null) return false;
-                  if (_tiles[index] == tile) return false;
+                  if (tiles[index] == tile) return false;
                   _moveTile(tile, index);
                   return true;
                 },
@@ -445,18 +502,21 @@ class _TileGridState extends State<TileGrid> {
                   List<dynamic> rejected,
                 ) {
                   return LongPressDraggable<Tile>(
-                    data: _tiles[index],
+                    data: tiles[index],
                     feedback: Opacity(
                       child: Material(color: Colors.transparent, child: _tiles[index]),
                       opacity: .5,
                     ),
                     child: Hero(
                       placeholderBuilder: (_, __, child) => child,
-                      tag: _tiles[index].hashCode,
+                      tag: tiles[index].hashCode,
                       child: Material(
                         child: InkWell(
-                          child: _tiles[index],
-                          onTap: () => print("tile $index tap"),
+                          child: tiles[index],
+                          onTap: () {
+                            print("tile $index tap");
+                            onTap(tiles[index]);
+                          },
                           onDoubleTap: () {
                             print("tile $index doubleTap");
                             Navigator.push(
@@ -477,6 +537,7 @@ class _TileGridState extends State<TileGrid> {
                                           children: [
                                             sizeAndColor(index),
                                             source(index),
+                                            tapAction(index),
                                           ],
                                         ),
                                         actions: [

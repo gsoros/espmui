@@ -659,6 +659,7 @@ class EspmuiDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    //print("EspmuiDropdown build() value: $value items: $items");
     Widget dropdown = Text("");
     if (items != null) if (items!.any((item) => item.value == value))
       dropdown = DecoratedBox(
