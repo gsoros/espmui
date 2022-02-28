@@ -681,6 +681,7 @@ class ESPM extends PowerMeter {
       "autoTareRangeG",
       */
       "config",
+      "weightService=1",
     ].forEach((key) async {
       await api.request<String>(
         key,
