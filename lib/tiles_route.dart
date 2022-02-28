@@ -28,7 +28,7 @@ class _TilesRouteState extends State<TilesRoute> {
   bool _fabVisible = false;
   Timer? _fabTimer;
 
-  var _tiles = TileGrid();
+  var _tileGrid = TileGrid();
   var devices = DeviceList();
 
   @override
@@ -44,7 +44,7 @@ class _TilesRouteState extends State<TilesRoute> {
     });
     _fabTimer?.cancel();
     _fabTimer = Timer(Duration(seconds: 3), () {
-      debugPrint("hide Fab");
+      debugPrint("hideFab");
       setState(() {
         _fabVisible = false;
       });
@@ -77,7 +77,7 @@ class _TilesRouteState extends State<TilesRoute> {
                                   child: ElevatedButton(
                                       onPressed: () => setState(() {
                                             dev.log('$runtimeType calling TileList(mode: fromPreferences)');
-                                            _tiles = TileGrid(
+                                            _tileGrid = TileGrid(
                                               key: UniqueKey(),
                                               mode: 'fromPreferences',
                                             );
@@ -89,8 +89,22 @@ class _TilesRouteState extends State<TilesRoute> {
                                   height: 50.0,
                                   margin: EdgeInsets.only(top: 30),
                                   child: ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          TileList().add(Tile());
+                                          TileList().save();
+                                        });
+                                        Navigator.of(context).pop(); // close dialog
+                                      },
+                                      child: Text("Add tile")),
+                                ),
+                                Container(
+                                  width: 150.0,
+                                  height: 50.0,
+                                  margin: EdgeInsets.only(top: 30),
+                                  child: ElevatedButton(
                                       onPressed: () => setState(() {
-                                            _tiles = TileGrid(
+                                            _tileGrid = TileGrid(
                                               key: UniqueKey(),
                                               mode: 'random',
                                             );
@@ -134,7 +148,7 @@ class _TilesRouteState extends State<TilesRoute> {
               )
             : Container(),
         body: SafeArea(
-          child: _tiles,
+          child: _tileGrid,
         ),
       ),
     );
@@ -184,7 +198,6 @@ class _TileGridState extends State<TileGrid> {
   }
 
   void _moveTile(Tile tile, int index) {
-    dev.log('$runtimeType reorder tile:${tile.name} newIndex:$index');
     setState(() {
       _tiles.removeWhere((existing) => existing.hashCode == tile.hashCode);
       _tiles.insert(index, tile);
@@ -194,6 +207,8 @@ class _TileGridState extends State<TileGrid> {
   @override
   Widget build(BuildContext context) {
     double sizeUnit = MediaQuery.of(context).size.width / 10;
+
+/*
     Widget Function(int) sizeAndColor = (index) {
       return StatefulBuilder(
         builder: (context, setChildState) {
@@ -223,13 +238,15 @@ class _TileGridState extends State<TileGrid> {
               },
             );
           }
+          Tile? tile = _tiles[index];
+          if (null == tile) return Text("Cannot find tile");
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Column(
                 children: [
                   Slider(
-                    value: _tiles[index].colSpan.toDouble(),
+                    value: tile.colSpan.toDouble(),
                     min: 2,
                     max: 10,
                     divisions: 8,
@@ -248,7 +265,7 @@ class _TileGridState extends State<TileGrid> {
                       dev.log("colspan changed");
                       setStates(() {
                         _tiles[index] = Tile.from(
-                          _tiles[index],
+                          tile,
                           colSpan: value.round(),
                         );
                       });
@@ -259,7 +276,7 @@ class _TileGridState extends State<TileGrid> {
                       RotatedBox(
                         quarterTurns: 1,
                         child: Slider(
-                          value: _tiles[index].height.toDouble(),
+                          value: tile.height.toDouble(),
                           min: 2,
                           max: 6,
                           divisions: 4,
@@ -278,7 +295,7 @@ class _TileGridState extends State<TileGrid> {
                             dev.log("height changed");
                             setStates(() {
                               _tiles[index] = Tile.from(
-                                _tiles[index],
+                                tile,
                                 height: value.round(),
                               );
                             });
@@ -298,9 +315,9 @@ class _TileGridState extends State<TileGrid> {
                                     dev.log("colorpicker bg");
                                     setStates(() {
                                       colorPicker = true;
-                                      colorPickerInitialColor = _tiles[index].color;
+                                      colorPickerInitialColor = tile.color;
                                       colorPickerCallback = (color) {
-                                        _tiles[index] = Tile.from(_tiles[index], color: color);
+                                        _tiles[index] = Tile.from(tile, color: color);
                                         _tiles.save();
                                       };
                                     });
@@ -309,9 +326,9 @@ class _TileGridState extends State<TileGrid> {
                                     dev.log("colorpicker textColor");
                                     setStates(() {
                                       colorPicker = true;
-                                      colorPickerInitialColor = _tiles[index].textColor;
+                                      colorPickerInitialColor = tile.textColor;
                                       colorPickerCallback = (color) {
-                                        _tiles[index] = Tile.from(_tiles[index], textColor: color);
+                                        _tiles[index] = Tile.from(tile, textColor: color);
                                         _tiles.save();
                                       };
                                     });
@@ -329,53 +346,209 @@ class _TileGridState extends State<TileGrid> {
         },
       );
     };
+*/
 
-    Widget Function(int) source = (index) {
-      Tile tile = _tiles[index];
-      String value = "${tile.sourceDevice};${tile.sourceStream}";
-      bool valuePresent = false;
-      var items = <DropdownMenuItem<String>>[];
-      DeviceList().forEach((_, device) {
-        if (device.tileStreams.length < 1) return;
-        device.tileStreams.forEach((stream) {
-          String itemValue = "${device.peripheral?.identifier};${stream.name}";
-          if (itemValue == value) valuePresent = true;
-          items.add(DropdownMenuItem(
-            value: itemValue,
-            child: Text("${stream.label} (${device.name ?? 'unnamed device'})"),
-          ));
-        });
-      });
-      if (items.length < 1)
-        items.add(
-          DropdownMenuItem(
-            value: value,
-            child: Text("No valid sources"),
-          ),
-        );
-      else if (!valuePresent)
-        items.insert(
-          0,
-          DropdownMenuItem(
-            value: value,
-            child: Text("Select Source"),
-          ),
-        );
-      return EspmuiDropdown(
-        value: value,
-        items: items,
-        onChanged: (value) {
-          print("New source for ${tile.name}: $value");
-          var chunks = value?.split(";");
-          //tile.sourceDevice = chunks[0];
-          //tile.sourceStream = chunks[1];
+    Widget Function(int) sizeAndColor = (index) {
+      return ValueListenableBuilder(
+        valueListenable: _tiles.notifier,
+        builder: (context, List<Tile> tiles, _) {
+          return StatefulBuilder(
+            builder: (context, setChildState) {
+              void Function(void Function() f) setStates = (f) {
+                setState(() {
+                  setChildState(() {
+                    f();
+                  });
+                });
+              };
+              if (colorPicker && colorPickerInitialColor != null && colorPickerCallback != null) {
+                var colorPickerController = CircleColorPickerController(initialColor: colorPickerInitialColor!);
+                return CircleColorPicker(
+                  controller: colorPickerController,
+                  textStyle: TextStyle(color: Colors.transparent),
+                  onChanged: (color) {
+                    dev.log("colorpicker $color");
+                    colorPickerController.color = color;
+                    setStates(() {
+                      colorPickerCallback!(color);
+                    });
+                  },
+                  onEnded: (color) {
+                    setStates(() {
+                      colorPicker = false;
+                    });
+                  },
+                );
+              }
+              if (tiles.length <= index || index < 0) return Text("Cannot find tile $index");
+              Tile tile = tiles[index];
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Column(
+                    children: [
+                      Slider(
+                        value: tile.width.toDouble(),
+                        min: 2,
+                        max: 10,
+                        divisions: 8,
+                        onChangeStart: (_) {
+                          setChildState(() {
+                            dialogOpacity = .5;
+                          });
+                        },
+                        onChangeEnd: (_) {
+                          setChildState(() {
+                            dialogOpacity = 1;
+                          });
+                          _tiles.save();
+                        },
+                        onChanged: (value) {
+                          dev.log("colspan changed");
+                          setStates(() {
+                            _tiles[index] = Tile.from(
+                              tile,
+                              colSpan: value.round(),
+                            );
+                          });
+                        },
+                      ),
+                      Row(
+                        children: [
+                          RotatedBox(
+                            quarterTurns: 1,
+                            child: Slider(
+                              value: tile.height.toDouble(),
+                              min: 2,
+                              max: 6,
+                              divisions: 4,
+                              onChangeStart: (_) {
+                                setChildState(() {
+                                  dialogOpacity = .5;
+                                });
+                              },
+                              onChangeEnd: (_) {
+                                setChildState(() {
+                                  dialogOpacity = 1;
+                                });
+                                _tiles.save();
+                              },
+                              onChanged: (value) {
+                                dev.log("height changed");
+                                setStates(() {
+                                  _tiles[index] = Tile.from(tile, height: value.round());
+                                });
+                              },
+                            ),
+                          ),
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Hero(
+                                tag: _tiles[index].hashCode,
+                                child: Opacity(
+                                    opacity: dialogOpacity,
+                                    child: GestureDetector(
+                                      child: _tiles[index],
+                                      onTap: () {
+                                        dev.log("colorpicker bg");
+                                        setStates(() {
+                                          colorPicker = true;
+                                          colorPickerInitialColor = tile.color;
+                                          colorPickerCallback = (color) {
+                                            _tiles[index] = Tile.from(tile, color: color);
+                                            _tiles.save();
+                                          };
+                                        });
+                                      },
+                                      onDoubleTap: () {
+                                        dev.log("colorpicker textColor");
+                                        setStates(() {
+                                          colorPicker = true;
+                                          colorPickerInitialColor = tile.textColor;
+                                          colorPickerCallback = (color) {
+                                            _tiles[index] = Tile.from(tile, textColor: color);
+                                            _tiles.save();
+                                          };
+                                        });
+                                      },
+                                    )),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          );
         },
       );
     };
 
+    Widget Function(int) source = (index) {
+      return ValueListenableBuilder(
+          valueListenable: _tiles.notifier,
+          builder: (context, List<Tile> tiles, _) {
+            if (tiles.length <= index || index < 0) return Text("Cannot find tile $index");
+            Tile tile = tiles[index];
+            print("builder called: ${tile.stream}");
+            String value = "${tile.device};${tile.stream}";
+            bool valuePresent = false;
+            var items = <DropdownMenuItem<String>>[];
+            DeviceList().forEach((_, device) {
+              if (device.tileStreams.length < 1) return;
+              device.tileStreams.forEach((name, stream) {
+                String itemValue = "${device.peripheral?.identifier};$name";
+                if (itemValue == value) valuePresent = true;
+                items.add(DropdownMenuItem(
+                  value: itemValue,
+                  child: Text("${stream.label} (${device.name ?? 'unnamed device'})"),
+                ));
+              });
+            });
+            if (items.length < 1)
+              items.add(
+                DropdownMenuItem(
+                  value: value,
+                  child: Text("No valid sources"),
+                ),
+              );
+            else if (!valuePresent)
+              items.insert(
+                0,
+                DropdownMenuItem(
+                  value: value,
+                  child: Text("Select Source"),
+                ),
+              );
+
+            return EspmuiDropdown(
+              value: value,
+              items: items,
+              onChanged: (value) {
+                print("New source $value");
+                var chunks = value?.split(";");
+                if (chunks == null || chunks.length < 2 || chunks[0].length < 1 || chunks[1].length < 1) {
+                  print("Wrong chunks: $chunks");
+                  return;
+                }
+                _tiles[index] = Tile.from(
+                  tile,
+                  device: chunks[0],
+                  stream: chunks[1],
+                );
+                _tiles.save();
+              },
+            );
+          });
+    };
+
     return ValueListenableBuilder<List<Tile>>(
         valueListenable: _tiles.notifier,
-        builder: (context, _, __) {
+        builder: (context, tiles, __) {
           return StaggeredGridView.countBuilder(
             crossAxisCount: 10,
             //mainAxisSpacing: 4,
@@ -384,8 +557,8 @@ class _TileGridState extends State<TileGrid> {
             itemCount: _tiles.length,
             staggeredTileBuilder: (index) {
               return StaggeredTile.extent(
-                _tiles[index].colSpan,
-                _tiles[index].height * sizeUnit,
+                tiles[index].width,
+                tiles[index].height * sizeUnit,
               );
               /*
             return StaggeredTile.fit(
@@ -396,19 +569,15 @@ class _TileGridState extends State<TileGrid> {
             itemBuilder: (context, index) {
               return DragTarget<Tile>(
                 onAccept: (tile) {
-                  dev.log("onAccept $index ${tile.name}");
                   _tiles.save();
                 },
                 onWillAccept: (tile) {
                   if (tile == null) return false;
                   if (_tiles[index] == tile) return false;
-                  dev.log("onWillAccept $index ${tile.name} ${_tiles[index].name}");
                   _moveTile(tile, index);
                   return true;
                 },
-                onLeave: (tile) {
-                  dev.log("onLeave $index ${tile?.name}");
-                },
+                onLeave: (tile) {},
                 builder: (
                   BuildContext context,
                   List<Tile?> accepted,
@@ -423,9 +592,9 @@ class _TileGridState extends State<TileGrid> {
                       child: Material(
                         child: InkWell(
                           child: _tiles[index],
-                          onTap: () => print("tile ${_tiles[index].name} tap"),
+                          onTap: () => print("tile $index tap"),
                           onDoubleTap: () {
-                            print("tile ${_tiles[index].name} doubleTap");
+                            print("tile $index doubleTap");
 
                             Navigator.push(
                               context,

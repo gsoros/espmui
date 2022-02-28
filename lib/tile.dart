@@ -6,126 +6,128 @@ import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 
 import 'preferences.dart';
+import 'device.dart';
+import 'device_list.dart';
 import 'util.dart';
 
 class Tile extends StatelessWidget {
-  final String name;
   final Color color;
   final Color textColor;
-  final int colSpan;
+  final int width;
   final int height;
-  final Widget value;
   final Widget background;
-  final String sourceDevice;
-  final String sourceStream;
+  final String device;
+  final String stream;
 
   Tile({
     Key? key,
-    this.name = "unnamed",
     this.color = Colors.red,
     this.textColor = Colors.white,
-    this.colSpan = 5,
+    this.width = 5,
     this.height = 2,
-    this.value = const Text(""),
-    this.background = const Text(""),
-    this.sourceDevice = "",
-    this.sourceStream = "",
+    this.background = const Text(" "),
+    this.device = "",
+    this.stream = "",
   }) : super(key: key);
 
   Tile.random({Key? key})
       : this(
           key: key,
-          name: "Tile ${Random().nextInt(1000).toString()}",
           color: Color((Random().nextDouble() * 0xffffff).toInt()).withOpacity(1.0),
           textColor: Colors.white,
           //textColor: Color((Random().nextDouble() * 0xffffff).toInt()).withOpacity(1.0),
-          colSpan: Random().nextInt(9) + 2,
+          width: Random().nextInt(9) + 2,
           height: Random().nextInt(3) + 2,
-          value: Text("${Random().nextInt(20000).toString()}"),
           background: Graph.random(),
         );
 
   Tile.from(
     Tile other, {
     Key? key,
-    String? name,
     Color? color,
     Color? textColor,
     int? colSpan,
     int? height,
-    Widget? value,
     Widget? background,
-    String? sourceDevice,
-    String? sourceStream,
+    String? device,
+    String? stream,
   }) : this(
           key: key ?? other.key,
-          name: name ?? other.name,
           color: color ?? other.color,
           textColor: textColor ?? other.textColor,
-          colSpan: colSpan ?? other.colSpan,
+          width: colSpan ?? other.width,
           height: height ?? other.height,
-          value: value ?? other.value,
           background: background ?? other.background,
-          sourceDevice: sourceDevice ?? other.sourceDevice,
-          sourceStream: sourceStream ?? other.sourceStream,
+          device: device ?? other.device,
+          stream: stream ?? other.stream,
         );
 
   Tile copyWith(
     Key? key,
-    String? name,
     Color? color,
     Color? textColor,
     int? colSpan,
     int? height,
-    Widget? value,
     Widget? background,
-    String? sourceDevice,
-    String? sourceStream,
+    String? device,
+    String? stream,
   ) {
     return Tile.from(
       this,
       key: key ?? this.key,
-      name: name ?? this.name,
       color: color ?? this.color,
       textColor: textColor ?? this.textColor,
-      colSpan: colSpan ?? this.colSpan,
+      colSpan: colSpan ?? this.width,
       height: height ?? this.height,
-      value: value ?? this.value,
       background: background ?? this.background,
-      sourceDevice: sourceDevice ?? this.sourceDevice,
-      sourceStream: sourceStream ?? this.sourceStream,
+      device: device ?? this.device,
+      stream: stream ?? this.stream,
     );
   }
 
   Tile.fromJson(Map<String, dynamic> json)
-      : name = json['name'] ?? "unnamed",
-        color = Color(json['color']),
+      : color = Color(json['color']),
         textColor = Color(json['textColor']),
-        colSpan = json['colSpan'] ?? 3,
+        width = json['colSpan'] ?? 3,
         height = json['height'] ?? 3,
-        value = Text('Loading...'),
         background = Graph(),
-        sourceDevice = json['sourceDevice'] ?? "",
-        sourceStream = json['sourceStream'] ?? "";
+        device = json['device'] ?? "",
+        stream = json['stream'] ?? "";
 
   Map<String, dynamic> toJson() => {
-        'name': name,
         'color': color.value,
         'textColor': textColor.value,
-        'colSpan': colSpan,
+        'colSpan': width,
         'height': height,
-        'sourceDevice': sourceDevice,
-        'sourceStream': sourceStream,
+        'device': device,
+        'stream': stream,
       };
 
   @override
   Widget build(BuildContext context) {
-    var sizeUnit = MediaQuery.of(context).size.width / 10;
+    double sizeUnit = MediaQuery.of(context).size.width / 10;
+    Device? device = DeviceList().byIdentifier(this.device);
+    //if (null == device) return Text("No device");
+    //if (!device?.tileStreams.containsKey(this.stream)) return Text("No stream");
+    TileStream? stream = device?.tileStreams[this.stream];
+    //if (null == stream) return Text("Invalid source");
+
+    Widget getValue() {
+      return StreamBuilder<String>(
+        stream: stream?.stream,
+        initialData: stream?.initialData != null ? stream?.initialData!() : null,
+        builder: (_, snapshot) {
+          //print("Tile build getValue ${device.name} ${source.label} ${snapshot.data}");
+          return Text(snapshot.hasData ? snapshot.data.toString() : " ");
+        },
+      );
+    }
+
     return Material(
       child: Container(
         padding: const EdgeInsets.all(2.0),
         height: height * sizeUnit,
-        width: colSpan * sizeUnit,
+        width: width * sizeUnit,
         child: Container(
           decoration: BoxDecoration(
             color: color,
@@ -139,7 +141,7 @@ class Tile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      name,
+                      "${stream?.label ?? ''} (${device?.name ?? ''})",
                       softWrap: false,
                       overflow: TextOverflow.fade,
                       style: TextStyle(fontSize: 10, color: textColor),
@@ -149,7 +151,7 @@ class Tile extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.topRight,
                       child: Text(
-                        "topRight",
+                        " ",
                         softWrap: false,
                         overflow: TextOverflow.fade,
                         style: TextStyle(fontSize: 10, color: textColor),
@@ -170,7 +172,7 @@ class Tile extends StatelessWidget {
                             color: textColor,
                             fontSize: 120,
                           ),
-                          child: value,
+                          child: getValue(),
                         ),
                       ),
                     ),
@@ -181,7 +183,7 @@ class Tile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      "bottomLeft",
+                      " ",
                       softWrap: false,
                       overflow: TextOverflow.fade,
                       style: TextStyle(fontSize: 10, color: textColor),
@@ -191,7 +193,7 @@ class Tile extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.bottomRight,
                       child: Text(
-                        "bottomRight",
+                        stream?.units ?? " ",
                         softWrap: false,
                         overflow: TextOverflow.fade,
                         style: TextStyle(fontSize: 10, color: textColor),
@@ -239,7 +241,7 @@ class TileList with DebugHelper {
     notifier.value = tileList;
   }
 
-  Tile operator [](int i) => tiles[i];
+  Tile? operator [](int i) => tiles[i];
   operator []=(int i, Tile tile) {
     tiles[i] = tile;
     notifier.notifyListeners();

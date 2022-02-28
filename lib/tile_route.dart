@@ -44,7 +44,7 @@ class _TileRouteState extends State<TileRoute> {
           Column(
             children: [
               Slider(
-                value: tile.colSpan.toDouble(),
+                value: tile.width.toDouble(),
                 min: 2,
                 max: 10,
                 divisions: 8,

@@ -56,7 +56,7 @@ class Device with DebugHelper {
   StreamSubscription<PeripheralConnectionState>? _stateChangeSubscription;
 
   /// Streams which can be selected on the tiles
-  List<TileStream> tileStreams = [];
+  Map<String, TileStream> tileStreams = {};
 
   Device(this.peripheral) {
     dev.log("$debugTag construct");
@@ -64,6 +64,14 @@ class Device with DebugHelper {
       _characteristics.addAll({
         'battery': CharacteristicListItem(BatteryCharacteristic(peripheral!)),
       });
+    tileStreams.addAll({
+      "battery": TileStream(
+        label: "Battery",
+        stream: battery?.stream.map<String>((value) => "$value"),
+        initialData: battery?.lastValue.toString,
+        units: "%",
+      ),
+    });
     init();
   }
 
@@ -230,7 +238,7 @@ class Device with DebugHelper {
         .connect(
       isAutoConnect: true,
       refreshGatt: true,
-      timeout: Duration(seconds: 10),
+      timeout: Duration(seconds: 20),
     )
         .catchError(
       (e) async {
@@ -239,7 +247,7 @@ class Device with DebugHelper {
           BleError be = e;
           if (be.errorCode.value == BleErrorCode.deviceAlreadyConnected) {
             await disconnect();
-            await Future.delayed(Duration(milliseconds: 3000));
+            await Future.delayed(Duration(seconds: 3));
             connect();
             //dev.log("$runtimeType $name already connected, sending message to stateController");
             //streamSendIfNotClosed(_stateController, connectedState);
@@ -378,11 +386,22 @@ class PowerMeter extends Device {
     _characteristics.addAll({
       'power': CharacteristicListItem(PowerCharacteristic(peripheral)),
     });
-    tileStreams.add(TileStream(
-      "power",
-      "Power",
-      power?.stream.map<String>((value) => "$value"),
-    ));
+    tileStreams.addAll({
+      "power": TileStream(
+        label: "Power",
+        stream: power?.powerStream.map<String>((value) => "$value"),
+        initialData: power?.lastPower.toString,
+        units: "W",
+      ),
+    });
+    tileStreams.addAll({
+      "cadence": TileStream(
+        label: "Cadence",
+        stream: power?.cadenceStream.map<String>((value) => "$value"),
+        initialData: power?.lastCadence.toString,
+        units: "rpm",
+      ),
+    });
   }
 
   /// Hack: the 128-bit api service uuid is sometimes not detected from the
@@ -444,6 +463,19 @@ class ESPM extends PowerMeter {
     api = EspmApi(this);
     // listen to api message done events
     _apiSubsciption = api.messageDoneStream.listen((message) => _onApiDone(message));
+    tileStreams.addAll({
+      "scale": TileStream(
+        label: "Weight Scale",
+        stream: weightScale?.stream.map<String>((value) {
+          String s = value.toStringAsFixed(2);
+          if (s.length > 6) s = s.substring(0, 6);
+          if (s == "-0.00") s = "0.00";
+          return s;
+        }),
+        initialData: weightScale?.lastValue.toString,
+        units: "kg",
+      ),
+    });
   }
 
   /// Processes "done" messages sent by the API
@@ -681,11 +713,14 @@ class HeartRateMonitor extends Device {
     _characteristics.addAll({
       'heartRate': CharacteristicListItem(HeartRateCharacteristic(peripheral)),
     });
-    tileStreams.add(TileStream(
-      "heartRate",
-      "Heart Rate",
-      heartRate?.stream.map<String>((value) => "$value"),
-    ));
+    tileStreams.addAll({
+      "heartRate": TileStream(
+        label: "Heart Rate",
+        stream: heartRate?.stream.map<String>((value) => "$value"),
+        initialData: heartRate?.lastValue.toString,
+        units: "bpm",
+      ),
+    });
   }
 }
 
@@ -799,9 +834,15 @@ class ESPMWifiSettings {
 }
 
 class TileStream {
-  String name;
   String label;
   Stream<String>? stream;
+  String Function()? initialData;
+  String units;
 
-  TileStream(this.name, this.label, this.stream);
+  TileStream({
+    required this.label,
+    required this.stream,
+    required this.initialData,
+    required this.units,
+  });
 }

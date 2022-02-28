@@ -32,7 +32,7 @@ class AlwaysNotifier<T> extends ValueNotifier<T> with DebugHelper {
   @override
   void notifyListeners() {
     super.notifyListeners();
-    //print("$debugTag notifyListeners");
+    print("$debugTag notifyListeners");
   }
 }
 
