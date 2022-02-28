@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
 import 'preferences.dart';
 import 'device.dart';
@@ -123,6 +124,19 @@ class Tile extends StatelessWidget {
       );
     }
 
+    Widget getValueWhenConnected() {
+      return StreamBuilder<PeripheralConnectionState>(
+        stream: device?.stateStream,
+        initialData: device?.lastConnectionState,
+        builder: (_, snapshot) {
+          //print("Tile build getValueWhenConnected ${device.name} ${source.label} ${snapshot.data}");
+          if (!snapshot.hasData || snapshot.data == null || snapshot.data == PeripheralConnectionState.connected) return getValue();
+          if (snapshot.data == PeripheralConnectionState.disconnected) return Text(" ");
+          return CircularProgressIndicator();
+        },
+      );
+    }
+
     return Material(
       child: Container(
         padding: const EdgeInsets.all(2.0),
@@ -141,12 +155,13 @@ class Tile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      "${stream?.label ?? ''} (${device?.name ?? ''})",
+                      "${stream?.label ?? ''} (${device?.name ?? 'No source'})",
                       softWrap: false,
                       overflow: TextOverflow.fade,
                       style: TextStyle(fontSize: 10, color: textColor),
                     ),
                   ),
+                  /*
                   Expanded(
                     child: Align(
                       alignment: Alignment.topRight,
@@ -158,6 +173,7 @@ class Tile extends StatelessWidget {
                       ),
                     ),
                   ),
+                  */
                 ],
               ),
               Expanded(
@@ -172,7 +188,7 @@ class Tile extends StatelessWidget {
                             color: textColor,
                             fontSize: 120,
                           ),
-                          child: getValue(),
+                          child: getValueWhenConnected(),
                         ),
                       ),
                     ),
@@ -181,6 +197,7 @@ class Tile extends StatelessWidget {
               ),
               Row(
                 children: [
+                  /*
                   Expanded(
                     child: Text(
                       " ",
@@ -189,6 +206,7 @@ class Tile extends StatelessWidget {
                       style: TextStyle(fontSize: 10, color: textColor),
                     ),
                   ),
+                  */
                   Expanded(
                     child: Align(
                       alignment: Alignment.bottomRight,

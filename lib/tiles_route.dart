@@ -10,7 +10,7 @@ import 'package:page_transition/page_transition.dart';
 import 'package:flutter_circle_color_picker/flutter_circle_color_picker.dart';
 
 //import 'preferences.dart';
-//import 'device.dart';
+import 'util.dart';
 import 'device_list.dart';
 import 'device_list_route.dart';
 import 'device_widgets.dart';
@@ -208,147 +208,7 @@ class _TileGridState extends State<TileGrid> {
   Widget build(BuildContext context) {
     double sizeUnit = MediaQuery.of(context).size.width / 10;
 
-/*
-    Widget Function(int) sizeAndColor = (index) {
-      return StatefulBuilder(
-        builder: (context, setChildState) {
-          void Function(void Function() f) setStates = (f) {
-            setState(() {
-              setChildState(() {
-                f();
-              });
-            });
-          };
-          if (colorPicker && colorPickerInitialColor != null && colorPickerCallback != null) {
-            var colorPickerController = CircleColorPickerController(initialColor: colorPickerInitialColor!);
-            return CircleColorPicker(
-              controller: colorPickerController,
-              textStyle: TextStyle(color: Colors.transparent),
-              onChanged: (color) {
-                dev.log("colorpicker $color");
-                colorPickerController.color = color;
-                setStates(() {
-                  colorPickerCallback!(color);
-                });
-              },
-              onEnded: (color) {
-                setStates(() {
-                  colorPicker = false;
-                });
-              },
-            );
-          }
-          Tile? tile = _tiles[index];
-          if (null == tile) return Text("Cannot find tile");
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Column(
-                children: [
-                  Slider(
-                    value: tile.colSpan.toDouble(),
-                    min: 2,
-                    max: 10,
-                    divisions: 8,
-                    onChangeStart: (_) {
-                      setChildState(() {
-                        dialogOpacity = .5;
-                      });
-                    },
-                    onChangeEnd: (_) {
-                      setChildState(() {
-                        dialogOpacity = 1;
-                      });
-                      _tiles.save();
-                    },
-                    onChanged: (value) {
-                      dev.log("colspan changed");
-                      setStates(() {
-                        _tiles[index] = Tile.from(
-                          tile,
-                          colSpan: value.round(),
-                        );
-                      });
-                    },
-                  ),
-                  Row(
-                    children: [
-                      RotatedBox(
-                        quarterTurns: 1,
-                        child: Slider(
-                          value: tile.height.toDouble(),
-                          min: 2,
-                          max: 6,
-                          divisions: 4,
-                          onChangeStart: (_) {
-                            setChildState(() {
-                              dialogOpacity = .5;
-                            });
-                          },
-                          onChangeEnd: (_) {
-                            setChildState(() {
-                              dialogOpacity = 1;
-                            });
-                            _tiles.save();
-                          },
-                          onChanged: (value) {
-                            dev.log("height changed");
-                            setStates(() {
-                              _tiles[index] = Tile.from(
-                                tile,
-                                height: value.round(),
-                              );
-                            });
-                          },
-                        ),
-                      ),
-                      Expanded(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Hero(
-                            tag: _tiles[index].hashCode,
-                            child: Opacity(
-                                opacity: dialogOpacity,
-                                child: GestureDetector(
-                                  child: _tiles[index],
-                                  onTap: () {
-                                    dev.log("colorpicker bg");
-                                    setStates(() {
-                                      colorPicker = true;
-                                      colorPickerInitialColor = tile.color;
-                                      colorPickerCallback = (color) {
-                                        _tiles[index] = Tile.from(tile, color: color);
-                                        _tiles.save();
-                                      };
-                                    });
-                                  },
-                                  onDoubleTap: () {
-                                    dev.log("colorpicker textColor");
-                                    setStates(() {
-                                      colorPicker = true;
-                                      colorPickerInitialColor = tile.textColor;
-                                      colorPickerCallback = (color) {
-                                        _tiles[index] = Tile.from(tile, textColor: color);
-                                        _tiles.save();
-                                      };
-                                    });
-                                  },
-                                )),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
-      );
-    };
-*/
-
-    Widget Function(int) sizeAndColor = (index) {
+    Widget sizeAndColor(int index) {
       return ValueListenableBuilder(
         valueListenable: _tiles.notifier,
         builder: (context, List<Tile> tiles, _) {
@@ -486,9 +346,9 @@ class _TileGridState extends State<TileGrid> {
           );
         },
       );
-    };
+    }
 
-    Widget Function(int) source = (index) {
+    Widget source(int index) {
       return ValueListenableBuilder(
           valueListenable: _tiles.notifier,
           builder: (context, List<Tile> tiles, _) {
@@ -505,7 +365,7 @@ class _TileGridState extends State<TileGrid> {
                 if (itemValue == value) valuePresent = true;
                 items.add(DropdownMenuItem(
                   value: itemValue,
-                  child: Text("${stream.label} (${device.name ?? 'unnamed device'})"),
+                  child: Text("${device.name ?? 'unnamed device'} ${stream.label}"),
                 ));
               });
             });
@@ -516,7 +376,8 @@ class _TileGridState extends State<TileGrid> {
                   child: Text("No valid sources"),
                 ),
               );
-            else if (!valuePresent)
+            items.sort((a, b) => a.child.toString().compareTo(b.child.toString()));
+            if (!valuePresent)
               items.insert(
                 0,
                 DropdownMenuItem(
@@ -544,7 +405,7 @@ class _TileGridState extends State<TileGrid> {
               },
             );
           });
-    };
+    }
 
     return ValueListenableBuilder<List<Tile>>(
         valueListenable: _tiles.notifier,
@@ -585,7 +446,10 @@ class _TileGridState extends State<TileGrid> {
                 ) {
                   return LongPressDraggable<Tile>(
                     data: _tiles[index],
-                    feedback: Opacity(child: Material(color: Colors.transparent, child: _tiles[index]), opacity: .5),
+                    feedback: Opacity(
+                      child: Material(color: Colors.transparent, child: _tiles[index]),
+                      opacity: .5,
+                    ),
                     child: Hero(
                       placeholderBuilder: (_, __, child) => child,
                       tag: _tiles[index].hashCode,
@@ -595,7 +459,6 @@ class _TileGridState extends State<TileGrid> {
                           onTap: () => print("tile $index tap"),
                           onDoubleTap: () {
                             print("tile $index doubleTap");
-
                             Navigator.push(
                               context,
                               HeroDialogRoute(
@@ -608,30 +471,38 @@ class _TileGridState extends State<TileGrid> {
                                       return true;
                                     },
                                     child: Center(
-                                      child: Dialog(
+                                      child: AlertDialog(
                                         backgroundColor: Colors.black87,
-                                        child: Column(
+                                        content: Column(
                                           children: [
                                             sizeAndColor(index),
                                             source(index),
                                           ],
                                         ),
+                                        actions: [
+                                          EspmuiElevatedButton(
+                                            "Delete",
+                                            action: () {
+                                              print("delete tile $index");
+                                              setState(() {
+                                                tiles.removeAt(index);
+                                                _tiles.tiles = tiles;
+                                                _tiles.save();
+                                              });
+                                              Navigator.of(context).pop();
+                                            },
+                                          ),
+                                          EspmuiElevatedButton(
+                                            "Close",
+                                            action: Navigator.of(context).pop,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
                                 },
                               ),
                             );
-
-                            /*
-                            Navigator.push(
-                              context,
-                              PageTransition(
-                                type: PageTransitionType.topToBottom,
-                                child: TileRoute(index: index, json: _tiles[index].toJson()),
-                              ),
-                            );
-                            */
                           },
                         ),
                       ),

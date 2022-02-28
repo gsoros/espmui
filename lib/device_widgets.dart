@@ -659,7 +659,7 @@ class EspmuiDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    dynamic dropdown = Text("");
+    Widget dropdown = Text("");
     if (items != null) if (items!.any((item) => item.value == value))
       dropdown = DecoratedBox(
         decoration: ShapeDecoration(
@@ -676,6 +676,7 @@ class EspmuiDropdown extends StatelessWidget {
             items: items,
             underline: SizedBox(),
             onChanged: onChanged,
+            isExpanded: true,
           ),
         ),
       );
