@@ -1,26 +1,27 @@
 import 'dart:async';
-import 'dart:developer' as dev;
+//import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 import 'util.dart';
+import 'debug.dart';
 import 'ble.dart';
 import 'device.dart';
 import 'device_list.dart';
 import 'device_widgets.dart';
 
-class DeviceRoute extends StatefulWidget {
+class DeviceRoute extends StatefulWidget with Debug {
   final Device device;
 
   DeviceRoute(this.device) {
-    print("$runtimeType construct");
+    debugLog("construct");
   }
 
   @override
   DeviceRouteState createState() {
-    print("$runtimeType createState()");
+    debugLog("createState()");
     if (device is ESPM)
       return ESPMRouteState(device as ESPM);
     else if (device is PowerMeter)
@@ -32,35 +33,35 @@ class DeviceRoute extends StatefulWidget {
   }
 }
 
-class DeviceRouteState extends State<DeviceRoute> with DebugHelper {
+class DeviceRouteState extends State<DeviceRoute> with Debug {
   Device device;
 
   DeviceRouteState(this.device) {
-    print("$runtimeType construct");
+    debugLog("construct");
   }
 
   @override
   void initState() {
-    print("$runtimeType initState");
+    debugLog("initState");
     _checkCorrectType();
     super.initState();
   }
 
   Future<void> _checkCorrectType() async {
-    //dev.log("$debugTag _checkCorrectType() $device");
+    //debugLog("_checkCorrectType() $device");
     if (await device.isCorrectType()) return;
     var newDevice = await device.copyToCorrectType();
     device.peripheral = null;
     device.dispose();
     device = newDevice;
     DeviceList().addOrUpdate(device);
-    dev.log("$debugTag _checkCorrectType() reloading DeviceRoute($device)");
+    debugLog("_checkCorrectType() reloading DeviceRoute($device)");
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => DeviceRoute(device)));
   }
 
   @override
   void dispose() async {
-    print("$runtimeType dispose");
+    debugLog("dispose");
     if (!device.autoConnect.value) device.disconnect();
     super.dispose();
   }
@@ -95,7 +96,7 @@ class DeviceRouteState extends State<DeviceRoute> with DebugHelper {
         value: ValueListenableBuilder<bool>(
           valueListenable: device.autoConnect,
           builder: (_, value, __) {
-            //print("$runtimeType autoconnect changed: $value");
+            //debugLog("autoconnect changed: $value");
             return SettingSwitch(
               name: "Auto Connect",
               value: extendedBoolFrom(value),
@@ -236,7 +237,7 @@ class Status extends StatelessWidget {
       initialData: null,
       builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
         String connState = snapshot.hasData ? snapshot.data.toString() : "....";
-        //print("Device status: snapshot=$connState");
+        //debugLog("Device status: snapshot=$connState");
         return Text(
           connState.substring(connState.lastIndexOf(".") + 1),
           style: TextStyle(fontSize: 10),
@@ -347,18 +348,18 @@ class AppBarTitle extends StatelessWidget {
   }
 }
 
-class ConnectButton extends StatelessWidget with DebugHelper {
+class ConnectButton extends StatelessWidget with Debug {
   final Device device;
   ConnectButton(this.device);
 
   @override
   Widget build(BuildContext context) {
-    //print("$debugTag initialState: ${device.lastConnectionState}");
+    //debugLog("initialState: ${device.lastConnectionState}");
     return StreamBuilder<PeripheralConnectionState?>(
       stream: device.stateStream,
       initialData: device.lastConnectionState,
       builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
-        //print("$debugTag $snapshot");
+        //debugLog("$snapshot");
         var action;
         var label = "Connect";
         if (snapshot.data == PeripheralConnectionState.connected) {

@@ -6,9 +6,10 @@ import 'ble.dart';
 import 'ble_constants.dart';
 import 'device_list.dart';
 import 'util.dart';
+import 'debug.dart';
 
 /// singleton class
-class Scanner {
+class Scanner with Debug {
   static final Scanner _instance = Scanner._construct();
 
   /// returns a singleton
@@ -35,30 +36,30 @@ class Scanner {
   Timer? _stopTimer;
 
   Scanner._construct() {
-    print("$runtimeType _construct()");
+    debugLog("_construct()");
     _init();
   }
 
   void _init() async {
-    print("$runtimeType _init()");
+    debugLog("_init()");
     _scanningSubscription = scanningStream.listen(
       (value) {
         scanning = value;
-        print("$runtimeType scanningSubscription: $value");
+        debugLog("scanningSubscription: $value");
       },
     );
     _resultSubscription = resultStream.listen(
       (result) {
         devices.addFromScanResult(result);
         //bool isNew = !devices.containsIdentifier(result.peripheral.identifier);
-        //print("$runtimeType _resultSubscription: ${result.peripheral.identifier} new=$isNew rssi=${result.rssi}");
+        //debugLog("_resultSubscription: ${result.peripheral.identifier} new=$isNew rssi=${result.rssi}");
       },
     );
-    print("$runtimeType _init() done");
+    debugLog("_init() done");
   }
 
   void dispose() async {
-    print("$runtimeType dispose()");
+    debugLog("dispose()");
     await _scanResultSubscription?.cancel();
     await _scanningController.close();
     await _scanningSubscription?.cancel();
@@ -70,7 +71,7 @@ class Scanner {
 
   void startScan() async {
     if (scanning) {
-      print("$runtimeType startScan() already scanning");
+      debugLog("startScan() already scanning");
       return;
     }
     if (await ble.currentState() != BluetoothState.POWERED_ON) {
@@ -98,7 +99,7 @@ class Scanner {
         .listen(
           (result) {
             // devices.addFromScanResult(result);
-            //print("$runtimeType Device found: ${result.advertisementData.localName} ${result.peripheral.identifier}");
+            //debugLog("Device found: ${result.advertisementData.localName} ${result.peripheral.identifier}");
             streamSendIfNotClosed(_resultController, result);
           },
           onError: (e) => bleError(runtimeType.toString(), "scanResultSubscription", e),
@@ -106,7 +107,7 @@ class Scanner {
   }
 
   Future<void> stopScan() async {
-    print("$runtimeType stopScan()");
+    debugLog("stopScan()");
     if (_stopTimer != null) {
       _stopTimer!.cancel();
       _stopTimer = null;
@@ -123,7 +124,7 @@ class ScanResultList {
   Map<String, ScanResult> _items = {};
 
   ScanResultList() {
-    print("$runtimeType construct");
+    debugLog("construct");
   }
 
   bool containsIdentifier(String identifier) {
@@ -140,12 +141,12 @@ class ScanResultList {
     _items.update(
       scanResult.peripheral.identifier,
       (existing) {
-        print("$runtimeType updating $subject");
+        debugLog("updating $subject");
         existing = scanResult;
         return existing;
       },
       ifAbsent: () {
-        print("$runtimeType adding $subject");
+        debugLog("adding $subject");
         return scanResult;
       },
     );
@@ -158,7 +159,7 @@ class ScanResultList {
   }
 
   Future<void> dispose() async {
-    print("$runtimeType dispose");
+    debugLog("dispose");
     //_items.forEach((_, scanResult) => scanResult.dispose());
     _items.clear();
   }

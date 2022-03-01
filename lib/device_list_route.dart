@@ -12,6 +12,7 @@ import 'device_list.dart';
 import 'scanner.dart';
 //import 'preferences.dart';
 import 'util.dart';
+import 'debug.dart';
 
 class DeviceListRoute extends StatefulWidget {
   DeviceListRoute({Key? key}) : super(key: key);
@@ -20,24 +21,24 @@ class DeviceListRoute extends StatefulWidget {
   DeviceListRouteState createState() => DeviceListRouteState();
 }
 
-class DeviceListRouteState extends State<DeviceListRoute> {
+class DeviceListRouteState extends State<DeviceListRoute> with Debug {
   final String defaultTitle = "Devices";
   final _key = GlobalKey<DeviceListRouteState>();
   Scanner get scanner => Scanner();
 
   DeviceListRouteState() {
-    print("$runtimeType construct");
+    debugLog("construct");
   }
 
   @override
   void initState() {
     super.initState();
-    print("$runtimeType initState()");
+    debugLog("initState()");
   }
 
   @override
   void dispose() {
-    print("$runtimeType dispose()");
+    debugLog("dispose()");
     //scanner.dispose();
     super.dispose();
   }
@@ -119,17 +120,23 @@ class DeviceListRouteState extends State<DeviceListRoute> {
       stream: DeviceList().stream,
       initialData: devices,
       builder: (BuildContext context, AsyncSnapshot<Map<String, Device>> snapshot) {
-        print("$runtimeType _list() rebuilding");
+        debugLog("_list() rebuilding");
         List<Widget> items = [];
         if (devices.length < 1)
           items.add(Center(child: Text("No devices")));
-        else
-          devices.forEach(
-            (identifier, device) {
-              //print("$runtimeType _list() adding ${device.runtimeType} ${device.name} ${device.lastScanRssi}");
+        else {
+          List<Device> sorted = devices.values.toList(growable: false);
+          sorted.sort((a, b) {
+            if (a.autoConnect.value == b.autoConnect.value) return a.name?.compareTo(b.name ?? "") ?? -1;
+            return a.autoConnect.value ? 1 : -1;
+          });
+          sorted.forEach(
+            (device) {
+              //debugLog("_list() adding ${device.runtimeType} ${device.name} ${device.lastScanRssi}");
               items.add(_listItem(device));
             },
           );
+        }
         return RefreshIndicator(
           key: _key,
           onRefresh: () {
@@ -146,20 +153,10 @@ class DeviceListRouteState extends State<DeviceListRoute> {
   }
 
   Widget _listItem(Device device) {
-    void openDevice() {
-      if (scanner.scanning) scanner.stopScan();
-      if (PeripheralConnectionState.connected != device.lastConnectionState) device.connect();
-      Navigator.push(
-        context,
-        PageTransition(
-          type: PageTransitionType.rightToLeft,
-          child: DeviceRoute(device),
-        ),
-      );
-    }
-
     return InkWell(
-      onTap: openDevice,
+      onTap: () {
+        openDevice(device);
+      },
       child: Container(
         padding: EdgeInsets.all(10),
         margin: EdgeInsets.fromLTRB(0, 0, 0, 6),
@@ -187,11 +184,25 @@ class DeviceListRouteState extends State<DeviceListRoute> {
               ),
             ),
             ElevatedButton(
-              onPressed: openDevice,
+              onPressed: () {
+                openDevice(device);
+              },
               child: Icon(Icons.arrow_forward),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void openDevice(Device device) {
+    if (scanner.scanning) scanner.stopScan();
+    if (PeripheralConnectionState.connected != device.lastConnectionState) device.connect();
+    Navigator.push(
+      context,
+      PageTransition(
+        type: PageTransitionType.rightToLeft,
+        child: DeviceRoute(device),
       ),
     );
   }

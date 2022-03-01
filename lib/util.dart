@@ -1,8 +1,9 @@
 import 'dart:async';
-//import 'dart:developer' as dev;
+import 'dart:developer' as dev;
 
 import 'package:espmui/main.dart';
 import 'package:flutter/material.dart';
+import 'debug.dart';
 
 /// bool plus Unknown and Waiting
 enum ExtendedBool {
@@ -19,12 +20,12 @@ ExtendedBool extendedBoolFrom(bool value) => value ? ExtendedBool.True : Extende
 /// with something that is equal to the old value as evaluated by the equality operator ==.
 ///
 /// After modifying a value indirectly (e.g. "alwaysNotifier.value.x = y;"), call [notifyListeners()].
-class AlwaysNotifier<T> extends ValueNotifier<T> with DebugHelper {
+class AlwaysNotifier<T> extends ValueNotifier<T> with Debug {
   AlwaysNotifier(T value) : super(value);
 
   @override
   set value(T newValue) {
-    //dev.log('AlwaysNotifier set value: $newValue');
+    //debugLog('AlwaysNotifier set value: $newValue');
     if (super.value == value) notifyListeners();
     super.value = newValue;
   }
@@ -32,7 +33,7 @@ class AlwaysNotifier<T> extends ValueNotifier<T> with DebugHelper {
   @override
   void notifyListeners() {
     super.notifyListeners();
-    print("$debugTag notifyListeners");
+    debugLog("notifyListeners");
   }
 }
 
@@ -43,10 +44,10 @@ int uts() {
 
 void streamSendIfNotClosed(StreamController stream, dynamic value) {
   if (stream.isClosed) {
-    print("[streamSendIfNotClosed] Stream ${stream.toString()} is closed");
+    dev.log("[streamSendIfNotClosed] Stream ${stream.toString()} is closed");
     return;
   }
-  //print("[streamSendIfNotClosed] Stream ${stream.toString()} sending value: $value");
+  //debugLog("[streamSendIfNotClosed] Stream ${stream.toString()} sending value: $value");
   stream.sink.add(value);
 }
 
@@ -95,21 +96,4 @@ void snackbar(String s, [BuildContext? context]) {
       style: const TextStyle(color: Colors.white),
     ),
   ));
-}
-
-class DebugBorder extends StatelessWidget {
-  final Widget child;
-  const DebugBorder({Key? key, required this.child}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(border: Border.all(color: Colors.white38)),
-      child: child,
-    );
-  }
-}
-
-class DebugHelper {
-  String get debugTag => "[$runtimeType(${identityHashCode(this)})]";
 }

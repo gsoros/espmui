@@ -6,6 +6,7 @@ import 'espm_api.dart';
 import 'device.dart';
 import 'ble_characteristic.dart';
 import 'util.dart';
+import 'debug.dart';
 
 class Battery extends StatelessWidget {
   final Device device;
@@ -456,7 +457,7 @@ class EspmApiStream extends StatelessWidget {
   }
 }
 
-class EspmApiCli extends StatelessWidget {
+class EspmApiCli extends StatelessWidget with Debug {
   final ESPM device;
   EspmApiCli(this.device);
 
@@ -475,7 +476,7 @@ class EspmApiCli extends StatelessWidget {
       ),
       onSubmitted: (String command) async {
         String? value = await device.api.request<String>(command);
-        print("[ApiCli] api.request($command): $value");
+        debugLog("[ApiCli] api.request($command): $value");
       },
     );
   }
@@ -504,7 +505,7 @@ class EspmApiInterface extends StatelessWidget {
   }
 }
 
-class EspmApiSettingInput extends StatelessWidget {
+class EspmApiSettingInput extends StatelessWidget with Debug {
   final ESPM device;
   final EspmApiCommand command;
   final String? value;
@@ -555,14 +556,14 @@ class EspmApiSettingInput extends StatelessWidget {
             minDelayMs: 2000,
           );
           if (name != null) snackbar("$name update${result == EspmApiResult.success.index ? "d" : " failed"}", context);
-          print("[ApiSettingInput] api.request($command): $result");
+          debugLog("[ApiSettingInput] api.request($command): $result");
         },
       ),
     );
   }
 }
 
-class SettingSwitch extends StatelessWidget {
+class SettingSwitch extends StatelessWidget with Debug {
   final ExtendedBool value;
   final String? name;
   final void Function(bool)? onChanged;
@@ -582,7 +583,7 @@ class SettingSwitch extends StatelessWidget {
             activeColor: Colors.red,
             onChanged: (bool enabled) async {
               if (onChanged != null) onChanged!(enabled);
-              print("[SettingSwitch] $name changed to $enabled");
+              debugLog("[SettingSwitch] $name changed to $enabled");
             });
     return (name == null)
         ? toggler
@@ -596,7 +597,7 @@ class SettingSwitch extends StatelessWidget {
   }
 }
 
-class EspmApiSettingSwitch extends StatelessWidget {
+class EspmApiSettingSwitch extends StatelessWidget with Debug {
   final ESPM device;
   final EspmApiCommand command;
   final ExtendedBool value;
@@ -626,7 +627,7 @@ class EspmApiSettingSwitch extends StatelessWidget {
                 minDelayMs: 2000,
               );
               if (name != null) snackbar("$name ${enabled ? "en" : "dis"}able${result == EspmApiResult.success.index ? "d" : " failed"}", context);
-              print("[EspmApiSettingSwitch] api.requestResultCode($command): $result");
+              debugLog("[EspmApiSettingSwitch] api.requestResultCode($command): $result");
             });
     return (name == null)
         ? onOff
@@ -640,7 +641,7 @@ class EspmApiSettingSwitch extends StatelessWidget {
   }
 }
 
-class EspmuiDropdown extends StatelessWidget {
+class EspmuiDropdown extends StatelessWidget with Debug {
   final String? value;
   final List<DropdownMenuItem<String>>? items;
   final String? name;
@@ -659,7 +660,7 @@ class EspmuiDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    //print("EspmuiDropdown build() value: $value items: $items");
+    //debugLog("EspmuiDropdown build() value: $value items: $items");
     Widget dropdown = Text("");
     if (items != null) if (items!.any((item) => item.value == value))
       dropdown = DecoratedBox(
@@ -724,7 +725,7 @@ class EspmApiSettingDropdown extends EspmuiDropdown {
         );
 }
 
-class EspmSettingsWidget extends StatelessWidget {
+class EspmSettingsWidget extends StatelessWidget with Debug {
   final ESPM device;
 
   EspmSettingsWidget(this.device);
@@ -746,7 +747,7 @@ class EspmSettingsWidget extends StatelessWidget {
     final wifiSettings = ValueListenableBuilder<ESPMWifiSettings>(
       valueListenable: device.wifiSettings,
       builder: (context, settings, child) {
-        //print("changed: $settings");
+        //debugLog("changed: $settings");
         var widgets = <Widget>[
           EspmApiSettingSwitch(
             device: device,
@@ -844,7 +845,7 @@ class EspmSettingsWidget extends StatelessWidget {
     final deviceSettings = ValueListenableBuilder<ESPMSettings>(
       valueListenable: device.deviceSettings,
       builder: (_, settings, __) {
-        //print("changed: $settings");
+        //debugLog("changed: $settings");
         var widgets = <Widget>[
           EspmApiSettingInput(
             device: device,
@@ -892,7 +893,7 @@ class EspmSettingsWidget extends StatelessWidget {
             command: EspmApiCommand.negativeTorqueMethod,
             value: settings.negativeTorqueMethod.toString(),
             onChanged: (value) {
-              print("Negative Torque Method: $value");
+              debugLog("Negative Torque Method: $value");
             },
             items: settings.negativeTorqueMethod == null
                 ? [
@@ -913,7 +914,7 @@ class EspmSettingsWidget extends StatelessWidget {
             command: EspmApiCommand.motionDetectionMethod,
             value: settings.motionDetectionMethod.toString(),
             onChanged: (value) {
-              print("Motion Detection Method: $value");
+              debugLog("Motion Detection Method: $value");
             },
             items: settings.motionDetectionMethod == null
                 ? [
@@ -931,7 +932,7 @@ class EspmSettingsWidget extends StatelessWidget {
         ];
         if (settings.motionDetectionMethod ==
             settings.validMotionDetectionMethods.keys.firstWhere((k) => settings.validMotionDetectionMethods[k] == "Strain gauge", orElse: () => -1)) {
-          //print("MDM==SG strainThresLow: ${settings.strainThresLow}");
+          //debugLog("MDM==SG strainThresLow: ${settings.strainThresLow}");
           widgets.add(
             Row(
               children: [

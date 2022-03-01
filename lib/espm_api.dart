@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'ble_characteristic.dart';
-import 'util.dart';
 import 'device.dart';
+import 'util.dart';
+import 'debug.dart';
 
 enum EspmApiCommand {
   invalid,
@@ -56,7 +57,7 @@ enum EspmApiResult {
 
 typedef void EspmApiCallback(EspmApiMessage message);
 
-class EspmApiMessage {
+class EspmApiMessage with Debug {
   String command;
   String? commandStr;
   int? commandCode;
@@ -96,7 +97,7 @@ class EspmApiMessage {
   /// Attempts to create commandCode and commandStr from command
   void parseCommand() {
     if (commandCode != null) return; // already parsed
-    //print("$runtimeType parsing: $command");
+    //debugLog("parsing: $command");
     int eqSign = command.indexOf("=");
     String? parsedArg;
     if (eqSign > 0) {
@@ -108,7 +109,7 @@ class EspmApiMessage {
     var intParsed = int.tryParse(command);
     for (EspmApiCommand code in EspmApiCommand.values) {
       var valStr = code.toString().split('.').last;
-      //print("$runtimeType checking $valStr");
+      //debugLog("checking $valStr");
       if (code.index == intParsed || valStr == command) {
         commandCode = code.index;
         commandStr = command;
@@ -120,12 +121,12 @@ class EspmApiMessage {
       info = "Unrecognized command";
       isDone = true;
     }
-    //print("$runtimeType parsed: " + toString());
+    //debugLog("parsed: " + toString());
   }
 
   void checkAge() {
     if (createdAt + maxAgeMs <= uts()) {
-      print("$runtimeType max age reached: " + toString());
+      debugLog("max age reached: " + toString());
       resultCode = -1;
       resultStr = "ClientError";
       info = "Maximum age reached";
@@ -135,7 +136,7 @@ class EspmApiMessage {
 
   void checkAttempts() {
     if (maxAttempts <= (attempts ?? 0)) {
-      print("$runtimeType max attmpts reached: " + toString());
+      debugLog("max attmpts reached: " + toString());
       resultCode = -1;
       resultStr = "ClientError";
       info = "Maximum attempts reached";
@@ -144,7 +145,7 @@ class EspmApiMessage {
   }
 
   void destruct() {
-    //print("$runtimeType destruct " + toString());
+    //debugLog("destruct " + toString());
     isDone = true;
     //info = ((info == null) ? "" : info.toString()) + " destructed";
   }
@@ -184,7 +185,7 @@ class EspmApiMessage {
   String? get valueAsString => value;
 }
 
-class EspmApi {
+class EspmApi with Debug {
   ESPM device;
   ApiCharacteristic? get _characteristic => device.apiCharacteristic;
   late StreamSubscription<String>? _subscription;
@@ -202,54 +203,54 @@ class EspmApi {
 
   void _startQueueSchedule() {
     if (_timer != null) return;
-    print("$runtimeType queueSchedule start");
+    debugLog("queueSchedule start");
     _timer = Timer.periodic(Duration(milliseconds: queueDelayMs), (_) => _runQueue());
   }
 
   void _stopQueueSchedule() {
     if (_timer == null) return;
-    print("$runtimeType queueSchedule stop");
+    debugLog("queueSchedule stop");
     _timer?.cancel();
     _timer = null;
   }
 
   /// format: resultCode:resultStr;commandCode:commandStr=[value]
   void _onNotify(String reply) {
-    //print("$runtimeType _onNotify() $reply");
+    //debugLog("_onNotify() $reply");
     int resultEnd = reply.indexOf(";");
     if (resultEnd < 1) {
-      print("$runtimeType Error parsing notification: $reply");
+      debugLog("Error parsing notification: $reply");
       return;
     }
     String result = reply.substring(0, resultEnd);
     int colon = result.indexOf(":");
     if (colon < 1) {
-      print("$runtimeType Error parsing result: $result");
+      debugLog("Error parsing result: $result");
       return;
     }
     String resultCodeStr = result.substring(0, colon);
     int? resultCode = int.tryParse(resultCodeStr);
     if (resultCode == null) {
-      print("$runtimeType Error parsing resultCode as int: $resultCode");
+      debugLog("Error parsing resultCode as int: $resultCode");
       return;
     }
     String resultStr = result.substring(colon + 1);
     String commandWithValue = reply.substring(resultEnd + 1);
     colon = commandWithValue.indexOf(":");
     if (colon < 1) {
-      print("$runtimeType Error parsing commandWithValue: $commandWithValue");
+      debugLog("Error parsing commandWithValue: $commandWithValue");
       return;
     }
     String commandCodeStr = commandWithValue.substring(0, colon);
     int? commandCode = int.tryParse(commandCodeStr);
     if (commandCode == null) {
-      print("$runtimeType Error parsing commandCode as int: $commandCodeStr");
+      debugLog("Error parsing commandCode as int: $commandCodeStr");
       return;
     }
     String commandStrWithValue = commandWithValue.substring(colon + 1);
     int eq = commandStrWithValue.indexOf("=");
     if (eq < 1) {
-      print("$runtimeType Error parsing commandStrWithValue: $commandStrWithValue");
+      debugLog("Error parsing commandStrWithValue: $commandStrWithValue");
       return;
     }
     //String commandStr = commandStrWithValue.substring(0, eq);
@@ -265,11 +266,11 @@ class EspmApi {
         // don't return on the first match, process all matching messages
       }
     }
-    if (matches == 0) print("$runtimeType Warning: did not find a matching queued message for the reply $reply");
+    if (matches == 0) debugLog("Warning: did not find a matching queued message for the reply $reply");
   }
 
   void _onDone(EspmApiMessage message) {
-    //print("$runtimeType onDone $message");
+    //debugLog("onDone $message");
     streamSendIfNotClosed(_doneController, message);
     var onDone = message.onDone;
     if (onDone == null) return;
@@ -278,7 +279,7 @@ class EspmApi {
     onDone(message);
     //return;
     //}
-    //print("$runtimeType Incorrect callback type: $onDone");
+    //debugLog("Incorrect callback type: $onDone");
   }
 
   /// Sends a command to the API.
@@ -307,8 +308,8 @@ class EspmApi {
     int before = _queue.length;
     _queue.removeWhere((queued) => queued.command == message.command);
     int removed = before - _queue.length;
-    if (removed > 0) print("$runtimeType removed $removed duplicate messages");
-    //print("$runtimeType adding to queue: $message");
+    if (removed > 0) debugLog("removed $removed duplicate messages");
+    //debugLog("adding to queue: $message");
     _queue.add(message);
     _runQueue();
     return message;
@@ -333,7 +334,7 @@ class EspmApi {
     if (T == double) return message.valueAsDouble as T?;
     if (T == int) return message.valueAsInt as T?;
     if (T == bool) return message.valueAsBool as T?;
-    print("$runtimeType request() error: type $T is not handled");
+    debugLog("request() error: type $T is not handled");
     return message as T?;
   }
 
@@ -359,12 +360,12 @@ class EspmApi {
   Future<void> isDone(EspmApiMessage message) async {
     await Future.doWhile(() async {
       if (message.isDone != true && message.resultCode == null) {
-        //print("$runtimeType polling...");
+        //debugLog("polling...");
         // TODO milliseconds: [message.minDelay, queueDelayMs].max
         await Future.delayed(Duration(milliseconds: message.minDelayMs));
         return true;
       }
-      //print("$runtimeType poll end");
+      //debugLog("poll end");
       return false;
     });
   }
@@ -376,7 +377,7 @@ class EspmApi {
 
   void _runQueue() async {
     if (_running) {
-      //print("$runtimeType _runQueue() already running");
+      //debugLog("_runQueue() already running");
       return;
     }
     _running = true;
@@ -385,7 +386,7 @@ class EspmApi {
       _running = false;
       return;
     }
-    //print("$runtimeType queue run");
+    //debugLog("queue run");
     var message = _queue.removeFirst();
     message.parseCommand();
     message.checkAge();
@@ -408,7 +409,7 @@ class EspmApi {
     if (now < (message.lastSentAt ?? 0) + message.minDelayMs) return;
     //var device = Scanner().selected;
     if (!await device.ready()) {
-      print("$runtimeType _send() not ready");
+      debugLog("_send() not ready");
       return;
     }
     message.lastSentAt = now;
@@ -416,12 +417,12 @@ class EspmApi {
     String toWrite = message.commandCode.toString();
     var arg = message.arg;
     if (arg != null) toWrite += "=$arg";
-    print("$runtimeType _send() calling char.write($toWrite)");
+    debugLog("_send() calling char.write($toWrite)");
     _characteristic?.write(toWrite);
   }
 
   Future<void> destruct() async {
-    print("$runtimeType destruct");
+    debugLog("destruct");
     _stopQueueSchedule();
     await _subscription?.cancel();
     while (_queue.isNotEmpty) {

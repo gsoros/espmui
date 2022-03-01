@@ -15,7 +15,7 @@ import 'device_list.dart';
 import 'device_list_route.dart';
 import 'device_widgets.dart';
 import 'tile.dart';
-//import 'tile_route.dart';
+import 'debug.dart';
 
 class TilesRoute extends StatefulWidget {
   const TilesRoute({Key? key}) : super(key: key);
@@ -24,7 +24,7 @@ class TilesRoute extends StatefulWidget {
   _TilesRouteState createState() => _TilesRouteState();
 }
 
-class _TilesRouteState extends State<TilesRoute> {
+class _TilesRouteState extends State<TilesRoute> with Debug {
   bool _fabVisible = false;
   Timer? _fabTimer;
 
@@ -38,13 +38,13 @@ class _TilesRouteState extends State<TilesRoute> {
   }
 
   Future<void> _showFab(dynamic _) async {
-    debugPrint("showFab");
+    debugLog("showFab");
     setState(() {
       _fabVisible = true;
     });
     _fabTimer?.cancel();
     _fabTimer = Timer(Duration(seconds: 3), () {
-      debugPrint("hideFab");
+      debugLog("hideFab");
       setState(() {
         _fabVisible = false;
       });
@@ -60,7 +60,7 @@ class _TilesRouteState extends State<TilesRoute> {
         floatingActionButton: _fabVisible
             ? FloatingActionButton(
                 onPressed: () {
-                  print("fab pressed");
+                  debugLog("fab pressed");
                   Navigator.push(
                     context,
                     HeroDialogRoute(
@@ -76,7 +76,7 @@ class _TilesRouteState extends State<TilesRoute> {
                                   height: 50.0,
                                   child: ElevatedButton(
                                       onPressed: () => setState(() {
-                                            dev.log('$runtimeType calling TileList(mode: fromPreferences)');
+                                            debugLog('calling TileList(mode: fromPreferences)');
                                             _tileGrid = TileGrid(
                                               key: UniqueKey(),
                                               mode: 'fromPreferences',
@@ -155,7 +155,7 @@ class _TilesRouteState extends State<TilesRoute> {
   }
 }
 
-class TileGrid extends StatefulWidget {
+class TileGrid extends StatefulWidget with Debug {
   final String mode;
 
   const TileGrid({
@@ -165,7 +165,7 @@ class TileGrid extends StatefulWidget {
 
   @override
   _TileGridState createState() {
-    dev.log('$runtimeType createState()');
+    debugLog('createState()');
     _TileGridState state = _TileGridState();
     //if (mode == 'fromPreferences')
     //  state._tiles.load();
@@ -175,7 +175,7 @@ class TileGrid extends StatefulWidget {
   }
 }
 
-class _TileGridState extends State<TileGrid> {
+class _TileGridState extends State<TileGrid> with Debug {
   late TileList _tiles;
   double dialogOpacity = 1;
   bool colorPicker = false;
@@ -188,12 +188,12 @@ class _TileGridState extends State<TileGrid> {
 
   @override
   void initState() {
-    dev.log('$runtimeType initState');
+    debugLog('initState');
     super.initState();
   }
 
   void _randomize() {
-    dev.log('$runtimeType _randomize');
+    debugLog('_randomize');
     _tiles.clear();
     for (var i = 0; i < 5; i++) _tiles.add(Tile.random());
   }
@@ -355,7 +355,7 @@ class _TileGridState extends State<TileGrid> {
           builder: (context, List<Tile> tiles, _) {
             if (tiles.length <= index || index < 0) return Text("Cannot find tile $index");
             Tile tile = tiles[index];
-            //print("source builder called: ${tile.stream}");
+            //debugLog("source builder called: ${tile.stream}");
             String value = "${tile.device};${tile.stream}";
             bool valuePresent = false;
             var items = <DropdownMenuItem<String>>[];
@@ -391,10 +391,10 @@ class _TileGridState extends State<TileGrid> {
               value: valuePresent ? value : "",
               items: items,
               onChanged: (value) {
-                print("New source $value");
+                debugLog("New source $value");
                 var chunks = value?.split(";");
                 if (chunks == null || chunks.length < 2 || chunks[0].length < 1 || chunks[1].length < 1) {
-                  print("Wrong chunks: $chunks");
+                  debugLog("Wrong chunks: $chunks");
                   return;
                 }
                 _tiles[index] = Tile.from(
@@ -414,14 +414,14 @@ class _TileGridState extends State<TileGrid> {
           builder: (context, List<Tile> tiles, _) {
             if (tiles.length <= index || index < 0) return Text("Cannot find tile $index");
             Tile tile = tiles[index];
-            //print("tapAction builder called: ${tile.tap}");
+            //debugLog("tapAction builder called: ${tile.tap}");
             bool valuePresent = false;
             var items = <DropdownMenuItem<String>>[];
             DeviceList().forEach((_, device) {
               if (device.tileActions.length < 1) return;
               device.tileActions.forEach((name, action) {
                 String itemValue = "${device.peripheral?.identifier};$name";
-                //print("${device.name ?? 'unnamed device'} ${action.label} $itemValue");
+                //debugLog("${device.name ?? 'unnamed device'} ${action.label} $itemValue");
                 if (itemValue == tile.tap) valuePresent = true;
                 items.add(DropdownMenuItem(
                   value: itemValue,
@@ -441,7 +441,7 @@ class _TileGridState extends State<TileGrid> {
               value: valuePresent ? tile.tap : "",
               items: items,
               onChanged: (value) {
-                print("New tapAction $value");
+                debugLog("New tapAction $value");
                 _tiles[index] = Tile.from(
                   tile,
                   tap: value ?? "",
@@ -454,7 +454,7 @@ class _TileGridState extends State<TileGrid> {
 
     void onTap(Tile? tile) {
       if (null == tile) return;
-      print("onTap: ${tile.tap}");
+      debugLog("onTap: ${tile.tap}");
       if (tile.tap.length < 3) return;
       var chunks = tile.tap.split(";");
       if (chunks.length != 2) return;
@@ -515,11 +515,11 @@ class _TileGridState extends State<TileGrid> {
                         child: InkWell(
                           child: tiles[index],
                           onTap: () {
-                            print("tile $index tap");
+                            debugLog("tile $index tap");
                             onTap(tiles[index]);
                           },
                           onDoubleTap: () {
-                            print("tile $index doubleTap");
+                            debugLog("tile $index doubleTap");
                             Navigator.push(
                               context,
                               HeroDialogRoute(
@@ -545,7 +545,7 @@ class _TileGridState extends State<TileGrid> {
                                           EspmuiElevatedButton(
                                             "Delete",
                                             action: () {
-                                              print("delete tile $index");
+                                              debugLog("delete tile $index");
                                               setState(() {
                                                 tiles.removeAt(index);
                                                 _tiles.tiles = tiles;

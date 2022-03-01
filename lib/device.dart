@@ -10,6 +10,7 @@ import 'ble_characteristic.dart';
 import 'preferences.dart';
 import 'espm_api.dart';
 import 'util.dart';
+import 'debug.dart';
 
 /*
 Device: Battery
@@ -20,7 +21,7 @@ Device: Battery
   └─ TODO SpeedSensor: Speed
 */
 
-class Device with DebugHelper {
+class Device with Debug {
   Peripheral? peripheral;
 
   /// whether the device should be kept connected
@@ -62,7 +63,7 @@ class Device with DebugHelper {
   Map<String, DeviceTileAction> tileActions = {};
 
   Device(this.peripheral) {
-    dev.log("$debugTag construct");
+    debugLog("construct");
     if (null != peripheral)
       _characteristics.addAll({
         'battery': CharacteristicListItem(BatteryCharacteristic(peripheral!)),
@@ -128,7 +129,7 @@ class Device with DebugHelper {
       )
           .listen(
         (state) async {
-          print("$runtimeType new connection state: $state");
+          debugLog("new connection state: $state");
           lastConnectionState = state;
           /*
           if (state == connectedState)
@@ -152,7 +153,7 @@ class Device with DebugHelper {
   }
 
   Future<void> dispose() async {
-    print("$runtimeType $name dispose");
+    debugLog("$name dispose");
     await disconnect();
     await _stateController.close();
     _characteristics.forEachCharacteristic((_, char) async {
@@ -197,14 +198,14 @@ class Device with DebugHelper {
   }
 
   Future<void> _onDisconnected() async {
-    print("$debugTag _onDisconnected()");
+    debugLog("_onDisconnected()");
     await _unsubscribeCharacteristics();
     _deinitCharacteristics();
     //streamSendIfNotClosed(stateController, newState);
     if (autoConnect.value && !await connected) {
       await Future.delayed(Duration(seconds: 15)).then((_) async {
         if (autoConnect.value && !await connected) {
-          print("$debugTag Autoconnect calling connect()");
+          debugLog("Autoconnect calling connect()");
           await connect();
         }
       });
@@ -216,7 +217,7 @@ class Device with DebugHelper {
     final disconnectedState = PeripheralConnectionState.disconnected;
 
     if (await connected) {
-      print("$runtimeType Not connecting to $name, already connected");
+      debugLog("Not connecting to $name, already connected");
       streamSendIfNotClosed(_stateController, connectedState);
       //await discoverCharacteristics();
       //await _subscribeCharacteristics();
@@ -224,19 +225,19 @@ class Device with DebugHelper {
       return;
     }
     if (await BLE().currentState() != BluetoothState.POWERED_ON) {
-      print("$debugTag connect() Adapter is off, not connecting");
+      debugLog("connect() Adapter is off, not connecting");
       streamSendIfNotClosed(_stateController, disconnectedState);
       return;
     }
     if (null == peripheral) {
-      print("$debugTag connect() Peripheral is null)");
+      debugLog("connect() Peripheral is null)");
       return;
     }
     if (_connectionInitiated) {
-      print("$debugTag connect() Connection already initiated");
+      debugLog("connect() Connection already initiated");
       return;
     }
-    print("$debugTag connect() Connecting to $name(${peripheral!.identifier})");
+    debugLog("connect() Connecting to $name(${peripheral!.identifier})");
     _connectionInitiated = true;
     await peripheral!
         .connect(
@@ -259,46 +260,46 @@ class Device with DebugHelper {
         }
       },
     );
-    print("$debugTag peripheral.connect() returned");
+    debugLog("peripheral.connect() returned");
     _connectionInitiated = false;
   }
 
   Future<void> discoverCharacteristics() async {
     String subject = "$debugTag discoverCharacteristics()";
-    //print("$subject conn=${await connected}");
+    //debugLog("$subject conn=${await connected}");
     if (!await connected) return;
     if (null == peripheral) return;
-    //print("$subject discoverAllServicesAndCharacteristics() start");
+    //debugLog("$subject discoverAllServicesAndCharacteristics() start");
     await peripheral!.discoverAllServicesAndCharacteristics().catchError((e) {
       bleError(debugTag, "discoverAllServicesAndCharacteristics()", e);
     });
-    //print("$subject discoverAllServicesAndCharacteristics() end");
-    //print("$subject services() start");
+    //debugLog("$subject discoverAllServicesAndCharacteristics() end");
+    //debugLog("$subject services() start");
     var services = await peripheral!.services().catchError((e) {
       bleError(debugTag, "services()", e);
       return <Service>[];
     });
-    //print("$subject services() end");
+    //debugLog("$subject services() end");
     var serviceUuids = <String>[];
     services.forEach((s) {
       serviceUuids.add(s.uuid);
     });
-    print("$subject end services: $serviceUuids");
+    debugLog("$subject end services: $serviceUuids");
     _discovered = true;
   }
 
   Future<void> _subscribeCharacteristics() async {
-    dev.log('$runtimeType _subscribeCharacteristics start');
+    debugLog('_subscribeCharacteristics start');
     if (!await discovered()) return;
     await _characteristics.forEachListItem((_, item) async {
       if (item.subscribeOnConnect) {
-        dev.log('$runtimeType _subscribeCharacteristics ${item.characteristic?.characteristicUUID} start');
+        debugLog('_subscribeCharacteristics ${item.characteristic?.characteristicUUID} start');
         await item.characteristic?.subscribe();
-        dev.log('$runtimeType _subscribeCharacteristics ${item.characteristic?.characteristicUUID} end');
+        debugLog('_subscribeCharacteristics ${item.characteristic?.characteristicUUID} end');
       }
     });
     _subscribed = true;
-    dev.log('$runtimeType _subscribeCharacteristics end');
+    debugLog('_subscribeCharacteristics end');
   }
 
   Future<void> _unsubscribeCharacteristics() async {
@@ -317,10 +318,10 @@ class Device with DebugHelper {
   }
 
   Future<void> disconnect() async {
-    print("$runtimeType disconnect() $name");
+    debugLog("disconnect() $name");
     if (null == peripheral) return;
     if (!await peripheral!.isConnected()) {
-      dev.log("$debugTag disconnect(): not connected, but proceeding anyway");
+      debugLog("disconnect(): not connected, but proceeding anyway");
       //return;
     }
     //await _unsubscribeCharacteristics();
@@ -353,15 +354,15 @@ class Device with DebugHelper {
   Future<void> updatePreferences() async {
     if (null == peripheral) return;
     List<String> devices = (await Preferences().getDevices()).value;
-    dev.log('$runtimeType updatePreferences savedDevices before: $devices');
+    debugLog('updatePreferences savedDevices before: $devices');
     String item = runtimeType.toString() + ';' + (name?.replaceAll(RegExp(r';'), '') ?? '') + ';' + peripheral!.identifier;
-    dev.log('$runtimeType updatePreferences item: $item');
+    debugLog('updatePreferences item: $item');
     if (autoConnect.value)
       devices.add(item);
     else
       devices.removeWhere((item) => item.endsWith(peripheral!.identifier));
     Preferences().setDevices(devices);
-    dev.log('$runtimeType updatePreferences savedDevices after: $devices');
+    debugLog('updatePreferences savedDevices after: $devices');
   }
 
   Future<bool> isSaved() async {
@@ -412,12 +413,12 @@ class PowerMeter extends Device {
   /// advertisement packet, only after discovery
   Future<Type> _correctType() async {
     Type t = runtimeType;
-    dev.log("$debugTag _correctType peripheral: $peripheral");
+    debugLog("_correctType peripheral: $peripheral");
     if (null == peripheral || !await discovered()) return t;
-    dev.log("$debugTag _correctType 2");
+    debugLog("_correctType 2");
     (await peripheral!.services()).forEach((s) {
       if (s.uuid == BleConstants.ESPM_API_SERVICE_UUID) {
-        dev.log("$debugTag _correctType() ESPM detected");
+        debugLog("_correctType() ESPM detected");
         t = ESPM;
         return;
       }
@@ -428,7 +429,7 @@ class PowerMeter extends Device {
   Future<Device> copyToCorrectType() async {
     if (null == peripheral) return this;
     Type t = await _correctType();
-    dev.log("$debugTag copyToCorrectType $t");
+    debugLog("copyToCorrectType $t");
     Device device = this;
     if (ESPM == t) {
       device = ESPM(peripheral!);
@@ -493,9 +494,9 @@ class ESPM extends PowerMeter {
 
   /// Processes "done" messages sent by the API
   void _onApiDone(EspmApiMessage message) async {
-    //print("$runtimeType onApiDone parsing message: $message");
+    //debugLog("onApiDone parsing message: $message");
     if (message.resultCode != EspmApiResult.success.index) return;
-    //print("$runtimeType onApiDone parsing successful message: $message");
+    //debugLog("onApiDone parsing successful message: $message");
     // switch does not work with non-constant case :(
 
     // hostName
@@ -623,7 +624,7 @@ class ESPM extends PowerMeter {
     }
     // config
     else if (EspmApiCommand.config.index == message.commandCode) {
-      dev.log('$runtimeType _onApiDone got config');
+      debugLog('_onApiDone got config');
       if (message.valueAsString != null) {
         message.valueAsString!.split(';').forEach((chunk) {
           var pair = chunk.split('=');
@@ -633,7 +634,7 @@ class ESPM extends PowerMeter {
           if (null == message.commandCode) return;
           message.resultCode = EspmApiResult.success.index;
           message.value = pair.last;
-          dev.log('$runtimeType _onApiDone config calling _onApiDone(${message.commandCode})');
+          debugLog('_onApiDone config calling _onApiDone(${message.commandCode})');
           _onApiDone(message);
         });
       }
@@ -641,13 +642,13 @@ class ESPM extends PowerMeter {
   }
 
   Future<void> dispose() async {
-    print("$runtimeType $name dispose");
+    debugLog("$name dispose");
     _apiSubsciption?.cancel();
     super.dispose();
   }
 
   Future<void> _onConnected() async {
-    print("$debugTag _onConnected()");
+    debugLog("_onConnected()");
     if (null == peripheral) return;
     // api char can use values longer than 20 bytes
     await BLE().requestMtu(peripheral!, 512);
@@ -656,7 +657,7 @@ class ESPM extends PowerMeter {
   }
 
   Future<void> _onDisconnected() async {
-    print("$runtimeType _onDisconnected()");
+    debugLog("_onDisconnected()");
     await super._onDisconnected();
     _resetInit();
   }
@@ -664,9 +665,9 @@ class ESPM extends PowerMeter {
   /// request initial values, returned values are discarded
   /// because the message.done subscription will handle them
   void _requestInit() async {
-    print("$runtimeType Requesting init start");
+    debugLog("Requesting init start");
     if (!await ready()) return;
-    print("$runtimeType Requesting init ready to go");
+    debugLog("Requesting init ready to go");
     weightServiceEnabled.value = ExtendedBool.Waiting;
     [
       /*

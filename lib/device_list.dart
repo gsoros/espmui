@@ -8,9 +8,10 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'device.dart';
 import 'preferences.dart';
 //import 'util.dart';
+import 'debug.dart';
 
 /// Singleton class
-class DeviceList with DebugHelper {
+class DeviceList with Debug {
   static final DeviceList _instance = DeviceList._construct();
   static int _instances = 0;
   Map<String, Device> _items = {};
@@ -27,7 +28,7 @@ class DeviceList with DebugHelper {
 
   DeviceList._construct() {
     _instances++;
-    dev.log('$runtimeType _construct() # of instances: $_instances');
+    debugLog('_construct() # of instances: $_instances');
     load();
     //_controller
   }
@@ -39,16 +40,16 @@ class DeviceList with DebugHelper {
     await _exclusiveAccess.protect(() async {
       if (_loaded && !reload) return;
       var saved = await Preferences().getDevices();
-      //dev.log("$debugTag load() saved: ${saved.value}");
+      //debugLog("load() saved: ${saved.value}");
       // don't forEach() on a Future
       for (String str in saved.value) {
         var device = await Device.fromSaved(str);
         device?.autoConnect.value = true;
         if (null != device) addOrUpdate(device);
         device?.connect();
-        //dev.log("$debugTag load() added ${device?.name}");
+        //debugLog("load() added ${device?.name}");
       }
-      //dev.log('$debugTag load() finished');
+      //debugLog('load() finished');
     });
     _loaded = true;
   }
@@ -74,7 +75,7 @@ class DeviceList with DebugHelper {
         return existing;
       },
       ifAbsent: () {
-        print("$runtimeType addOrUpdate adding ${device.peripheral!.name}");
+        debugLog("addOrUpdate adding ${device.peripheral!.name}");
         return device;
       },
     );
@@ -92,7 +93,7 @@ class DeviceList with DebugHelper {
     _items.update(
       result.peripheral.identifier,
       (existing) {
-        //print("$runtimeType addFromScanResult already exists: ${existing.peripheral.name}");
+        //debugLog("addFromScanResult already exists: ${existing.peripheral.name}");
         existing.lastScanRssi = result.rssi;
         //var device = Device.fromScanResult(result);
         //if (existing.runtimeType != device.runtimeType) dev.log("$runtimeType type mismatch: existing: ${existing.runtimeType} new: ${existing.runtimeType}");
@@ -100,7 +101,7 @@ class DeviceList with DebugHelper {
       },
       ifAbsent: () {
         Device device = Device.fromScanResult(result);
-        print("$runtimeType addFromScanResult adding ${device.peripheral!.name}");
+        debugLog("addFromScanResult adding ${device.peripheral!.name}");
         return device;
       },
     );
@@ -115,7 +116,7 @@ class DeviceList with DebugHelper {
   }
 
   Future<void> dispose() async {
-    print("$runtimeType dispose");
+    debugLog("dispose");
     _items.forEach((_, device) => device.dispose());
     _items.clear();
     _controller.close();

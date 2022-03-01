@@ -10,8 +10,9 @@ import 'preferences.dart';
 import 'device.dart';
 import 'device_list.dart';
 import 'util.dart';
+import 'debug.dart';
 
-class Tile extends StatelessWidget with DebugHelper {
+class Tile extends StatelessWidget with Debug {
   final Color color;
   final Color textColor;
   final int width;
@@ -121,14 +122,14 @@ class Tile extends StatelessWidget with DebugHelper {
     //if (!device?.tileStreams.containsKey(this.stream)) return Text("No stream");
     DeviceTileStream? stream = device?.tileStreams[this.stream];
     //if (null == stream) return Text("Invalid source");
-    //print("$debugTag build device: ${device?.name ?? 'null'} dl.l: ${DeviceList().devices.length}");
+    //debugLog("build device: ${device?.name ?? 'null'} dl.l: ${DeviceList().devices.length}");
 
     Widget getValue() {
       return StreamBuilder<String>(
         stream: stream?.stream,
         initialData: stream?.initialData != null ? stream?.initialData!() : null,
         builder: (_, snapshot) {
-          //print("Tile build getValue ${device.name} ${source.label} ${snapshot.data}");
+          //debugLog("Tile build getValue ${device.name} ${source.label} ${snapshot.data}");
           return Text(snapshot.hasData ? snapshot.data.toString() : " ");
         },
       );
@@ -139,7 +140,7 @@ class Tile extends StatelessWidget with DebugHelper {
         stream: device?.stateStream,
         initialData: device?.lastConnectionState,
         builder: (_, snapshot) {
-          //print("Tile build getValueWhenConnected ${device.name} ${source.label} ${snapshot.data}");
+          //debugLog("Tile build getValueWhenConnected ${device.name} ${source.label} ${snapshot.data}");
           if (!snapshot.hasData || snapshot.data == null || snapshot.data == PeripheralConnectionState.connected) return getValue();
           if (snapshot.data == PeripheralConnectionState.disconnected) return Text(" ");
           return CircularProgressIndicator();
@@ -260,7 +261,7 @@ class Graph extends StatelessWidget {
 }
 
 /// Singleton class
-class TileList with DebugHelper {
+class TileList with Debug {
   static final TileList _instance = TileList._construct();
   static int _instances = 0;
   var notifier = AlwaysNotifier<List<Tile>>([]);
@@ -305,15 +306,15 @@ class TileList with DebugHelper {
 
   TileList._construct() {
     _instances++;
-    dev.log('$runtimeType _construct() # of instances: $_instances');
+    debugLog('_construct() # of instances: $_instances');
     load();
   }
 
   Future<void> load() async {
-    //dev.log("$debugTag load() start");
+    //debugLog("load() start");
     await DeviceList().load();
     _fromJsonStringList((await Preferences().getTiles()).value);
-    //dev.log("$debugTag load() end");
+    //debugLog("load() end");
     notifier.notifyListeners();
   }
 

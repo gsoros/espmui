@@ -1,13 +1,14 @@
 import 'dart:async';
-import 'dart:developer' as dev;
+//import 'dart:developer' as dev;
 
 //import 'package:flutter/foundation.dart';
+import 'package:espmui/debug.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mutex/mutex.dart';
 
 import 'util.dart';
 
-class Preferences {
+class Preferences with Debug {
   static final Preferences _instance = Preferences._construct();
   late final SharedPreferences _sharedPreferences;
   bool _initDone = false;
@@ -25,7 +26,7 @@ class Preferences {
     await _init();
     _devices.value = devices;
     _sharedPreferences.setStringList('devices', devices);
-    dev.log('$runtimeType setDevices $devices');
+    debugLog('setDevices $devices');
   }
 
   /* Tiles */
@@ -40,23 +41,23 @@ class Preferences {
     await _init();
     _tiles.value = tiles;
     _sharedPreferences.setStringList('tiles', tiles);
-    dev.log('$runtimeType setTiles $tiles');
+    debugLog('setTiles $tiles');
   }
 
   Future<void> _init() async {
-    dev.log('$runtimeType init step 1');
+    debugLog('init step 1');
     if (_initDone) return;
     await _exclusiveAccess.protect(() async {
       if (_initDone) return;
-      dev.log('$runtimeType init step 2');
+      debugLog('init step 2');
       _sharedPreferences = await SharedPreferences.getInstance();
       _devices.value = _sharedPreferences.getStringList('devices') ?? [];
       _devices.addListener(() {
-        dev.log('$runtimeType _devicesNotifier listener ${_devices.value}');
+        debugLog('_devicesNotifier listener ${_devices.value}');
       });
       _tiles.value = _sharedPreferences.getStringList('tiles') ?? [];
       _tiles.addListener(() {
-        dev.log('$runtimeType _tilesNotifier listener ${_tiles.value}');
+        debugLog('_tilesNotifier listener ${_tiles.value}');
       });
       _initDone = true;
     });
@@ -68,7 +69,7 @@ class Preferences {
   }
 
   Preferences._construct() {
-    dev.log('$runtimeType _construct()');
+    debugLog('_construct()');
     _init();
   }
 }
