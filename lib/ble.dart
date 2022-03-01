@@ -31,9 +31,9 @@ class BLE with DebugHelper {
   bool _currentStateInitialized = false;
 
   Future<BluetoothState> currentState() async {
-    await _checkClient();
+    await _init();
     if (!_currentStateInitialized) {
-      _currentState = await manager.bluetoothState();
+      _currentState = await (await manager).bluetoothState();
       streamSendIfNotClosed(stateController, _currentState);
       _currentStateInitialized = true;
     }
@@ -45,8 +45,63 @@ class BLE with DebugHelper {
     return _currentState;
   }
 
+  Future<BleManager> get manager async {
+    //print("$runtimeType get manager");
+    await _init();
+    return BleManager();
+  }
+
+  BLE._construct() {
+    print("$runtimeType _construct()");
+    tag = runtimeType.toString();
+    _init();
+  }
+
+  Future<void> _init() async {
+    if (_initDone) return;
+    print("$runtimeType _init()");
+    await _exclusiveAccess.protect(() async {
+      if (_initDone) return;
+      //print("$runtimeType _init() calling _checkPermissions()");
+      await _checkPermissions();
+      //print("$runtimeType _init() calling _checkClient()");
+      await _checkClient();
+      //print("$runtimeType _init() calling _checkAdapter()");
+      await _checkAdapter();
+      _initDone = true;
+      //print("$runtimeType _init() done");
+    });
+  }
+
+  Future<void> dispose() async {
+    print("$runtimeType dispose()");
+    await stateController.close();
+    await stateSubscription?.cancel();
+    await (await manager).destroyClient();
+    _initDone = false;
+  }
+
+  Future<void> reinit() async {
+    await dispose();
+    await _init();
+  }
+
+  Future<void> _checkPermissions() async {
+    print("$runtimeType Checking permissions");
+    if (!Platform.isAndroid) return;
+    if (!await Permission.location.request().isGranted) {
+      bleError(tag, "No location permission");
+      return Future.error(Exception("$runtimeType Location permission not granted"));
+    }
+    if (!await Permission.bluetooth.request().isGranted) {
+      bleError(tag, "No blootueth permission");
+      return Future.error(Exception("$runtimeType Bluetooth permission not granted"));
+    }
+    print("$runtimeType Checking permissions done");
+  }
+
   Future<void> _checkClient() async {
-    //print("$runtimeType _checkClient() start");
+    print("$runtimeType _checkClient() start");
     if (!_createClientCompleted) {
       while (!await BleManager().isClientCreated()) {
         // make sure createClient() is called only once
@@ -73,64 +128,6 @@ class BLE with DebugHelper {
     }
     //print("$runtimeType _checkClient() end");
     //return Future.value(null);
-  }
-
-  BleManager get manager {
-    if (!_initDone) {
-      print("$runtimeType get manager calling _init()");
-      _init();
-      sleep(Duration(milliseconds: 1000));
-    }
-    //_checkClient();
-    return BleManager();
-  }
-
-  BLE._construct() {
-    print("$runtimeType _construct()");
-    tag = runtimeType.toString();
-    _init();
-  }
-
-  Future<void> _init() async {
-    if (_initDone) return;
-    await _exclusiveAccess.protect(() async {
-      if (_initDone) return;
-      print("$runtimeType _init()");
-      await _checkPermissions();
-      await _checkClient();
-      print("$runtimeType _init() _checkClient() done");
-      await _checkAdapter();
-      _initDone = true;
-      print("$runtimeType _init() done");
-      //return Future.value(null);
-    });
-  }
-
-  Future<void> dispose() async {
-    print("$runtimeType dispose()");
-    await stateController.close();
-    await stateSubscription?.cancel();
-    await manager.destroyClient();
-    _initDone = false;
-  }
-
-  Future<void> reinit() async {
-    await dispose();
-    await _init();
-  }
-
-  Future<void> _checkPermissions() async {
-    if (!Platform.isAndroid) return;
-    print("$runtimeType Checking permissions");
-    if (!await Permission.location.request().isGranted) {
-      bleError(tag, "No location permission");
-      return Future.error(Exception("$runtimeType Location permission not granted"));
-    }
-    if (!await Permission.bluetooth.request().isGranted) {
-      bleError(tag, "No blootueth permission");
-      return Future.error(Exception("$runtimeType Bluetooth permission not granted"));
-    }
-    print("$runtimeType Checking permissions done");
   }
 
   Future<void> _checkAdapter() async {
@@ -193,6 +190,10 @@ class BLE with DebugHelper {
       return result;
     });
     return 0;
+  }
+
+  Future<void> enableRadio() async {
+    (await manager).enableRadio();
   }
 
   Mutex get mutex => _exclusiveAccess;
@@ -349,7 +350,7 @@ class BleDisabled extends StatelessWidget {
                 "Enable",
                 action: () {
                   print("Radio enable button pressed");
-                  BLE().manager.enableRadio();
+                  BLE().enableRadio();
                 },
               ),
             ],

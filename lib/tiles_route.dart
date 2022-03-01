@@ -167,9 +167,10 @@ class TileGrid extends StatefulWidget {
   _TileGridState createState() {
     dev.log('$runtimeType createState()');
     _TileGridState state = _TileGridState();
-    if (mode == 'fromPreferences')
-      state._tiles.load();
-    else if (mode == 'random') state._randomize();
+    //if (mode == 'fromPreferences')
+    //  state._tiles.load();
+    //else
+    if (mode == 'random') state._randomize();
     return state;
   }
 }
@@ -459,7 +460,7 @@ class _TileGridState extends State<TileGrid> {
       if (chunks.length != 2) return;
       Device? device = DeviceList().byIdentifier(chunks[0]);
       if (null == device) return;
-      TileAction? action = device.tileActions[chunks[1]];
+      DeviceTileAction? action = device.tileActions[chunks[1]];
       if (null == action) return;
       action.call();
     }

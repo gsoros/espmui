@@ -85,7 +85,8 @@ class Scanner {
       },
     );
     streamSendIfNotClosed(_scanningController, true);
-    _scanResultSubscription = ble.manager
+    var manager = await (ble.manager);
+    _scanResultSubscription = manager
         .startPeripheralScan(
           uuids: [
             BleConstants.ESPM_API_SERVICE_UUID,
@@ -111,7 +112,8 @@ class Scanner {
       _stopTimer = null;
     }
     await _scanResultSubscription?.cancel();
-    await ble.manager.stopPeripheralScan();
+    var manager = await (ble.manager);
+    await manager.stopPeripheralScan();
     streamSendIfNotClosed(_scanningController, false);
   }
 }

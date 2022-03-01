@@ -11,7 +11,7 @@ import 'device.dart';
 import 'device_list.dart';
 import 'util.dart';
 
-class Tile extends StatelessWidget {
+class Tile extends StatelessWidget with DebugHelper {
   final Color color;
   final Color textColor;
   final int width;
@@ -119,8 +119,9 @@ class Tile extends StatelessWidget {
     Device? device = DeviceList().byIdentifier(this.device);
     //if (null == device) return Text("No device");
     //if (!device?.tileStreams.containsKey(this.stream)) return Text("No stream");
-    TileStream? stream = device?.tileStreams[this.stream];
+    DeviceTileStream? stream = device?.tileStreams[this.stream];
     //if (null == stream) return Text("Invalid source");
+    //print("$debugTag build device: ${device?.name ?? 'null'} dl.l: ${DeviceList().devices.length}");
 
     Widget getValue() {
       return StreamBuilder<String>(
@@ -261,6 +262,7 @@ class Graph extends StatelessWidget {
 /// Singleton class
 class TileList with DebugHelper {
   static final TileList _instance = TileList._construct();
+  static int _instances = 0;
   var notifier = AlwaysNotifier<List<Tile>>([]);
   List<Tile> get tiles => notifier.value;
 
@@ -302,14 +304,16 @@ class TileList with DebugHelper {
   }
 
   TileList._construct() {
-    dev.log('$runtimeType _construct()');
+    _instances++;
+    dev.log('$runtimeType _construct() # of instances: $_instances');
     load();
   }
 
   Future<void> load() async {
-    dev.log("$debugTag load() start");
+    //dev.log("$debugTag load() start");
+    await DeviceList().load();
     _fromJsonStringList((await Preferences().getTiles()).value);
-    dev.log("$debugTag load() end");
+    //dev.log("$debugTag load() end");
     notifier.notifyListeners();
   }
 

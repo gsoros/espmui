@@ -2,19 +2,23 @@ import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:espmui/util.dart';
+import 'package:mutex/mutex.dart';
+import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
 import 'device.dart';
 import 'preferences.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 //import 'util.dart';
 
 /// Singleton class
-class DeviceList {
+class DeviceList with DebugHelper {
   static final DeviceList _instance = DeviceList._construct();
+  static int _instances = 0;
   Map<String, Device> _items = {};
   Map<String, Device> get devices => _items;
   final _controller = StreamController<Map<String, Device>>.broadcast();
   Stream<Map<String, Device>> get stream => _controller.stream;
+  bool _loaded = false;
+  final _exclusiveAccess = Mutex();
 
   /// returns a singleton
   factory DeviceList() {
@@ -22,19 +26,31 @@ class DeviceList {
   }
 
   DeviceList._construct() {
-    dev.log('$runtimeType _construct()');
-    _loadSaved();
+    _instances++;
+    dev.log('$runtimeType _construct() # of instances: $_instances');
+    load();
     //_controller
   }
 
   Map<String, Device> where(bool filter(String k, Device v)) => Map.from(_items)..removeWhere((k, v) => !filter(k, v));
 
-  Future<void> _loadSaved() async {
-    (await Preferences().getDevices()).value.forEach((str) {
-      var device = Device.fromSaved(str);
-      device?.autoConnect.value = true;
-      if (null != device) addOrUpdate(device);
+  Future<void> load({bool reload = false}) async {
+    if (_loaded && !reload) return;
+    await _exclusiveAccess.protect(() async {
+      if (_loaded && !reload) return;
+      var saved = await Preferences().getDevices();
+      //dev.log("$debugTag load() saved: ${saved.value}");
+      // don't forEach() on a Future
+      for (String str in saved.value) {
+        var device = await Device.fromSaved(str);
+        device?.autoConnect.value = true;
+        if (null != device) addOrUpdate(device);
+        device?.connect();
+        //dev.log("$debugTag load() added ${device?.name}");
+      }
+      //dev.log('$debugTag load() finished');
     });
+    _loaded = true;
   }
 
   bool containsIdentifier(String identifier) {

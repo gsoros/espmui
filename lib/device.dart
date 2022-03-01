@@ -56,10 +56,10 @@ class Device with DebugHelper {
   StreamSubscription<PeripheralConnectionState>? _stateChangeSubscription;
 
   /// Streams which can be selected on the tiles
-  Map<String, TileStream> tileStreams = {};
+  Map<String, DeviceTileStream> tileStreams = {};
 
   /// Actions which can be initiated by tapping on the tiles
-  Map<String, TileAction> tileActions = {};
+  Map<String, DeviceTileAction> tileActions = {};
 
   Device(this.peripheral) {
     dev.log("$debugTag construct");
@@ -68,7 +68,7 @@ class Device with DebugHelper {
         'battery': CharacteristicListItem(BatteryCharacteristic(peripheral!)),
       });
     tileStreams.addAll({
-      "battery": TileStream(
+      "battery": DeviceTileStream(
         label: "Battery",
         stream: battery?.stream.map<String>((value) => "$value"),
         initialData: battery?.lastValue.toString,
@@ -97,11 +97,13 @@ class Device with DebugHelper {
     return Device(scanResult.peripheral);
   }
 
-  static Device? fromSaved(String savedDevice) {
+  static Future<Device?> fromSaved(String savedDevice) async {
+    dev.log("Device.fromSaved($savedDevice)");
     var chunks = savedDevice.split(";");
     if (chunks.length != 3) return null;
-    Peripheral peripheral = BleManager().createUnsafePeripheral(chunks[2]);
-    var device;
+    var manager = await BLE().manager;
+    Peripheral peripheral = manager.createUnsafePeripheral(chunks[2]);
+    Device device;
     if ("ESPM" == chunks[0])
       device = ESPM(peripheral);
     else if ("PowerMeter" == chunks[0])
@@ -111,7 +113,6 @@ class Device with DebugHelper {
     else
       return null;
     device.name = chunks[1];
-    dev.log("Device.fromSaved($savedDevice): $device");
     return device;
   }
 
@@ -390,7 +391,7 @@ class PowerMeter extends Device {
       'power': CharacteristicListItem(PowerCharacteristic(peripheral)),
     });
     tileStreams.addAll({
-      "power": TileStream(
+      "power": DeviceTileStream(
         label: "Power",
         stream: power?.powerStream.map<String>((value) => "$value"),
         initialData: power?.lastPower.toString,
@@ -398,7 +399,7 @@ class PowerMeter extends Device {
       ),
     });
     tileStreams.addAll({
-      "cadence": TileStream(
+      "cadence": DeviceTileStream(
         label: "Cadence",
         stream: power?.cadenceStream.map<String>((value) => "$value"),
         initialData: power?.lastCadence.toString,
@@ -467,7 +468,7 @@ class ESPM extends PowerMeter {
     // listen to api message done events
     _apiSubsciption = api.messageDoneStream.listen((message) => _onApiDone(message));
     tileStreams.addAll({
-      "scale": TileStream(
+      "scale": DeviceTileStream(
         label: "Weight Scale",
         stream: weightScale?.stream.map<String>((value) {
           String s = value.toStringAsFixed(2);
@@ -480,7 +481,7 @@ class ESPM extends PowerMeter {
       ),
     });
     tileActions.addAll({
-      "tare": TileAction(
+      "tare": DeviceTileAction(
         label: "Tare",
         action: () async {
           var resultCode = await api.requestResultCode("tare=0");
@@ -727,7 +728,7 @@ class HeartRateMonitor extends Device {
       'heartRate': CharacteristicListItem(HeartRateCharacteristic(peripheral)),
     });
     tileStreams.addAll({
-      "heartRate": TileStream(
+      "heartRate": DeviceTileStream(
         label: "Heart Rate",
         stream: heartRate?.stream.map<String>((value) => "$value"),
         initialData: heartRate?.lastValue.toString,
@@ -846,13 +847,13 @@ class ESPMWifiSettings {
   }
 }
 
-class TileStream {
+class DeviceTileStream {
   String label;
   Stream<String>? stream;
   String Function()? initialData;
   String units;
 
-  TileStream({
+  DeviceTileStream({
     required this.label,
     required this.stream,
     required this.initialData,
@@ -860,11 +861,11 @@ class TileStream {
   });
 }
 
-class TileAction {
+class DeviceTileAction {
   String label;
   Function action;
 
-  TileAction({
+  DeviceTileAction({
     required this.label,
     required this.action,
   });
