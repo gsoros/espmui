@@ -75,19 +75,6 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
                                 Container(
                                   width: 150.0,
                                   height: 50.0,
-                                  child: ElevatedButton(
-                                      onPressed: () => setState(() {
-                                            debugLog('calling TileList(mode: fromPreferences)');
-                                            _tileGrid = TileGrid(
-                                              key: UniqueKey(),
-                                              mode: 'fromPreferences',
-                                            );
-                                          }),
-                                      child: Text("Load tiles")),
-                                ),
-                                Container(
-                                  width: 150.0,
-                                  height: 50.0,
                                   margin: EdgeInsets.only(top: 30),
                                   child: ElevatedButton(
                                       onPressed: () {

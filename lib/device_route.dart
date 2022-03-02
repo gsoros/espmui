@@ -62,12 +62,12 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
   @override
   void dispose() async {
     debugLog("dispose");
-    if (!device.autoConnect.value) device.disconnect();
+    // if (!device.autoConnect.value) device.disconnect();
     super.dispose();
   }
 
   Future<bool> _onBackPressed() {
-    if (!device.autoConnect.value) device.disconnect();
+    //if (!device.autoConnect.value) device.disconnect();
     return Future.value(true);
   }
 
@@ -106,7 +106,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
             );
           },
         ),
-        colSpan: 4,
+        colSpan: 6,
       ),
       StaggeredGridItem(
         value: Battery(device),

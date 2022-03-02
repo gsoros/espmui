@@ -446,7 +446,7 @@ class PowerMeter extends Device {
 
 class ESPM extends PowerMeter {
   late EspmApi api;
-  final weightServiceEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
+  final weightServiceMode = ValueNotifier<int>(-1);
   final hallEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
   final deviceSettings = AlwaysNotifier<ESPMSettings>(ESPMSettings());
   final wifiSettings = AlwaysNotifier<ESPMWifiSettings>(ESPMWifiSettings());
@@ -507,10 +507,10 @@ class ESPM extends PowerMeter {
     if (EspmApiCommand.hostName.index == message.commandCode) {
       name = message.valueAsString;
     }
-    // weightServiceEnabled
+    // weightServiceMode
     else if (EspmApiCommand.weightService.index == message.commandCode) {
-      weightServiceEnabled.value = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      if (message.valueAsBool ?? false)
+      weightServiceMode.value = message.valueAsInt ?? -1;
+      if (0 < weightServiceMode.value)
         await weightScale?.subscribe();
       else
         await weightScale?.unsubscribe();
@@ -672,7 +672,7 @@ class ESPM extends PowerMeter {
     debugLog("Requesting init start");
     if (!await ready()) return;
     debugLog("Requesting init ready to go");
-    weightServiceEnabled.value = ExtendedBool.Waiting;
+    weightServiceMode.value = -1;
     [
       /*
       "weightService",
@@ -699,7 +699,7 @@ class ESPM extends PowerMeter {
       "autoTareRangeG",
       */
       "config",
-      "weightService=1",
+      "weightService=2",
     ].forEach((key) async {
       await api.request<String>(
         key,
@@ -711,7 +711,7 @@ class ESPM extends PowerMeter {
   }
 
   void _resetInit() {
-    weightServiceEnabled.value = ExtendedBool.Unknown;
+    weightServiceMode.value = -1;
     wifiSettings.value = ESPMWifiSettings();
     deviceSettings.value = ESPMSettings();
   }
@@ -756,17 +756,23 @@ class ESPMSettings {
   int? autoTareDelayMs;
   int? autoTareRangeG;
 
-  final validMotionDetectionMethods = {
+  final motionDetectionMethods = {
     0: "Hall effect sensor",
     1: "MPU",
     2: "Strain gauge",
   };
 
-  final validNegativeTorqueMethods = {
+  final negativeTorqueMethods = {
     0: "Keep",
     1: "Zero",
     2: "Discard",
     3: "Absolute value",
+  };
+
+  static final weightMeasurementCharModes = {
+    0: "Off",
+    1: "On",
+    2: "On When Not Pedalling",
   };
 
   @override

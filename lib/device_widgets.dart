@@ -50,9 +50,9 @@ class Battery extends StatelessWidget {
 
 class EspmWeightScaleStreamListener extends StatelessWidget {
   final ESPM device;
-  final ExtendedBool enabled;
+  final int mode;
 
-  EspmWeightScaleStreamListener(this.device, this.enabled);
+  EspmWeightScaleStreamListener(this.device, this.mode);
 
   @override
   Widget build(BuildContext context) {
@@ -60,12 +60,12 @@ class EspmWeightScaleStreamListener extends StatelessWidget {
       stream: device.weightScale?.defaultStream,
       initialData: device.weightScale?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
-        String weight = snapshot.hasData && enabled != ExtendedBool.False ? snapshot.data!.toStringAsFixed(2) : "--";
+        String weight = snapshot.hasData && 0 < mode ? snapshot.data!.toStringAsFixed(2) : "--";
         if (weight.length > 6) weight = weight.substring(0, 6);
         if (weight == "-0.00") weight = "0.00";
         const styleEnabled = TextStyle(fontSize: 30);
         const styleDisabled = TextStyle(fontSize: 30, color: Colors.white12);
-        return Text(weight, style: (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
+        return Text(weight, style: (0 < mode) ? styleEnabled : styleDisabled);
       },
     );
   }
@@ -104,6 +104,8 @@ class EspmWeightScale extends StatelessWidget {
         snackbar("Success calibrating device", context);
       }
 
+      Widget autoTareWarning = device.deviceSettings.value.autoTare == ExtendedBool.True ? Text("Warning: AutoTare is enabled") : Empty();
+
       await showDialog(
         context: context,
         builder: (BuildContext context) {
@@ -113,7 +115,8 @@ class EspmWeightScale extends StatelessWidget {
             content: Container(
               child: Column(
                 children: [
-                  EspmWeightScaleStreamListener(device, ExtendedBool.True),
+                  autoTareWarning,
+                  EspmWeightScaleStreamListener(device, 1),
                   TextField(
                     maxLength: 10,
                     maxLines: 1,
@@ -138,18 +141,23 @@ class EspmWeightScale extends StatelessWidget {
       );
     }
 
-    void toggle(enabled) async {
-      device.weightServiceEnabled.value = ExtendedBool.Waiting;
-      bool enable = enabled == ExtendedBool.True ? false : true;
-      bool? reply = await device.api.request<bool>("weightService=" + (enable ? "true" : "false"));
-      bool success = reply == enable;
-      if (success) {
-        if (enable)
-          await device.weightScale?.subscribe();
-        else
-          await device.characteristic("weightScale")?.unsubscribe();
+    void toggle(int mode) async {
+      device.weightServiceMode.value = -1;
+      bool enable = mode < 1;
+      bool success = false;
+      int? reply = await device.api.request<int>("weightService=" +
+          (enable
+              ? "2" // on when not pedalling
+              : "0" // off
+          ));
+      if (1 == reply || 2 == reply) {
+        if (enable) success = true;
+        await device.weightScale?.subscribe();
+      } else if (0 == reply) {
+        if (!enable) success = true;
+        await device.characteristic("weightScale")?.unsubscribe();
       } else
-        device.weightServiceEnabled.value = ExtendedBool.Unknown;
+        device.weightServiceMode.value = -1;
       snackbar(
         "Weight service " + (enable ? "en" : "dis") + "able" + (success ? "d" : " failed"),
         context,
@@ -164,20 +172,20 @@ class EspmWeightScale extends StatelessWidget {
       );
     }
 
-    return ValueListenableBuilder<ExtendedBool>(
-      valueListenable: device.weightServiceEnabled,
-      builder: (_, enabled, __) {
-        var strainOutput = EspmWeightScaleStreamListener(device, enabled);
+    return ValueListenableBuilder<int>(
+      valueListenable: device.weightServiceMode,
+      builder: (_, mode, __) {
+        var strainOutput = EspmWeightScaleStreamListener(device, mode);
 
         return InkWell(
           onTap: () {
-            if (enabled == ExtendedBool.True) tare();
+            if (0 < mode) tare();
           },
           onLongPress: () {
-            if (enabled == ExtendedBool.True) calibrate();
+            if (0 < mode) calibrate();
           },
           onDoubleTap: () {
-            if (enabled == ExtendedBool.True || enabled == ExtendedBool.False || enabled == ExtendedBool.Unknown) toggle(enabled);
+            toggle(mode);
           },
           child: Container(
             child: Column(
@@ -188,7 +196,7 @@ class EspmWeightScale extends StatelessWidget {
                 Flexible(
                   fit: FlexFit.loose,
                   child: Align(
-                    child: enabled == ExtendedBool.Waiting ? CircularProgressIndicator() : strainOutput,
+                    child: mode == -1 ? CircularProgressIndicator() : strainOutput,
                   ),
                 ),
                 Align(
@@ -901,7 +909,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                       child: Empty(),
                     ),
                   ]
-                : settings.validNegativeTorqueMethods.entries
+                : settings.negativeTorqueMethods.entries
                     .map((e) => DropdownMenuItem<String>(
                           value: e.key.toString(),
                           child: Text(e.value),
@@ -922,7 +930,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                       child: Empty(),
                     ),
                   ]
-                : settings.validMotionDetectionMethods.entries
+                : settings.motionDetectionMethods.entries
                     .map((e) => DropdownMenuItem<String>(
                           value: e.key.toString(),
                           child: Text(e.value),
@@ -931,7 +939,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           ),
         ];
         if (settings.motionDetectionMethod ==
-            settings.validMotionDetectionMethods.keys.firstWhere((k) => settings.validMotionDetectionMethods[k] == "Strain gauge", orElse: () => -1)) {
+            settings.motionDetectionMethods.keys.firstWhere((k) => settings.motionDetectionMethods[k] == "Strain gauge", orElse: () => -1)) {
           //debugLog("MDM==SG strainThresLow: ${settings.strainThresLow}");
           widgets.add(
             Row(
