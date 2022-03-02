@@ -71,9 +71,10 @@ class Device with Debug {
     tileStreams.addAll({
       "battery": DeviceTileStream(
         label: "Battery",
-        stream: battery?.stream.map<String>((value) => "$value"),
+        stream: battery?.defaultStream.map<String>((value) => "$value"),
         initialData: battery?.lastValue.toString,
         units: "%",
+        history: battery?.histories['charge'],
       ),
     });
     init();
@@ -397,6 +398,7 @@ class PowerMeter extends Device {
         stream: power?.powerStream.map<String>((value) => "$value"),
         initialData: power?.lastPower.toString,
         units: "W",
+        history: power?.histories['power'],
       ),
     });
     tileStreams.addAll({
@@ -405,6 +407,7 @@ class PowerMeter extends Device {
         stream: power?.cadenceStream.map<String>((value) => "$value"),
         initialData: power?.lastCadence.toString,
         units: "rpm",
+        history: power?.histories['cadence'],
       ),
     });
   }
@@ -471,7 +474,7 @@ class ESPM extends PowerMeter {
     tileStreams.addAll({
       "scale": DeviceTileStream(
         label: "Weight Scale",
-        stream: weightScale?.stream.map<String>((value) {
+        stream: weightScale?.defaultStream.map<String>((value) {
           String s = value.toStringAsFixed(2);
           if (s.length > 6) s = s.substring(0, 6);
           if (s == "-0.00") s = "0.00";
@@ -479,6 +482,7 @@ class ESPM extends PowerMeter {
         }),
         initialData: weightScale?.lastValue.toString,
         units: "kg",
+        history: weightScale?.histories['measurement'],
       ),
     });
     tileActions.addAll({
@@ -731,7 +735,7 @@ class HeartRateMonitor extends Device {
     tileStreams.addAll({
       "heartRate": DeviceTileStream(
         label: "Heart Rate",
-        stream: heartRate?.stream.map<String>((value) => "$value"),
+        stream: heartRate?.defaultStream.map<String>((value) => "$value"),
         initialData: heartRate?.lastValue.toString,
         units: "bpm",
       ),
@@ -853,12 +857,14 @@ class DeviceTileStream {
   Stream<String>? stream;
   String Function()? initialData;
   String units;
+  CharacteristicHistory? history;
 
   DeviceTileStream({
     required this.label,
     required this.stream,
     required this.initialData,
     required this.units,
+    this.history,
   });
 }
 

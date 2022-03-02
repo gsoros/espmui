@@ -17,7 +17,6 @@ class BLE with Debug {
   bool _createClientCompleted = false;
   bool _initDone = false;
   final _exclusiveAccess = Mutex();
-  late final String tag;
 
   /// returns a singleton
   factory BLE() {
@@ -54,7 +53,6 @@ class BLE with Debug {
 
   BLE._construct() {
     debugLog("_construct()");
-    tag = runtimeType.toString();
     _init();
   }
 
@@ -91,11 +89,11 @@ class BLE with Debug {
     debugLog("Checking permissions");
     if (!Platform.isAndroid) return;
     if (!await Permission.location.request().isGranted) {
-      bleError(tag, "No location permission");
+      bleError(debugTag, "No location permission");
       return Future.error(Exception("$runtimeType Location permission not granted"));
     }
     if (!await Permission.bluetooth.request().isGranted) {
-      bleError(tag, "No blootueth permission");
+      bleError(debugTag, "No blootueth permission");
       return Future.error(Exception("$runtimeType Bluetooth permission not granted"));
     }
     debugLog("Checking permissions done");
@@ -137,7 +135,7 @@ class BLE with Debug {
     stateSubscription = BleManager()
         .observeBluetoothState()
         .handleError(
-          (e) => bleError(tag, "observeBluetoothState()", e),
+          (e) => bleError(debugTag, "observeBluetoothState()", e),
         )
         .listen(
       (state) async {
@@ -152,18 +150,18 @@ class BLE with Debug {
           //debugLog("Adapter powered on, starting scan");
           //startScan();
         } else {
-          bleError(tag, "Adapter not powered on");
+          bleError(debugTag, "Adapter not powered on");
           /*
           if (Platform.isAndroid) {
             await bleManager.cancelTransaction("autoEnableBT");
             await bleManager
                 .enableRadio(transactionId: "autoEnableBT")
-                .catchError((e) => bleError(tag, "enableRadio()", e));
+                .catchError((e) => bleError(debugTag, "enableRadio()", e));
           }
           */
         }
       },
-      onError: (e) => bleError(tag, "stateSubscription", e),
+      onError: (e) => bleError(debugTag, "stateSubscription", e),
     );
     return Future.value(null);
   }
@@ -172,7 +170,7 @@ class BLE with Debug {
     await _exclusiveAccess.protect(() async {
       debugLog("discover($peripheral)");
       await peripheral.discoverAllServicesAndCharacteristics().catchError((e) {
-        bleError(tag, "discoverAllServicesAndCharacteristics()", e);
+        bleError(debugTag, "discoverAllServicesAndCharacteristics()", e);
       });
     });
   }

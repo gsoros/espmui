@@ -1,13 +1,16 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:async';
-//import 'dart:developer' as dev;
+import 'dart:collection';
+
+import 'package:flutter/material.dart';
 
 import 'package:espmui/debug.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 //import 'package:mutex/mutex.dart';
 
-import 'util.dart';
+import 'util.dart' as util;
 import 'ble.dart';
 import 'ble_constants.dart';
 
@@ -21,16 +24,18 @@ abstract class BleCharacteristic<T> with Debug {
   StreamSubscription<Uint8List>? _subscription;
   final _controller = StreamController<T>.broadcast();
   T? lastValue;
-  // shared mutex
-  final _exclusiveAccess = BLE().mutex;
-  late final String tag;
 
-  Stream<T> get stream => _controller.stream;
+  /// mutex shared with BLE
+  final _exclusiveAccess = BLE().mutex;
+
+  /// Histories associated with the streams
+  Map<String, CharacteristicHistory> histories = {};
+
+  Stream<T> get defaultStream => _controller.stream;
 
   BleCharacteristic(this._peripheral) {
+    debugLog("construct ${_peripheral.identifier}");
     lastValue = fromUint8List(Uint8List.fromList([]));
-    debugLog("construct " + _peripheral.identifier);
-    tag = runtimeType.toString();
   }
 
   T fromUint8List(Uint8List list);
@@ -40,16 +45,16 @@ abstract class BleCharacteristic<T> with Debug {
   Future<T?> read() async {
     await _init();
     if (null == _characteristic) {
-      bleError(tag, "read() characteristic is null");
+      bleError(debugTag, "read() characteristic is null");
       return fromUint8List(Uint8List.fromList([]));
     }
     if (!_characteristic!.isReadable) {
-      bleError(tag, "read() characteristic not readable");
+      bleError(debugTag, "read() characteristic not readable");
       return fromUint8List(Uint8List.fromList([]));
     }
     await _exclusiveAccess.protect(() async {
       var value = await _characteristic?.read().catchError((e) {
-        bleError(tag, "read()", e);
+        bleError(debugTag, "read()", e);
         return Uint8List.fromList([]);
       });
       if (value != null) lastValue = fromUint8List(value);
@@ -64,15 +69,15 @@ abstract class BleCharacteristic<T> with Debug {
   }) async {
     await _init();
     if (_characteristic == null) {
-      bleError(tag, "write() characteristic is null");
+      bleError(debugTag, "write() characteristic is null");
       return Future.value(null);
     }
     if (!_characteristic!.isWritableWithoutResponse && !_characteristic!.isWritableWithResponse) {
-      bleError(tag, "write() characteristic not writable");
+      bleError(debugTag, "write() characteristic not writable");
       return Future.value(null);
     }
     if (withResponse && !_characteristic!.isWritableWithResponse) {
-      bleError(tag, "write() characteristic not writableWithResponse");
+      bleError(debugTag, "write() characteristic not writableWithResponse");
       return Future.value(null);
     }
     //debugLog("write($value)");
@@ -85,7 +90,7 @@ abstract class BleCharacteristic<T> with Debug {
         transactionId: transactionId,
       )
           .catchError((e) {
-        bleError(tag, "write($value)", e);
+        bleError(debugTag, "write($value)", e);
       });
     });
   }
@@ -93,23 +98,23 @@ abstract class BleCharacteristic<T> with Debug {
   Future<void> subscribe() async {
     debugLog("subscribe()");
     if (_subscription != null) {
-      bleError(tag, "already subscribed");
+      bleError(debugTag, "already subscribed");
       return;
     }
     await _init();
     if (_characteristic == null) {
-      bleError(tag, "subscribe() characteristic is null");
+      bleError(debugTag, "subscribe() characteristic is null");
       return;
     }
     if (!(_characteristic?.isIndicatable ?? false) && !(_characteristic?.isNotifiable ?? false)) {
-      bleError(tag, "characteristic neither indicatable nor notifiable");
+      bleError(debugTag, "characteristic neither indicatable nor notifiable");
       return;
     }
     _rawStream = _characteristic?.monitor().handleError((e) {
-      bleError(tag, "_rawStream", e);
+      bleError(debugTag, "_rawStream", e);
     }); //.asBroadcastStream();
     if (_rawStream == null) {
-      bleError(tag, "subscribe() _rawStream is null");
+      bleError(debugTag, "subscribe() _rawStream is null");
       return;
     }
     await _exclusiveAccess.protect(() async {
@@ -117,21 +122,28 @@ abstract class BleCharacteristic<T> with Debug {
         (value) async {
           lastValue = await onNotify(fromUint8List(value));
           //debugLog("$lastValue");
-          streamSendIfNotClosed(_controller, lastValue);
+          util.streamSendIfNotClosed(_controller, lastValue);
+          _appendToHistory();
         },
-        onError: (e) => bleError(tag, "subscription", e),
+        onError: (e) => bleError(debugTag, "subscription", e),
       );
     });
     await read();
+    _appendToHistory();
     debugLog("subscribe() initial value: $lastValue");
-    streamSendIfNotClosed(_controller, lastValue);
+    util.streamSendIfNotClosed(_controller, lastValue);
+  }
+
+  void _appendToHistory() {
+    // var history = histories['raw'];
+    // if (null != lastValue || null != history) history!.append(util.uts(), lastValue!);
   }
 
   Future<void> unsubscribe() async {
     await _init();
     if (_subscription == null) return;
     debugLog("unsubscribe");
-    streamSendIfNotClosed(_controller, fromUint8List(Uint8List.fromList([])));
+    util.streamSendIfNotClosed(_controller, fromUint8List(Uint8List.fromList([])));
     await _subscription?.cancel();
     _subscription = null;
   }
@@ -140,7 +152,7 @@ abstract class BleCharacteristic<T> with Debug {
     if (_characteristic != null) return; // already init'd
     bool connected = await _peripheral.isConnected();
     if (!connected) {
-      //bleError(tag, "_init() peripheral not connected");
+      //bleError(debugTag, "_init() peripheral not connected");
       return;
     }
     try {
@@ -151,7 +163,7 @@ abstract class BleCharacteristic<T> with Debug {
       });
       _characteristic = chars.firstWhere((char) => char.uuid == characteristicUUID);
     } catch (e) {
-      bleError(tag, "_init() readCharacteristic()", e);
+      bleError(debugTag, "_init() readCharacteristic()", e);
       _characteristic = null;
       //  debugLog("readCharacteristic() serviceUUID: $serviceUUID, characteristicUUID: $characteristicUUID, $e");
     }
@@ -177,7 +189,16 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
   final serviceUUID = BleConstants.BATTERY_SERVICE_UUID;
   final characteristicUUID = BleConstants.BATTERY_LEVEL_CHAR_UUID;
 
-  BatteryCharacteristic(Peripheral peripheral) : super(peripheral);
+  BatteryCharacteristic(Peripheral peripheral) : super(peripheral) {
+    histories['charge'] = CharacteristicHistory<int>(3600, 3600);
+  }
+
+  @override
+  void _appendToHistory() {
+    super._appendToHistory();
+    var history = histories['charge'];
+    if (null != lastValue || null != history) history!.append(lastValue!);
+  }
 
   @override
   int fromUint8List(Uint8List list) => list.isEmpty ? 0 : list.first;
@@ -185,8 +206,8 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
   @override
   Uint8List toUint8List(int value) {
     if (value < 0)
-      bleError(tag, "toUint8List() negative value");
-    else if (255 < value) bleError(tag, "toUint8List() $value clipped");
+      bleError(debugTag, "toUint8List() negative value");
+    else if (255 < value) bleError(debugTag, "toUint8List() $value clipped");
     return Uint8List.fromList([value]);
   }
 }
@@ -206,7 +227,19 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
   final _cadenceController = StreamController<int>.broadcast();
   Stream<int> get cadenceStream => _cadenceController.stream;
 
-  PowerCharacteristic(Peripheral peripheral) : super(peripheral);
+  PowerCharacteristic(Peripheral peripheral) : super(peripheral) {
+    histories['power'] = CharacteristicHistory<int>(3600, 3600);
+    histories['cadence'] = CharacteristicHistory<int>(3600, 3600);
+  }
+
+  @override
+  void _appendToHistory() {
+    super._appendToHistory();
+    var history = histories['power'];
+    if (null != history) history.append(lastPower);
+    history = histories['cadence'];
+    if (null != history) history.append(lastCadence);
+  }
 
   @override
   Uint8List fromUint8List(Uint8List list) => list;
@@ -222,7 +255,7 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
     /// crank event time unit: 1/1024s, rolls over
     int power = value.buffer.asByteData().getUint16(2, Endian.little);
     lastPower = power;
-    streamSendIfNotClosed(_powerController, power);
+    util.streamSendIfNotClosed(_powerController, power);
 
     int newRevolutions = value.buffer.asByteData().getUint16(4, Endian.little);
     int newCrankEvent = value.buffer.asByteData().getUint16(6, Endian.little);
@@ -245,7 +278,7 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
       lastCrankEventTime = now;
     }
 
-    if (lastCadence != cadence && cadence > 0 || (lastCrankEventTime < now - 2000)) streamSendIfNotClosed(_cadenceController, cadence);
+    if (lastCadence != cadence && cadence > 0 || (lastCrankEventTime < now - 2000)) util.streamSendIfNotClosed(_cadenceController, cadence);
     lastCadence = cadence;
     revolutions = newRevolutions;
 
@@ -295,7 +328,16 @@ class WeightScaleCharacteristic extends BleCharacteristic<double> {
   final serviceUUID = BleConstants.WEIGHT_SCALE_SERVICE_UUID;
   final characteristicUUID = BleConstants.WEIGHT_MEASUREMENT_CHAR_UUID;
 
-  WeightScaleCharacteristic(Peripheral peripheral) : super(peripheral);
+  WeightScaleCharacteristic(Peripheral peripheral) : super(peripheral) {
+    histories['measurement'] = CharacteristicHistory<double>(360, 60);
+  }
+
+  @override
+  void _appendToHistory() {
+    super._appendToHistory();
+    var history = histories['measurement'];
+    if (null != lastValue || null != history) history!.append(lastValue!);
+  }
 
   @override
   double fromUint8List(Uint8List list) {
@@ -324,7 +366,7 @@ class HallCharacteristic extends BleCharacteristic<int> {
   Uint8List toUint8List(int value) => Uint8List(2)..buffer.asByteData().setInt16(0, (value).round(), Endian.little);
 }
 
-class HeartRateCharacteristic extends BleCharacteristic<int> with Debug {
+class HeartRateCharacteristic extends BleCharacteristic<int> {
   final serviceUUID = BleConstants.HEART_RATE_SERVICE_UUID;
   final characteristicUUID = BleConstants.HEART_RATE_MEASUREMENT_CHAR_UUID;
 
@@ -389,5 +431,68 @@ class CharacteristicListItem {
 
   void dispose() {
     characteristic?.dispose();
+  }
+}
+
+class CharacteristicHistory<T> with Debug {
+  final _data = LinkedHashMap<int, T>();
+  final int maxEntries;
+  final int maxAge;
+
+  /// The oldest entries will be deleted when either
+  /// - the number of entries exceeds [maxEntries]
+  /// - or the age of the entry in seconds is greater than [maxAge].
+  CharacteristicHistory(this.maxEntries, this.maxAge);
+
+  /// [timestamp]: milliseconds since Epoch
+  void append(T value, {int? timestamp}) {
+    if (null == timestamp) timestamp = util.uts();
+    //debugLog("append timestamp: $timestamp value: $value length: ${_data.length}");
+    _data[timestamp] = value;
+    // Prune on every ~100 appends
+    if (.99 < Random().nextDouble()) {
+      if (.5 < Random().nextDouble())
+        while (maxEntries < _data.length) _data.remove(_data.entries.first.key);
+      else
+        _data.removeWhere((time, _) => time < util.uts() - maxAge * 1000);
+    }
+  }
+
+  /// [timestamp] is milliseconds since the Epoch
+  Map<int, T> since({required int timestamp}) {
+    Map<int, T> filtered = Map.of(_data);
+    filtered.removeWhere((time, _) => time < timestamp);
+    //debugLog("since  timestamp: $timestamp data: ${_data.length} filtered: ${filtered.length}");
+    return filtered;
+  }
+
+  /// [timestamp] is milliseconds since the Epoch
+  Widget graph({required int timestamp}) {
+    Map<int, T> filtered = since(timestamp: timestamp);
+    if (filtered.length < 1) return util.Empty();
+    var data = Map<int, num>.from(filtered);
+    double? min;
+    double? max;
+    data.forEach((_, val) {
+      if (null == min || val < min!) min = val.toDouble();
+      if (null == max || max! < val) max = val.toDouble();
+    });
+    //debugLog("min: $min max: $max");
+    if (null == min || null == max) return util.Empty();
+    var widgets = <Widget>[];
+    data.forEach((time, value) {
+      var height = util.map(value.toDouble(), min!, max!, 0, 1000);
+      widgets.add(Container(
+        width: 50,
+        height: (0 < height) ? height : 1,
+        color: Colors.red.withOpacity((0 < height) ? .5 : 0),
+        margin: EdgeInsets.all(1),
+      ));
+    });
+    if (widgets.length < 1) return util.Empty();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: widgets,
+    );
   }
 }

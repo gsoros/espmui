@@ -15,7 +15,7 @@ class Battery extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<int>(
-      stream: device.battery?.stream,
+      stream: device.battery?.defaultStream,
       initialData: device.battery?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
         return Container(
@@ -57,7 +57,7 @@ class EspmWeightScaleStreamListener extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<double>(
-      stream: device.weightScale?.stream,
+      stream: device.weightScale?.defaultStream,
       initialData: device.weightScale?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
         String weight = snapshot.hasData && enabled != ExtendedBool.False ? snapshot.data!.toStringAsFixed(2) : "--";
@@ -216,7 +216,7 @@ class EspmHallStreamListener extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<int>(
-      stream: device.hall?.stream,
+      stream: device.hall?.defaultStream,
       initialData: device.hall?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
         String value = snapshot.hasData && enabled != ExtendedBool.False ? (snapshot.data! > 0 ? snapshot.data!.toString() : '--') : "--";
@@ -409,7 +409,7 @@ class HeartRate extends StatelessWidget {
     HeartRateCharacteristic char = tmpChar;
 
     var value = StreamBuilder<int>(
-      stream: char.stream,
+      stream: char.defaultStream,
       initialData: char.lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
         return Text(
@@ -448,7 +448,7 @@ class EspmApiStream extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<String>(
-      stream: device.apiCharacteristic?.stream,
+      stream: device.apiCharacteristic?.defaultStream,
       initialData: device.apiCharacteristic?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
         return Text("${snapshot.data}");
@@ -661,7 +661,7 @@ class EspmuiDropdown extends StatelessWidget with Debug {
   @override
   Widget build(BuildContext context) {
     //debugLog("EspmuiDropdown build() value: $value items: $items");
-    Widget dropdown = Text("");
+    Widget dropdown = Empty();
     if (items != null) if (items!.any((item) => item.value == value))
       dropdown = DecoratedBox(
         decoration: ShapeDecoration(
@@ -691,7 +691,7 @@ class EspmuiDropdown extends StatelessWidget with Debug {
                 fit: FlexFit.tight,
                 child: Text(name!),
               ),
-              Text(" "),
+              Empty(),
               dropdown,
             ]),
     );
@@ -784,7 +784,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                     value: settings.apSSID,
                     enabled: settings.apEnabled == ExtendedBool.True ? true : false,
                   ),
-                  Text(' '),
+                  Empty(),
                   EspmApiSettingInput(
                     device: device,
                     name: "Password",
@@ -821,7 +821,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                     value: settings.staSSID,
                     enabled: settings.staEnabled == ExtendedBool.True ? true : false,
                   ),
-                  Text(' '),
+                  Empty(),
                   EspmApiSettingInput(
                     device: device,
                     name: "Password",
@@ -898,7 +898,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             items: settings.negativeTorqueMethod == null
                 ? [
                     DropdownMenuItem<String>(
-                      child: Text(""),
+                      child: Empty(),
                     ),
                   ]
                 : settings.validNegativeTorqueMethods.entries
@@ -919,7 +919,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             items: settings.motionDetectionMethod == null
                 ? [
                     DropdownMenuItem<String>(
-                      child: Text(""),
+                      child: Empty(),
                     ),
                   ]
                 : settings.validMotionDetectionMethods.entries
@@ -945,7 +945,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                   enabled: settings.strainThresLow != null,
                   suffix: Text("kg"),
                 ),
-                Text(' '),
+                Empty(),
                 EspmApiSettingInput(
                   device: device,
                   name: "High Threshold",
@@ -985,7 +985,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                   enabled: settings.autoTareDelayMs != null,
                   suffix: Text("ms"),
                 ),
-                Text(' '),
+                Empty(),
                 EspmApiSettingInput(
                   device: device,
                   name: "Max. Range",

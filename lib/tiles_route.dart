@@ -1,6 +1,6 @@
 import 'dart:async';
 //import 'dart:convert';
-//import 'dart:math';
+import 'dart:math';
 import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
@@ -9,12 +9,13 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:flutter_circle_color_picker/flutter_circle_color_picker.dart';
 
+import 'tile.dart';
 import 'device.dart';
-import 'util.dart';
+import 'ble_characteristic.dart';
 import 'device_list.dart';
 import 'device_list_route.dart';
 import 'device_widgets.dart';
-import 'tile.dart';
+import 'util.dart';
 import 'debug.dart';
 
 class TilesRoute extends StatefulWidget {
@@ -103,19 +104,6 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
                                   height: 50.0,
                                   margin: EdgeInsets.only(top: 30),
                                   child: ElevatedButton(
-                                      onPressed: () => setState(() {
-                                            _tileGrid = TileGrid(
-                                              key: UniqueKey(),
-                                              mode: 'random',
-                                            );
-                                          }),
-                                      child: Text("Randomize tiles")),
-                                ),
-                                Container(
-                                  width: 150.0,
-                                  height: 50.0,
-                                  margin: EdgeInsets.only(top: 30),
-                                  child: ElevatedButton(
                                     onPressed: () {
                                       Navigator.of(context).pop(); // close dialog
                                       Navigator.push(
@@ -166,12 +154,7 @@ class TileGrid extends StatefulWidget with Debug {
   @override
   _TileGridState createState() {
     debugLog('createState()');
-    _TileGridState state = _TileGridState();
-    //if (mode == 'fromPreferences')
-    //  state._tiles.load();
-    //else
-    if (mode == 'random') state._randomize();
-    return state;
+    return _TileGridState();
   }
 }
 
@@ -190,12 +173,6 @@ class _TileGridState extends State<TileGrid> with Debug {
   void initState() {
     debugLog('initState');
     super.initState();
-  }
-
-  void _randomize() {
-    debugLog('_randomize');
-    _tiles.clear();
-    for (var i = 0; i < 5; i++) _tiles.add(Tile.random());
   }
 
   void _moveTile(Tile tile, int index) {
@@ -387,7 +364,7 @@ class _TileGridState extends State<TileGrid> with Debug {
                 ),
               );
 
-            return EspmuiDropdown(
+            var sourceDropdown = EspmuiDropdown(
               value: valuePresent ? value : "",
               items: items,
               onChanged: (value) {
@@ -404,6 +381,70 @@ class _TileGridState extends State<TileGrid> with Debug {
                 );
                 _tiles.save();
               },
+            );
+            CharacteristicHistory? charHistory = DeviceList().byIdentifier(tile.device)?.tileStreams[tile.stream]?.history;
+            if (null == charHistory) return sourceDropdown;
+            debugLog("this stream supports history");
+            double max = charHistory.maxAge.toDouble();
+
+            /// Slider power curve
+            /// https://stackoverflow.com/a/17102320/7195990
+
+            /// desired curve value at start
+            double cX = 0;
+
+            /// desired curve value at midpoint
+            double cY = max / 10;
+
+            /// desired curve value at end
+            double cZ = max;
+
+            /// special case: linear curve
+            if ((cX - 2 * cY + cZ) == 0) {
+              debugLog("linear curve");
+              cY += 1;
+            }
+
+            ///
+            double curveA = (cX * cZ - cY * cY) / (cX - 2 * cY + cZ);
+            double curveB = pow(cY - cX, 2) / (cX - 2 * cY + cZ);
+            double curveC = 2 * log((cZ - cY) / (cY - cX));
+
+            double valueToSlider(double value) {
+              return log((value - curveA) / curveB) / curveC;
+            }
+
+            double sliderToValue(double value) {
+              return curveA + curveB * exp(curveC * value);
+            }
+
+            double currentValue = tile.history.toDouble();
+            if (max < currentValue) currentValue = max;
+            if (currentValue < 0) currentValue = 0;
+            var historySlider = Slider(
+              label: "History: ${currentValue.round()} seconds",
+              value: valueToSlider(currentValue),
+              min: 0,
+              max: 1,
+              divisions: 100,
+              onChangeStart: null,
+              onChangeEnd: (value) {
+                _tiles.save();
+                snackbar("History: ${sliderToValue(value).round()} seconds", context);
+              },
+              onChanged: (value) {
+                //debugLog("v: $value s2v(v): ${sliderToValue(value)} v2s(s2v(v)): ${valueToSlider(sliderToValue(value))}");
+                _tiles[index] = Tile.from(
+                  tile,
+                  history: sliderToValue(value).round(),
+                );
+              },
+            );
+            return Column(
+              children: [
+                sourceDropdown,
+                historySlider,
+              ],
             );
           });
     }

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
+//import 'dart:math';
 import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
@@ -9,6 +9,7 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'preferences.dart';
 import 'device.dart';
 import 'device_list.dart';
+import 'ble_characteristic.dart';
 import 'util.dart';
 import 'debug.dart';
 
@@ -17,10 +18,14 @@ class Tile extends StatelessWidget with Debug {
   final Color textColor;
   final int width;
   final int height;
-  final Widget background;
   final String device;
   final String stream;
+
+  /// tap action
   final String tap;
+
+  /// history length in seconds
+  final int history;
 
   Tile({
     Key? key,
@@ -28,22 +33,11 @@ class Tile extends StatelessWidget with Debug {
     this.textColor = Colors.white,
     this.width = 5,
     this.height = 2,
-    this.background = const Text(" "),
     this.device = "",
     this.stream = "",
     this.tap = "",
+    this.history = 0,
   }) : super(key: key);
-
-  Tile.random({Key? key})
-      : this(
-          key: key,
-          color: Color((Random().nextDouble() * 0xffffff).toInt()).withOpacity(1.0),
-          textColor: Colors.white,
-          //textColor: Color((Random().nextDouble() * 0xffffff).toInt()).withOpacity(1.0),
-          width: Random().nextInt(9) + 2,
-          height: Random().nextInt(3) + 2,
-          background: Graph.random(),
-        );
 
   Tile.from(
     Tile other, {
@@ -52,20 +46,20 @@ class Tile extends StatelessWidget with Debug {
     Color? textColor,
     int? colSpan,
     int? height,
-    Widget? background,
     String? device,
     String? stream,
     String? tap,
+    int? history,
   }) : this(
           key: key ?? other.key,
           color: color ?? other.color,
           textColor: textColor ?? other.textColor,
           width: colSpan ?? other.width,
           height: height ?? other.height,
-          background: background ?? other.background,
           device: device ?? other.device,
           stream: stream ?? other.stream,
           tap: tap ?? other.tap,
+          history: history ?? other.history,
         );
 
   Tile copyWith(
@@ -74,7 +68,6 @@ class Tile extends StatelessWidget with Debug {
     Color? textColor,
     int? colSpan,
     int? height,
-    Widget? background,
     String? device,
     String? stream,
     String? tap,
@@ -86,7 +79,6 @@ class Tile extends StatelessWidget with Debug {
       textColor: textColor ?? this.textColor,
       colSpan: colSpan ?? this.width,
       height: height ?? this.height,
-      background: background ?? this.background,
       device: device ?? this.device,
       stream: stream ?? this.stream,
       tap: tap ?? this.tap,
@@ -98,20 +90,20 @@ class Tile extends StatelessWidget with Debug {
         textColor = Color(json['textColor']),
         width = json['colSpan'] ?? 3,
         height = json['height'] ?? 3,
-        background = Text(" "), //json['background'],
         device = json['device'] ?? "",
         stream = json['stream'] ?? "",
-        tap = json['tap'] ?? "";
+        tap = json['tap'] ?? "",
+        history = json['history'] ?? 0;
 
   Map<String, dynamic> toJson() => {
         'color': color.value,
         'textColor': textColor.value,
         'colSpan': width,
         'height': height,
-        //'background': background.toJson(),
         'device': device,
         'stream': stream,
         'tap': tap,
+        'history': history,
       };
 
   @override
@@ -142,8 +134,21 @@ class Tile extends StatelessWidget with Debug {
         builder: (_, snapshot) {
           //debugLog("Tile build getValueWhenConnected ${device.name} ${source.label} ${snapshot.data}");
           if (!snapshot.hasData || snapshot.data == null || snapshot.data == PeripheralConnectionState.connected) return getValue();
-          if (snapshot.data == PeripheralConnectionState.disconnected) return Text(" ");
+          if (snapshot.data == PeripheralConnectionState.disconnected) return Empty();
           return CircularProgressIndicator();
+        },
+      );
+    }
+
+    Widget background() {
+      if (0 == history) return Empty();
+      CharacteristicHistory? charHistory = DeviceList().byIdentifier(this.device)?.tileStreams[this.stream]?.history;
+      if (null == charHistory) return Empty();
+      return StreamBuilder<String>(
+        stream: stream?.stream,
+        initialData: stream?.initialData != null ? stream?.initialData!() : null,
+        builder: (_, snapshot) {
+          return charHistory.graph(timestamp: uts() - history * 1000);
         },
       );
     }
@@ -189,9 +194,13 @@ class Tile extends StatelessWidget with Debug {
               ),
               Expanded(
                 child: Stack(
+                  fit: StackFit.expand,
                   alignment: AlignmentDirectional.bottomEnd,
                   children: [
-                    FittedBox(child: background, fit: BoxFit.scaleDown),
+                    FittedBox(
+                      child: background(),
+                      fit: BoxFit.fill,
+                    ),
                     Align(
                       child: FittedBox(
                         child: DefaultTextStyle.merge(
@@ -235,27 +244,6 @@ class Tile extends StatelessWidget with Debug {
           ),
         ),
       ),
-    );
-  }
-}
-
-class Graph extends StatelessWidget {
-  const Graph({Key? key}) : super(key: key);
-  const Graph.random({Key? key}) : this();
-
-  @override
-  Widget build(BuildContext context) {
-    var widgets = <Widget>[];
-    for (int i = 0; i < 10; i++)
-      widgets.add(Container(
-        width: 50,
-        height: Random().nextDouble() * 1000,
-        color: Colors.red.withOpacity(.5),
-        margin: EdgeInsets.all(1),
-      ));
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: widgets,
     );
   }
 }

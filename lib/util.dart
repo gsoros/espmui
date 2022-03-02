@@ -33,7 +33,7 @@ class AlwaysNotifier<T> extends ValueNotifier<T> with Debug {
   @override
   void notifyListeners() {
     super.notifyListeners();
-    debugLog("notifyListeners");
+    //debugLog("notifyListeners");
   }
 }
 
@@ -96,4 +96,14 @@ void snackbar(String s, [BuildContext? context]) {
       style: const TextStyle(color: Colors.white),
     ),
   ));
+}
+
+double map(double x, double inMin, double inMax, double outMin, double outMax) {
+  double out = (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+  return out.isNaN || out.isInfinite ? 0 : out;
+}
+
+class Empty extends StatelessWidget {
+  const Empty();
+  Widget build(BuildContext context) => const SizedBox.square(dimension: 1);
 }

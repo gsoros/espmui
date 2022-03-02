@@ -26,7 +26,7 @@ class Preferences with Debug {
     await _init();
     _devices.value = devices;
     _sharedPreferences.setStringList('devices', devices);
-    debugLog('setDevices $devices');
+    //debugLog('setDevices $devices');
   }
 
   /* Tiles */
@@ -41,7 +41,7 @@ class Preferences with Debug {
     await _init();
     _tiles.value = tiles;
     _sharedPreferences.setStringList('tiles', tiles);
-    debugLog('setTiles $tiles');
+    //debugLog('setTiles $tiles');
   }
 
   Future<void> _init() async {
@@ -53,11 +53,11 @@ class Preferences with Debug {
       _sharedPreferences = await SharedPreferences.getInstance();
       _devices.value = _sharedPreferences.getStringList('devices') ?? [];
       _devices.addListener(() {
-        debugLog('_devicesNotifier listener ${_devices.value}');
+        //debugLog('_devicesNotifier listener ${_devices.value}');
       });
       _tiles.value = _sharedPreferences.getStringList('tiles') ?? [];
       _tiles.addListener(() {
-        debugLog('_tilesNotifier listener ${_tiles.value}');
+        //debugLog('_tilesNotifier listener ${_tiles.value}');
       });
       _initDone = true;
     });

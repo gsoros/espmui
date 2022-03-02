@@ -198,7 +198,7 @@ class EspmApi with Debug {
 
   EspmApi(this.device, {this.queueDelayMs = 200}) {
     //_characteristic?.subscribe();
-    _subscription = _characteristic?.stream.listen((reply) => _onNotify(reply));
+    _subscription = _characteristic?.defaultStream.listen((reply) => _onNotify(reply));
   }
 
   void _startQueueSchedule() {
