@@ -10,6 +10,7 @@ class TileRoute extends StatefulWidget {
   final int index;
   final Map<String, dynamic> json;
 
+  /// Dead code
   const TileRoute({Key? key, required this.index, required this.json}) : super(key: key);
 
   @override

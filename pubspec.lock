@@ -78,15 +78,13 @@ packages:
       url: "git@github.com:gsoros/FlutterBleLib.git"
     source: git
     version: "2.4.0"
-  flutter_circle_color_picker:
+  flutter_colorpicker:
     dependency: "direct main"
     description:
-      path: "."
-      ref: HEAD
-      resolved-ref: "60a746fe3cd3b4583963ac4290516d34dbd61c58"
-      url: "git@github.com:gsoros/flutter_circle_color_picker.git"
-    source: git
-    version: "0.3.0"
+      name: flutter_colorpicker
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.3"
   flutter_staggered_grid_view:
     dependency: "direct main"
     description:

@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:page_transition/page_transition.dart';
-import 'package:flutter_circle_color_picker/flutter_circle_color_picker.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 import 'tile.dart';
 import 'device.dart';
@@ -152,9 +152,10 @@ class TileGrid extends StatefulWidget with Debug {
 class _TileGridState extends State<TileGrid> with Debug {
   late TileList _tiles;
   double dialogOpacity = 1;
-  bool colorPicker = false;
+  bool showColorPicker = false;
   void Function(Color)? colorPickerCallback;
-  Color? colorPickerInitialColor;
+  String? colorPickerTarget;
+  Color? colorPickerColor;
 
   _TileGridState() {
     _tiles = TileList();
@@ -190,23 +191,62 @@ class _TileGridState extends State<TileGrid> with Debug {
                   });
                 });
               };
-              if (colorPicker && colorPickerInitialColor != null && colorPickerCallback != null) {
-                var colorPickerController = CircleColorPickerController(initialColor: colorPickerInitialColor!);
-                return CircleColorPicker(
-                  controller: colorPickerController,
-                  textStyle: TextStyle(color: Colors.transparent),
-                  onChanged: (color) {
-                    dev.log("colorpicker $color");
-                    colorPickerController.color = color;
-                    setStates(() {
-                      colorPickerCallback!(color);
-                    });
-                  },
-                  onEnded: (color) {
-                    setStates(() {
-                      colorPicker = false;
-                    });
-                  },
+              if (showColorPicker && colorPickerColor != null && colorPickerCallback != null) {
+                return Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: Text("$colorPickerTarget Color"),
+                    ),
+                    SlidePicker(
+                      pickerColor: colorPickerColor!,
+                      colorModel: ColorModel.rgb,
+                      enableAlpha: true,
+                      displayThumbColor: true,
+                      showParams: false,
+                      showIndicator: true,
+                      //indicatorBorderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+                      //indicatorAlignmentBegin: const Alignment(-1.0, -3.0),
+                      //indicatorAlignmentEnd: const Alignment(1.0, 3.0),
+                      onColorChanged: (color) {
+                        dev.log("colorpicker $color");
+                        setStates(() {
+                          colorPickerColor = color;
+                        });
+                      },
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          flex: 4,
+                          child: EspmuiElevatedButton(
+                            "Cancel",
+                            action: () {
+                              setStates(() {
+                                showColorPicker = false;
+                              });
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          flex: 6,
+                          child: Padding(
+                            padding: EdgeInsets.only(left: 10),
+                            child: EspmuiElevatedButton(
+                              "Set Color",
+                              action: () {
+                                setStates(() {
+                                  if (null != colorPickerColor) colorPickerCallback!(colorPickerColor!);
+                                  showColorPicker = false;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 );
               }
               if (tiles.length <= index || index < 0) return Text("Cannot find tile $index");
@@ -282,8 +322,9 @@ class _TileGridState extends State<TileGrid> with Debug {
                                       onTap: () {
                                         dev.log("colorpicker bg");
                                         setStates(() {
-                                          colorPicker = true;
-                                          colorPickerInitialColor = tile.color;
+                                          showColorPicker = true;
+                                          colorPickerColor = tile.color;
+                                          colorPickerTarget = "Background";
                                           colorPickerCallback = (color) {
                                             _tiles[index] = Tile.from(tile, color: color);
                                             _tiles.save();
@@ -293,8 +334,9 @@ class _TileGridState extends State<TileGrid> with Debug {
                                       onDoubleTap: () {
                                         dev.log("colorpicker textColor");
                                         setStates(() {
-                                          colorPicker = true;
-                                          colorPickerInitialColor = tile.textColor;
+                                          showColorPicker = true;
+                                          colorPickerColor = tile.textColor;
+                                          colorPickerTarget = "Text";
                                           colorPickerCallback = (color) {
                                             _tiles[index] = Tile.from(tile, textColor: color);
                                             _tiles.save();
@@ -559,12 +601,13 @@ class _TileGridState extends State<TileGrid> with Debug {
                                   return WillPopScope(
                                     onWillPop: () async {
                                       setState(() {
-                                        colorPicker = false;
+                                        showColorPicker = false;
                                       });
                                       return true;
                                     },
                                     child: Center(
                                       child: AlertDialog(
+                                        scrollable: true,
                                         backgroundColor: Colors.black87,
                                         content: Column(
                                           children: [
@@ -575,7 +618,7 @@ class _TileGridState extends State<TileGrid> with Debug {
                                         ),
                                         actions: [
                                           EspmuiElevatedButton(
-                                            "Delete",
+                                            "Delete Tile",
                                             action: () {
                                               debugLog("delete tile $index");
                                               setState(() {
@@ -591,6 +634,8 @@ class _TileGridState extends State<TileGrid> with Debug {
                                             action: Navigator.of(context).pop,
                                           ),
                                         ],
+                                        actionsAlignment: MainAxisAlignment.spaceBetween,
+                                        buttonPadding: EdgeInsets.zero,
                                       ),
                                     ),
                                   );
