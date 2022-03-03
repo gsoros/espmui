@@ -29,7 +29,7 @@ class Battery extends StatelessWidget {
                 child: Align(
                   child: Text(
                     snapshot.hasData && snapshot.data! > 0 ? "${snapshot.data}" : "--",
-                    style: const TextStyle(fontSize: 40),
+                    style: const TextStyle(fontSize: 30),
                   ),
                 ),
               ),
@@ -338,6 +338,7 @@ class EspmHallSensor extends StatelessWidget {
                     child: (enabled == ExtendedBool.Waiting) ? CircularProgressIndicator() : EspmHallStreamListener(device, enabled),
                   ),
                 ),
+                Text(" "),
               ],
             ),
           ),
@@ -696,15 +697,20 @@ class EspmuiDropdown extends StatelessWidget with Debug {
       );
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 10, 0, 0),
-      child: (name == null || true)
+      child: (name == null)
           ? dropdown
           : Row(children: [
-              Flexible(
-                fit: FlexFit.tight,
+              Expanded(
+                flex: 5,
                 child: Text(name!),
               ),
-              Text(" "),
-              dropdown,
+              Expanded(
+                flex: 5,
+                child: Padding(
+                  padding: EdgeInsets.only(left: 10),
+                  child: dropdown,
+                ),
+              ),
             ]),
     );
   }
@@ -916,7 +922,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                 : settings.negativeTorqueMethods.entries
                     .map((e) => DropdownMenuItem<String>(
                           value: e.key.toString(),
-                          child: Text("Negative torque: ${e.value}"),
+                          child: Text("${e.value}"),
                         ))
                     .toList(),
           ),
@@ -937,7 +943,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                 : settings.motionDetectionMethods.entries
                     .map((e) => DropdownMenuItem<String>(
                           value: e.key.toString(),
-                          child: Text("Motion detection: ${e.value}"),
+                          child: Text("${e.value}"),
                         ))
                     .toList(),
           ),
