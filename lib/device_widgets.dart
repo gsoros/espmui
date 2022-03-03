@@ -668,8 +668,12 @@ class EspmuiDropdown extends StatelessWidget with Debug {
 
   @override
   Widget build(BuildContext context) {
-    //debugLog("EspmuiDropdown build() value: $value items: $items");
+    // debugLog("EspmuiDropdown build() value: $value items: $items");
+    // items?.forEach((item) {
+    //   debugLog("EspmuiDropdown build() item: ${item.child.toStringDeep()}");
+    // });
     Widget dropdown = Empty();
+    //return dropdown;
     if (items != null) if (items!.any((item) => item.value == value))
       dropdown = DecoratedBox(
         decoration: ShapeDecoration(
@@ -691,15 +695,15 @@ class EspmuiDropdown extends StatelessWidget with Debug {
         ),
       );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 5, 0, 5),
-      child: (name == null)
+      padding: const EdgeInsets.fromLTRB(0, 10, 0, 0),
+      child: (name == null || true)
           ? dropdown
           : Row(children: [
               Flexible(
                 fit: FlexFit.tight,
                 child: Text(name!),
               ),
-              Empty(),
+              Text(" "),
               dropdown,
             ]),
     );
@@ -906,13 +910,13 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             items: settings.negativeTorqueMethod == null
                 ? [
                     DropdownMenuItem<String>(
-                      child: Empty(),
+                      child: Text(" "),
                     ),
                   ]
                 : settings.negativeTorqueMethods.entries
                     .map((e) => DropdownMenuItem<String>(
                           value: e.key.toString(),
-                          child: Text(e.value),
+                          child: Text("Negative torque: ${e.value}"),
                         ))
                     .toList(),
           ),
@@ -927,13 +931,13 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             items: settings.motionDetectionMethod == null
                 ? [
                     DropdownMenuItem<String>(
-                      child: Empty(),
+                      child: Text(" "),
                     ),
                   ]
                 : settings.motionDetectionMethods.entries
                     .map((e) => DropdownMenuItem<String>(
                           value: e.key.toString(),
-                          child: Text(e.value),
+                          child: Text("Motion detection: ${e.value}"),
                         ))
                     .toList(),
           ),

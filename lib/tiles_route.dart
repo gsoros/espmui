@@ -118,7 +118,11 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
                     ),
                   );
                 },
-                child: Icon(Icons.settings),
+                child: Icon(
+                  Icons.settings,
+                  color: Colors.white,
+                ),
+                backgroundColor: Colors.red,
                 heroTag: "fab",
               )
             : Container(),
