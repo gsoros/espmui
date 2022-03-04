@@ -18,7 +18,7 @@ abstract class BleCharacteristic<T> with Debug {
   Peripheral _peripheral;
   final serviceUUID = "";
   final characteristicUUID = "";
-  //CharacteristicWithValue? _characteristic;
+  //CharacteristicWithValue? _characteristicWithValue;
   Characteristic? _characteristic;
   Stream<Uint8List>? _rawStream;
   StreamSubscription<Uint8List>? _subscription;
