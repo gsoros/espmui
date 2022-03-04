@@ -370,7 +370,16 @@ class HeartRateCharacteristic extends BleCharacteristic<int> {
   final serviceUUID = BleConstants.HEART_RATE_SERVICE_UUID;
   final characteristicUUID = BleConstants.HEART_RATE_MEASUREMENT_CHAR_UUID;
 
-  HeartRateCharacteristic(Peripheral peripheral) : super(peripheral);
+  HeartRateCharacteristic(Peripheral peripheral) : super(peripheral) {
+    histories['measurement'] = CharacteristicHistory<int>(120, 120);
+  }
+
+  @override
+  void _appendToHistory() {
+    super._appendToHistory();
+    var history = histories['measurement'];
+    if (null != lastValue || null != history) history!.append(lastValue!);
+  }
 
   @override
   int fromUint8List(Uint8List list) {

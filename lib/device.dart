@@ -738,6 +738,7 @@ class HeartRateMonitor extends Device {
         stream: heartRate?.defaultStream.map<String>((value) => "$value"),
         initialData: heartRate?.lastValue.toString,
         units: "bpm",
+        history: heartRate?.histories['measurement'],
       ),
     });
   }
