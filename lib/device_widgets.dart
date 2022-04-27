@@ -970,7 +970,7 @@ class EspccPeersEditor extends StatelessWidget with Debug {
                 onPressed: settings.scanning
                     ? null
                     : () {
-                        device.settings.value.scanning = true;
+                        //device.settings.value.scanning = true;
                         device.settings.value.scanResults = [];
                         device.settings.notifyListeners();
                         device.api.sendCommand("scan=10");
@@ -984,6 +984,41 @@ class EspccPeersEditor extends StatelessWidget with Debug {
               ),
             ],
           );
+        });
+  }
+}
+
+class EspccTouchEditor extends StatelessWidget with Debug {
+  final ESPCC device;
+  EspccTouchEditor(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<ESPCCSettings>(
+        valueListenable: device.settings,
+        builder: (_, settings, __) {
+          List<Widget> items = [Text(settings.touchRead.toString())];
+          settings.touchThres.forEach((k, v) {
+            String mcm = settings.touchRead[k]?.toString() ?? "";
+            items.add(Stack(
+              children: [
+                Container(
+                  color: Colors.blue,
+                  child: Text(mcm),
+                ),
+                Slider(
+                  label: v.toString(),
+                  value: v.toDouble(),
+                  min: 0.0,
+                  max: 100.0,
+                  onChanged: (newValue) {
+                    device.api.sendCommand("touchThres=$k:${newValue.toInt()}");
+                  },
+                ),
+              ],
+            ));
+          });
+          return Column(children: items);
         });
   }
 }
@@ -1056,23 +1091,27 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
 
     final apiWifiSettings = ApiWifiSettings(device.api, device.wifiSettings);
 
-    void editPeers({required List<String> peers}) async {
+    void dialog({required Widget title, required Widget body}) async {
+      final timer = Timer.periodic(const Duration(seconds: 2), (_) {
+        device.api.sendCommand("touchRead");
+      });
       await showDialog(
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
             scrollable: true,
-            title: Text("Peers"),
+            title: title,
             content: Container(
               child: Column(
                 children: [
-                  EspccPeersEditor(device),
+                  body,
                 ],
               ),
             ),
           );
         },
       );
+      timer.cancel();
     }
 
     final deviceSettings = ValueListenableBuilder<ESPCCSettings>(
@@ -1090,18 +1129,34 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
             ),
             EspmuiElevatedButton(
               onPressed: () {
-                editPeers(peers: settings.peers);
+                dialog(
+                  title: Text("Peers"),
+                  body: EspccPeersEditor(device),
+                );
               },
               child: Icon(Icons.edit),
             ),
           ]),
           Text(" "),
-          ApiSettingInput(
-            api: device.api,
-            name: "TouchThres",
-            command: device.api.commandCode("touchThres"),
-            value: settings.touchThres.toString(),
-          ),
+          Row(children: [
+            Flexible(
+              child: Column(
+                children: [
+                  Row(children: [Text("Touch Thresholds:")]),
+                  Text(settings.touchThres.values.join(", ")),
+                ],
+              ),
+            ),
+            EspmuiElevatedButton(
+              onPressed: () {
+                dialog(
+                  title: Text("Touch Thresholds"),
+                  body: EspccTouchEditor(device),
+                );
+              },
+              child: Icon(Icons.edit),
+            ),
+          ]),
         ];
 
         return Column(

@@ -941,6 +941,31 @@ class ESPCC extends Device {
       return;
     }
 
+    //////////////////////////////////////////////////// touchRead
+    if ("touchRead" == message.commandStr) {
+      // reply format: padIndex:currentValue[,padIndex:currentValue...]
+      String? result = message.valueAsString;
+      if (null == result) return;
+      List<String> tokens = result.split(",");
+      tokens.forEach((token) {
+        List<String> pair = token.split(":");
+        if (pair.length != 2) return;
+        int? k = int.tryParse(pair[0]);
+        int? v = int.tryParse(pair[1]);
+        if (null == k || null == v) return;
+        var values = MinCurMax<int>();
+        var touchRead = settings.value.touchRead;
+        if (touchRead.containsKey(k) && null != touchRead[k]) values = touchRead[k]!;
+        values.cur = v;
+        if (null == values.min || v < values.min!) values.min = v;
+        if (null == values.max || values.max! < v) values.max = v;
+        settings.value.touchRead.update(k, (_) => values, ifAbsent: () => values);
+      });
+      debugLog("touchRead: ${settings.value.touchRead}");
+      settings.notifyListeners();
+      return;
+    }
+
     snackbar("${message.info} ${message.command}");
     debugLog("unhandled api response: $message");
   }
@@ -1081,11 +1106,22 @@ class ESPMSettings {
   }
 }
 
+class MinCurMax<T> {
+  T? min;
+  T? cur;
+  T? max;
+
+  String toString() {
+    return "($min, $cur, $max)";
+  }
+}
+
 class ESPCCSettings {
   List<String> peers = [];
   Map<int, int> touchThres = {};
   bool scanning = false;
   List<String> scanResults = [];
+  Map<int, MinCurMax<int>> touchRead = {};
 
   @override
   bool operator ==(other) {
