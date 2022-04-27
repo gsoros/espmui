@@ -221,8 +221,8 @@ class _TileGridState extends State<TileGrid> with Debug {
                         Expanded(
                           flex: 4,
                           child: EspmuiElevatedButton(
-                            "Cancel",
-                            action: () {
+                            child: Text("Cancel"),
+                            onPressed: () {
                               setStates(() {
                                 showColorPicker = false;
                               });
@@ -234,8 +234,8 @@ class _TileGridState extends State<TileGrid> with Debug {
                           child: Padding(
                             padding: EdgeInsets.only(left: 10),
                             child: EspmuiElevatedButton(
-                              "Set Color",
-                              action: () {
+                              child: Text("Set Color"),
+                              onPressed: () {
                                 setStates(() {
                                   if (null != colorPickerColor) colorPickerCallback!(colorPickerColor!);
                                   showColorPicker = false;
@@ -618,8 +618,8 @@ class _TileGridState extends State<TileGrid> with Debug {
                                         ),
                                         actions: [
                                           EspmuiElevatedButton(
-                                            "Delete Tile",
-                                            action: () {
+                                            child: Text("Delete Tile"),
+                                            onPressed: () {
                                               debugLog("delete tile $index");
                                               setState(() {
                                                 tiles.removeAt(index);
@@ -630,8 +630,8 @@ class _TileGridState extends State<TileGrid> with Debug {
                                             },
                                           ),
                                           EspmuiElevatedButton(
-                                            "Close",
-                                            action: Navigator.of(context).pop,
+                                            child: Text("Close"),
+                                            onPressed: Navigator.of(context).pop,
                                           ),
                                         ],
                                         actionsAlignment: MainAxisAlignment.spaceBetween,

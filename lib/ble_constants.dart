@@ -12,7 +12,10 @@ class BleConstants {
   static const HEART_RATE_MEASUREMENT_CHAR_UUID = "00002a37-0000-1000-8000-00805f9b34fb";
 
   static const ESPM_API_SERVICE_UUID = "55bebab5-1857-4b14-a07b-d4879edad159";
-  static const ESPM_API_CHAR_UUID = "da34811a-03c0-4efe-a266-ed014e181b65";
+  static const ESPCC_API_SERVICE_UUID = "f2d59f15-1fb3-4b22-b8cc-b554debb2720";
+
+  static const API_RXCHAR_UUID = "da34811a-03c0-4efe-a266-ed014e181b65";
+  static const API_TXCHAR_UUID = "422ecb2a-be77-43f2-bf79-f0a62d31fab7";
 
   static const ESPM_HALL_CHAR_UUID = "e43fb4d4-1dc7-4ecd-9409-fb9d65dc7187";
 }

@@ -8,7 +8,7 @@ import 'ble_constants.dart';
 import 'ble.dart';
 import 'ble_characteristic.dart';
 import 'preferences.dart';
-import 'espm_api.dart';
+import 'api.dart';
 import 'util.dart';
 import 'debug.dart';
 
@@ -16,6 +16,7 @@ import 'debug.dart';
 Device: Battery
   ├─ PowerMeter: Power(, Cadence)
   │    └─ ESPM: Api, WeightScale, Hall
+  ├─ ESPCC: Api
   ├─ HeartrateMonitor: Heartrate
   ├─ TODO CadenceSensor: Cadence
   └─ TODO SpeedSensor: Speed
@@ -90,6 +91,9 @@ class Device with Debug {
     if (uuids.contains(BleConstants.ESPM_API_SERVICE_UUID)) {
       return ESPM(scanResult.peripheral);
     }
+    if (uuids.contains(BleConstants.ESPCC_API_SERVICE_UUID)) {
+      return ESPCC(scanResult.peripheral);
+    }
     if (uuids.contains(BleConstants.CYCLING_POWER_SERVICE_UUID)) {
       return PowerMeter(scanResult.peripheral);
     }
@@ -130,7 +134,7 @@ class Device with Debug {
       )
           .listen(
         (state) async {
-          debugLog("new connection state: $state");
+          //debugLog("new connection state: $state");
           lastConnectionState = state;
           /*
           if (state == connectedState)
@@ -199,14 +203,14 @@ class Device with Debug {
   }
 
   Future<void> _onDisconnected() async {
-    debugLog("_onDisconnected()");
+    //debugLog("_onDisconnected()");
     await _unsubscribeCharacteristics();
     _deinitCharacteristics();
     //streamSendIfNotClosed(stateController, newState);
     if (autoConnect.value && !await connected) {
       await Future.delayed(Duration(seconds: 15)).then((_) async {
         if (autoConnect.value && !await connected) {
-          debugLog("Autoconnect calling connect()");
+          //debugLog("Autoconnect calling connect()");
           await connect();
         }
       });
@@ -238,7 +242,7 @@ class Device with Debug {
       debugLog("connect() Connection already initiated");
       return;
     }
-    debugLog("connect() Connecting to $name(${peripheral!.identifier})");
+    //debugLog("connect() Connecting to $name(${peripheral!.identifier})");
     _connectionInitiated = true;
     await peripheral!
         .connect(
@@ -261,7 +265,7 @@ class Device with Debug {
         }
       },
     );
-    debugLog("peripheral.connect() returned");
+    //debugLog("peripheral.connect() returned");
     _connectionInitiated = false;
   }
 
@@ -294,9 +298,9 @@ class Device with Debug {
     if (!await discovered()) return;
     await _characteristics.forEachListItem((_, item) async {
       if (item.subscribeOnConnect) {
-        debugLog('_subscribeCharacteristics ${item.characteristic?.characteristicUUID} start');
+        debugLog('_subscribeCharacteristics ${item.characteristic?.charUUID} start');
         await item.characteristic?.subscribe();
-        debugLog('_subscribeCharacteristics ${item.characteristic?.characteristicUUID} end');
+        debugLog('_subscribeCharacteristics ${item.characteristic?.charUUID} end');
       }
     });
     _subscribed = true;
@@ -445,20 +449,25 @@ class PowerMeter extends Device {
 }
 
 class ESPM extends PowerMeter {
-  late EspmApi api;
+  late Api api;
   final weightServiceMode = ValueNotifier<int>(-1);
   final hallEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
-  final deviceSettings = AlwaysNotifier<ESPMSettings>(ESPMSettings());
-  final wifiSettings = AlwaysNotifier<ESPMWifiSettings>(ESPMWifiSettings());
+  final settings = AlwaysNotifier<ESPMSettings>(ESPMSettings());
+  final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
+  //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
+  StreamSubscription<ApiMessage>? _apiSubsciption;
 
-  ApiCharacteristic? get apiCharacteristic => characteristic("api") as ApiCharacteristic?;
-  WeightScaleCharacteristic? get weightScale => characteristic("weightScale") as WeightScaleCharacteristic?;
-  HallCharacteristic? get hall => characteristic("hall") as HallCharacteristic?;
-  StreamSubscription<EspmApiMessage>? _apiSubsciption;
+  WeightScaleCharacteristic? get weightScaleChar => characteristic("weightScale") as WeightScaleCharacteristic?;
+  HallCharacteristic? get hallChar => characteristic("hall") as HallCharacteristic?;
 
   ESPM(Peripheral peripheral) : super(peripheral) {
     _characteristics.addAll({
-      'api': CharacteristicListItem(ApiCharacteristic(peripheral)),
+      'api': CharacteristicListItem(
+        ApiCharacteristic(
+          peripheral,
+          serviceUUID: BleConstants.ESPM_API_SERVICE_UUID,
+        ),
+      ),
       'weightScale': CharacteristicListItem(
         WeightScaleCharacteristic(peripheral),
         subscribeOnConnect: false,
@@ -468,21 +477,22 @@ class ESPM extends PowerMeter {
         subscribeOnConnect: false,
       ),
     });
-    api = EspmApi(this);
+    api = Api(this);
+    api.commands = {1: "config"};
     // listen to api message done events
     _apiSubsciption = api.messageDoneStream.listen((message) => _onApiDone(message));
     tileStreams.addAll({
       "scale": DeviceTileStream(
         label: "Weight Scale",
-        stream: weightScale?.defaultStream.map<String>((value) {
+        stream: weightScaleChar?.defaultStream.map<String>((value) {
           String s = value.toStringAsFixed(2);
           if (s.length > 6) s = s.substring(0, 6);
           if (s == "-0.00") s = "0.00";
           return s;
         }),
-        initialData: weightScale?.lastValue.toString,
+        initialData: weightScaleChar?.lastValue.toString,
         units: "kg",
-        history: weightScale?.histories['measurement'],
+        history: weightScaleChar?.histories['measurement'],
       ),
     });
     tileActions.addAll({
@@ -490,153 +500,153 @@ class ESPM extends PowerMeter {
         label: "Tare",
         action: () async {
           var resultCode = await api.requestResultCode("tare=0");
-          snackbar("Tare " + (resultCode == EspmApiResult.success.index ? "success" : "failed"));
+          snackbar("Tare " + (resultCode == ApiResult.success ? "success" : "failed"));
         },
       ),
     });
   }
 
   /// Processes "done" messages sent by the API
-  void _onApiDone(EspmApiMessage message) async {
+  void _onApiDone(ApiMessage message) async {
     //debugLog("onApiDone parsing message: $message");
-    if (message.resultCode != EspmApiResult.success.index) return;
+    if (message.resultCode != ApiResult.success) return;
     //debugLog("onApiDone parsing successful message: $message");
     // switch does not work with non-constant case :(
 
     // hostName
-    if (EspmApiCommand.hostName.index == message.commandCode) {
+    if (api.commandCode("hostName") == message.commandCode) {
       name = message.valueAsString;
     }
     // weightServiceMode
-    else if (EspmApiCommand.weightService.index == message.commandCode) {
+    else if (api.commandCode("weightService") == message.commandCode) {
       weightServiceMode.value = message.valueAsInt ?? -1;
       if (0 < weightServiceMode.value)
-        await weightScale?.subscribe();
+        await weightScaleChar?.subscribe();
       else
-        await weightScale?.unsubscribe();
+        await weightScaleChar?.unsubscribe();
     }
     // hallEnabled
-    else if (EspmApiCommand.hallChar.index == message.commandCode) {
+    else if (api.commandCode("hallChar") == message.commandCode) {
       hallEnabled.value = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       if (message.valueAsBool ?? false)
-        await hall?.subscribe();
+        await hallChar?.subscribe();
       else
-        await hall?.unsubscribe();
+        await hallChar?.unsubscribe();
     }
     // wifi
-    else if (EspmApiCommand.wifi.index == message.commandCode) {
+    else if (api.commandCode("wifi") == message.commandCode) {
       wifiSettings.value.enabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       wifiSettings.notifyListeners();
     }
     // wifiApEnabled
-    else if (EspmApiCommand.wifiApEnabled.index == message.commandCode) {
+    else if (api.commandCode("wifiApEnabled") == message.commandCode) {
       wifiSettings.value.apEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       wifiSettings.notifyListeners();
     }
     // wifiApSSID
-    else if (EspmApiCommand.wifiApSSID.index == message.commandCode) {
+    else if (api.commandCode("wifiApSSID") == message.commandCode) {
       wifiSettings.value.apSSID = message.valueAsString;
       wifiSettings.notifyListeners();
     }
     // wifiApPassword
-    else if (EspmApiCommand.wifiApPassword.index == message.commandCode) {
+    else if (api.commandCode("wifiApPassword") == message.commandCode) {
       wifiSettings.value.apPassword = message.valueAsString;
       wifiSettings.notifyListeners();
     }
     // wifiStaEnabled
-    else if (EspmApiCommand.wifiStaEnabled.index == message.commandCode) {
+    else if (api.commandCode("wifiStaEnabled") == message.commandCode) {
       wifiSettings.value.staEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
       wifiSettings.notifyListeners();
     }
     // wifiStaSSID
-    else if (EspmApiCommand.wifiStaSSID.index == message.commandCode) {
+    else if (api.commandCode("wifiStaSSID") == message.commandCode) {
       wifiSettings.value.staSSID = message.valueAsString;
       wifiSettings.notifyListeners();
     }
     // wifiStaPassword
-    else if (EspmApiCommand.wifiStaPassword.index == message.commandCode) {
+    else if (api.commandCode("wifiStaPassword") == message.commandCode) {
       wifiSettings.value.staPassword = message.valueAsString;
       wifiSettings.notifyListeners();
     }
     // crankLength
-    else if (EspmApiCommand.crankLength.index == message.commandCode) {
-      deviceSettings.value.cranklength = message.valueAsDouble;
-      deviceSettings.notifyListeners();
+    else if (api.commandCode("crankLength") == message.commandCode) {
+      settings.value.cranklength = message.valueAsDouble;
+      settings.notifyListeners();
     }
     // reverseStrain
-    else if (EspmApiCommand.reverseStrain.index == message.commandCode) {
-      deviceSettings.value.reverseStrain = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      deviceSettings.notifyListeners();
+    else if (api.commandCode("reverseStrain") == message.commandCode) {
+      settings.value.reverseStrain = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      settings.notifyListeners();
     }
     // doublePower
-    else if (EspmApiCommand.doublePower.index == message.commandCode) {
-      deviceSettings.value.doublePower = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      deviceSettings.notifyListeners();
+    else if (api.commandCode("doublePower") == message.commandCode) {
+      settings.value.doublePower = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      settings.notifyListeners();
     }
     // sleepDelay
-    else if (EspmApiCommand.sleepDelay.index == message.commandCode) {
+    else if (api.commandCode("sleepDelay") == message.commandCode) {
       if (message.valueAsInt != null) {
-        deviceSettings.value.sleepDelay = (message.valueAsInt! / 1000 / 60).round();
-        deviceSettings.notifyListeners();
+        settings.value.sleepDelay = (message.valueAsInt! / 1000 / 60).round();
+        settings.notifyListeners();
       }
     }
     // motionDetectionMethod
-    else if (EspmApiCommand.motionDetectionMethod.index == message.commandCode) {
+    else if (api.commandCode("motionDetectionMethod") == message.commandCode) {
       if (message.valueAsInt != null) {
-        deviceSettings.value.motionDetectionMethod = message.valueAsInt!;
-        deviceSettings.notifyListeners();
+        settings.value.motionDetectionMethod = message.valueAsInt!;
+        settings.notifyListeners();
       }
     }
     // strainThreshold
-    else if (EspmApiCommand.strainThreshold.index == message.commandCode) {
+    else if (api.commandCode("strainThreshold") == message.commandCode) {
       if (message.valueAsInt != null) {
-        deviceSettings.value.strainThreshold = message.valueAsInt!;
-        deviceSettings.notifyListeners();
+        settings.value.strainThreshold = message.valueAsInt!;
+        settings.notifyListeners();
       }
     } // strainThresLow
-    else if (EspmApiCommand.strainThresLow.index == message.commandCode) {
+    else if (api.commandCode("strainThresLow") == message.commandCode) {
       if (message.valueAsInt != null) {
-        deviceSettings.value.strainThresLow = message.valueAsInt!;
-        deviceSettings.notifyListeners();
+        settings.value.strainThresLow = message.valueAsInt!;
+        settings.notifyListeners();
       }
     }
     // negativeTorqueMethod
-    else if (EspmApiCommand.negativeTorqueMethod.index == message.commandCode) {
+    else if (api.commandCode("negativeTorqueMethod") == message.commandCode) {
       if (message.valueAsInt != null) {
-        deviceSettings.value.negativeTorqueMethod = message.valueAsInt!;
-        deviceSettings.notifyListeners();
+        settings.value.negativeTorqueMethod = message.valueAsInt!;
+        settings.notifyListeners();
       }
     }
     // autoTare
-    else if (EspmApiCommand.autoTare.index == message.commandCode) {
-      deviceSettings.value.autoTare = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      deviceSettings.notifyListeners();
+    else if (api.commandCode("autoTare") == message.commandCode) {
+      settings.value.autoTare = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      settings.notifyListeners();
     }
     // autoTareDelayMs
-    else if (EspmApiCommand.autoTareDelayMs.index == message.commandCode) {
+    else if (api.commandCode("autoTareDelayMs") == message.commandCode) {
       if (message.valueAsInt != null) {
-        deviceSettings.value.autoTareDelayMs = message.valueAsInt!;
-        deviceSettings.notifyListeners();
+        settings.value.autoTareDelayMs = message.valueAsInt!;
+        settings.notifyListeners();
       }
     }
     // autoTareRangG
-    else if (EspmApiCommand.autoTareRangeG.index == message.commandCode) {
+    else if (api.commandCode("autoTareRangeG") == message.commandCode) {
       if (message.valueAsInt != null) {
-        deviceSettings.value.autoTareRangeG = message.valueAsInt!;
-        deviceSettings.notifyListeners();
+        settings.value.autoTareRangeG = message.valueAsInt!;
+        settings.notifyListeners();
       }
     }
     // config
-    else if (EspmApiCommand.config.index == message.commandCode) {
-      debugLog('_onApiDone got config');
+    else if (api.commandCode("config") == message.commandCode) {
+      debugLog("_onApiDone got config: ${message.valueAsString}");
       if (message.valueAsString != null) {
         message.valueAsString!.split(';').forEach((chunk) {
           var pair = chunk.split('=');
           if (2 != pair.length) return;
-          var message = EspmApiMessage(pair.first);
+          var message = ApiMessage(api, pair.first);
           message.commandCode = int.tryParse(pair.first);
           if (null == message.commandCode) return;
-          message.resultCode = EspmApiResult.success.index;
+          message.resultCode = ApiResult.success;
           message.value = pair.last;
           debugLog('_onApiDone config calling _onApiDone(${message.commandCode})');
           _onApiDone(message);
@@ -661,7 +671,7 @@ class ESPM extends PowerMeter {
   }
 
   Future<void> _onDisconnected() async {
-    debugLog("_onDisconnected()");
+    //debugLog("_onDisconnected()");
     await super._onDisconnected();
     _resetInit();
   }
@@ -712,8 +722,8 @@ class ESPM extends PowerMeter {
 
   void _resetInit() {
     weightServiceMode.value = -1;
-    wifiSettings.value = ESPMWifiSettings();
-    deviceSettings.value = ESPMSettings();
+    wifiSettings.value = WifiSettings();
+    settings.value = ESPMSettings();
   }
 
   Future<Type> _correctType() async {
@@ -722,6 +732,255 @@ class ESPM extends PowerMeter {
 
   Future<Device> copyToCorrectType() async {
     return this;
+  }
+}
+
+class ESPCC extends Device {
+  late Api api;
+  final settings = AlwaysNotifier<ESPCCSettings>(ESPCCSettings());
+  final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
+  //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
+  StreamSubscription<ApiMessage>? _apiSubsciption;
+
+  ESPCC(Peripheral peripheral) : super(peripheral) {
+    _characteristics.addAll({
+      'api': CharacteristicListItem(
+        ApiCharacteristic(
+          peripheral,
+          serviceUUID: BleConstants.ESPCC_API_SERVICE_UUID,
+        ),
+      ),
+    });
+    api = Api(this);
+    // listen to api message done events
+    _apiSubsciption = api.messageDoneStream.listen((message) => _onApiDone(message));
+  }
+
+  void _onApiDone(ApiMessage message) async {
+    //debugLog("onApiDone parsing message: $message");
+
+    //////////////////////////////////////////////////// init
+    if ("init" == message.commandStr) {
+      if (null == message.value) {
+        debugLog("init value null");
+        return;
+      }
+      List<String> tokens = message.value!.split(";");
+      tokens.forEach((token) {
+        int? code;
+        String? command;
+        String? value;
+        List<String> parts = token.split("=");
+        if (parts.length == 1) {
+          //debugLog("parts.length == 1; $parts");
+          value = null;
+        } else
+          value = parts[1];
+        List<String> c = parts[0].split(":");
+        if (c.length != 2) {
+          //debugLog("c.length != 2; $c");
+          return;
+        }
+        code = int.tryParse(c[0]);
+        command = c[1];
+        //debugLog("_onApiDone init: $code:$command=$value");
+
+        if (null == code) {
+          debugLog("code is null");
+        } else if (api.commands.containsKey(code)) {
+          //debugLog("command code already exists: $code");
+        } else if (api.commands.containsValue(command)) {
+          debugLog("command already exists: $command");
+        } else {
+          api.commands.addAll({code: command});
+        }
+
+        if (null == value) {
+          //debugLog("value is null");
+          //} else if (value.length < 1) {
+          //  //debugLog("value is empty");
+        } else {
+          // generate (fake) message and call ourself
+          ApiMessage m = ApiMessage(api, command);
+          m.commandCode = code;
+          m.commandStr = command;
+          m.value = value;
+          m.isDone = true;
+          _onApiDone(m);
+        }
+      });
+      return;
+    }
+
+    //////////////////////////////////////////////////// hostname
+    if ("hostname" == message.commandStr) {
+      name = message.valueAsString;
+      return;
+    }
+
+    //////////////////////////////////////////////////// build
+    if ("build" == message.commandStr) {
+      return;
+    }
+
+    //////////////////////////////////////////////////// touchThres
+    if ("touchThres" == message.commandStr) {
+      String? v = message.valueAsString;
+      if (null == v) return;
+      List<String> pairs = v.split(",");
+      Map<int, int> values = {};
+      pairs.forEach((pair) {
+        List<String> parts = pair.split(":");
+        if (parts.length != 2) return;
+        int? index = int.tryParse(parts[0]);
+        if (null == index) return;
+        if (index < 0) return;
+        int? value = int.tryParse(parts[1]);
+        if (null == value) return;
+        if (value < 0 || 100 < value) return;
+        values[index] = value;
+      });
+      debugLog("new touchThres=$values");
+      settings.value.touchThres = values;
+      settings.notifyListeners();
+      return;
+    }
+
+    //////////////////////////////////////////////////// peers
+    if ("peers" == message.commandStr) {
+      String? v = message.valueAsString;
+      if (null == v) return;
+      List<String> tokens = v.split("|");
+      List<String> values = [];
+      tokens.forEach((token) {
+        if (token.length < 1) return;
+        values.add(token);
+      });
+      debugLog("new peers=$values");
+      settings.value.peers = values;
+      settings.notifyListeners();
+      return;
+    }
+
+    //////////////////////////////////////////////////// wifi
+    if ("wifi" == message.commandStr) {
+      wifiSettings.value.enabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.notifyListeners();
+      return;
+    }
+
+    //////////////////////////////////////////////////// wifiAp
+    if ("wifiAp" == message.commandStr) {
+      wifiSettings.value.apEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.notifyListeners();
+      return;
+    }
+
+    //////////////////////////////////////////////////// wifiApSSID
+    if ("wifiApSSID" == message.commandStr) {
+      wifiSettings.value.apSSID = message.valueAsString;
+      wifiSettings.notifyListeners();
+      return;
+    }
+
+    //////////////////////////////////////////////////// wifiApPassword
+    if ("wifiApPassword" == message.commandStr) {
+      wifiSettings.value.apPassword = message.valueAsString;
+      wifiSettings.notifyListeners();
+      return;
+    }
+
+    //////////////////////////////////////////////////// wifiSta
+    if ("wifiSta" == message.commandStr) {
+      wifiSettings.value.staEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      wifiSettings.notifyListeners();
+      return;
+    }
+
+    //////////////////////////////////////////////////// wifiStaSSID
+    if ("wifiStaSSID" == message.commandStr) {
+      wifiSettings.value.staSSID = message.valueAsString;
+      wifiSettings.notifyListeners();
+      return;
+    }
+
+    //////////////////////////////////////////////////// wifiStaPassword
+    if ("wifiStaPassword" == message.commandStr) {
+      wifiSettings.value.staPassword = message.valueAsString;
+      wifiSettings.notifyListeners();
+      return;
+    }
+
+    //////////////////////////////////////////////////// battery
+    if ("battery" == message.commandStr) {
+      return;
+    }
+
+    //////////////////////////////////////////////////// rec
+    if ("rec" == message.commandStr) {
+      return;
+    }
+
+    //////////////////////////////////////////////////// scan
+    if ("scan" == message.commandStr) {
+      int? timeout = message.valueAsInt;
+      debugLog("received scan=$timeout");
+      settings.value.scanning = null != timeout && 0 < timeout;
+      settings.notifyListeners();
+      return;
+    }
+
+    //////////////////////////////////////////////////// scanResult
+    if ("scanResult" == message.commandStr) {
+      String? result = message.valueAsString;
+      debugLog("received scanResult=$result");
+      if (null == result) return;
+      if (settings.value.scanResults.contains(result)) return;
+      settings.value.scanResults.add(result);
+      settings.notifyListeners();
+      return;
+    }
+
+    snackbar("${message.info} ${message.command}");
+    debugLog("unhandled api response: $message");
+  }
+
+  Future<void> dispose() async {
+    debugLog("$name dispose");
+    _apiSubsciption?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _onConnected() async {
+    debugLog("_onConnected()");
+    if (null == peripheral) return;
+    // api char can use values longer than 20 bytes
+    await BLE().requestMtu(peripheral!, 512);
+    await super._onConnected();
+    _requestInit();
+  }
+
+  Future<void> _onDisconnected() async {
+    await super._onDisconnected();
+    settings.value = ESPCCSettings();
+    settings.notifyListeners();
+    wifiSettings.value = WifiSettings();
+    wifiSettings.notifyListeners();
+  }
+
+  /// request initial values, returned value is discarded
+  /// because the message.done subscription will handle it
+  void _requestInit() async {
+    debugLog("Requesting init start");
+    if (!await ready()) return;
+    //await characteristic("api")?.write("init");
+
+    await api.request<String>(
+      "init",
+      minDelayMs: 10000,
+      maxAttempts: 3,
+    );
+    //await Future.delayed(Duration(milliseconds: 250));
   }
 }
 
@@ -822,7 +1081,29 @@ class ESPMSettings {
   }
 }
 
-class ESPMWifiSettings {
+class ESPCCSettings {
+  List<String> peers = [];
+  Map<int, int> touchThres = {};
+  bool scanning = false;
+  List<String> scanResults = [];
+
+  @override
+  bool operator ==(other) {
+    return (other is ESPCCSettings) && other.peers == peers && other.touchThres == touchThres;
+  }
+
+  @override
+  int get hashCode => peers.hashCode ^ touchThres.hashCode;
+
+  String toString() {
+    return "${describeIdentity(this)} ("
+        "peers: $peers, "
+        "touchThres: $touchThres"
+        ")";
+  }
+}
+
+class WifiSettings {
   var enabled = ExtendedBool.Unknown;
   var apEnabled = ExtendedBool.Unknown;
   String? apSSID;
@@ -833,7 +1114,7 @@ class ESPMWifiSettings {
 
   @override
   bool operator ==(other) {
-    return (other is ESPMWifiSettings) &&
+    return (other is WifiSettings) &&
         other.enabled == enabled &&
         other.apEnabled == apEnabled &&
         other.apSSID == apSSID &&

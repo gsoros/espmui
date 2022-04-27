@@ -22,14 +22,11 @@ class DeviceRoute extends StatefulWidget with Debug {
   @override
   DeviceRouteState createState() {
     debugLog("createState()");
-    if (device is ESPM)
-      return ESPMRouteState(device as ESPM);
-    else if (device is PowerMeter)
-      return PowerMeterRouteState(device as PowerMeter);
-    else if (device is HeartRateMonitor)
-      return HeartRateMonitorRouteState(device as HeartRateMonitor);
-    else
-      return DeviceRouteState(device);
+    if (device is ESPM) return ESPMRouteState(device as ESPM);
+    if (device is ESPCC) return ESPCCRouteState(device as ESPCC);
+    if (device is PowerMeter) return PowerMeterRouteState(device as PowerMeter);
+    if (device is HeartRateMonitor) return HeartRateMonitorRouteState(device as HeartRateMonitor);
+    return DeviceRouteState(device);
   }
 }
 
@@ -194,6 +191,23 @@ class ESPMRouteState extends PowerMeterRouteState {
         ),
         StaggeredGridItem(
           value: EspmSettingsWidget(espm),
+          colSpan: 6,
+        ),
+      ]);
+  }
+}
+
+class ESPCCRouteState extends DeviceRouteState {
+  ESPCC espcc;
+
+  ESPCCRouteState(this.espcc) : super(espcc);
+
+  @override
+  _devicePropertyItems() {
+    return super._devicePropertyItems()
+      ..addAll([
+        StaggeredGridItem(
+          value: EspccSettingsWidget(espcc),
           colSpan: 6,
         ),
       ]);
@@ -372,7 +386,7 @@ class ConnectButton extends StatelessWidget with Debug {
           label = "Disonnecting";
         else //if (snapshot.data == PeripheralConnectionState.disconnected)
           action = device.connect;
-        return EspmuiElevatedButton(label, action: action);
+        return EspmuiElevatedButton(child: Text(label), onPressed: action);
       },
     );
   }

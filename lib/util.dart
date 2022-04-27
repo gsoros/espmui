@@ -52,16 +52,16 @@ void streamSendIfNotClosed(StreamController stream, dynamic value) {
 }
 
 class EspmuiElevatedButton extends StatelessWidget {
-  final String label;
-  final Function()? action;
+  final Widget child;
+  final void Function()? onPressed;
 
-  EspmuiElevatedButton(this.label, {this.action});
+  EspmuiElevatedButton({required this.child, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
-      onPressed: action,
-      child: Text(label),
+      onPressed: onPressed,
+      child: child,
       style: ButtonStyle(
         backgroundColor: MaterialStateProperty.resolveWith((state) {
           return state.contains(MaterialState.disabled) ? Colors.red.shade400 : Colors.red.shade900;

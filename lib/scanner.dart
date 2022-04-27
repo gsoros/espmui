@@ -45,7 +45,7 @@ class Scanner with Debug {
     _scanningSubscription = scanningStream.listen(
       (value) {
         scanning = value;
-        debugLog("scanningSubscription: $value");
+        //debugLog("scanningSubscription: $value");
       },
     );
     _resultSubscription = resultStream.listen(
@@ -91,6 +91,7 @@ class Scanner with Debug {
         .startPeripheralScan(
           uuids: [
             BleConstants.ESPM_API_SERVICE_UUID,
+            BleConstants.ESPCC_API_SERVICE_UUID,
             BleConstants.CYCLING_POWER_SERVICE_UUID,
             BleConstants.HEART_RATE_SERVICE_UUID,
           ],
@@ -107,7 +108,7 @@ class Scanner with Debug {
   }
 
   Future<void> stopScan() async {
-    debugLog("stopScan()");
+    //debugLog("stopScan()");
     if (_stopTimer != null) {
       _stopTimer!.cancel();
       _stopTimer = null;

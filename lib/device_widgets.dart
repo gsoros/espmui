@@ -1,8 +1,9 @@
 import 'dart:async';
+//import 'dart:html';
 
 import 'package:flutter/material.dart';
 
-import 'espm_api.dart';
+import 'api.dart';
 import 'device.dart';
 import 'ble_characteristic.dart';
 import 'util.dart';
@@ -57,8 +58,8 @@ class EspmWeightScaleStreamListener extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<double>(
-      stream: device.weightScale?.defaultStream,
-      initialData: device.weightScale?.lastValue,
+      stream: device.weightScaleChar?.defaultStream,
+      initialData: device.weightScaleChar?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
         String weight = snapshot.hasData && 0 < mode ? snapshot.data!.toStringAsFixed(2) : "--";
         if (weight.length > 6) weight = weight.substring(0, 6);
@@ -104,7 +105,7 @@ class EspmWeightScale extends StatelessWidget {
         snackbar("Success calibrating device", context);
       }
 
-      Widget autoTareWarning = device.deviceSettings.value.autoTare == ExtendedBool.True ? Text("Warning: AutoTare is enabled") : Empty();
+      Widget autoTareWarning = device.settings.value.autoTare == ExtendedBool.True ? Text("Warning: AutoTare is enabled") : Empty();
 
       await showDialog(
         context: context,
@@ -152,7 +153,7 @@ class EspmWeightScale extends StatelessWidget {
           ));
       if (1 == reply || 2 == reply) {
         if (enable) success = true;
-        await device.weightScale?.subscribe();
+        await device.weightScaleChar?.subscribe();
       } else if (0 == reply) {
         if (!enable) success = true;
         await device.characteristic("weightScale")?.unsubscribe();
@@ -167,7 +168,7 @@ class EspmWeightScale extends StatelessWidget {
     void tare() async {
       var resultCode = await device.api.requestResultCode("tare=0");
       snackbar(
-        "Tare " + (resultCode == EspmApiResult.success.index ? "success" : "failed"),
+        "Tare " + (resultCode == ApiResult.success ? "success" : "failed"),
         context,
       );
     }
@@ -224,8 +225,8 @@ class EspmHallStreamListener extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<int>(
-      stream: device.hall?.defaultStream,
-      initialData: device.hall?.lastValue,
+      stream: device.hallChar?.defaultStream,
+      initialData: device.hallChar?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
         String value = snapshot.hasData && enabled != ExtendedBool.False ? (snapshot.data! > 0 ? snapshot.data!.toString() : '--') : "--";
         const styleEnabled = TextStyle(fontSize: 30);
@@ -259,34 +260,34 @@ class EspmHallSensor extends StatelessWidget {
                   EspmHallStreamListener(device, ExtendedBool.True),
                   Row(
                     children: [
-                      EspmApiSettingInput(
+                      ApiSettingInput(
                         name: "Offset",
                         value: hallOffset.toString(),
                         keyboardType: TextInputType.number,
-                        device: device,
-                        command: EspmApiCommand.hallOffset,
+                        api: device.api,
+                        command: device.api.commandCode("hallOffset"),
                       ),
                     ],
                   ),
                   Row(
                     children: [
-                      EspmApiSettingInput(
+                      ApiSettingInput(
                         name: "High Threshold",
                         value: hallThreshold.toString(),
                         keyboardType: TextInputType.number,
-                        device: device,
-                        command: EspmApiCommand.hallThreshold,
+                        api: device.api,
+                        command: device.api.commandCode("hallThreshold"),
                       ),
                     ],
                   ),
                   Row(
                     children: [
-                      EspmApiSettingInput(
+                      ApiSettingInput(
                         name: "Low Threshold",
                         value: hallThresLow.toString(),
                         keyboardType: TextInputType.number,
-                        device: device,
-                        command: EspmApiCommand.hallThresLow,
+                        api: device.api,
+                        command: device.api.commandCode("hallThresLow"),
                       ),
                     ],
                   ),
@@ -305,9 +306,9 @@ class EspmHallSensor extends StatelessWidget {
       bool success = reply == enable;
       if (success) {
         if (enable)
-          await device.hall?.subscribe();
+          await device.hallChar?.subscribe();
         else
-          await device.hall?.unsubscribe();
+          await device.hallChar?.unsubscribe();
       } else
         device.hallEnabled.value = ExtendedBool.Unknown;
       snackbar(
@@ -450,15 +451,15 @@ class HeartRate extends StatelessWidget {
   }
 }
 
-class EspmApiStream extends StatelessWidget {
-  final ESPM device;
-  EspmApiStream(this.device);
+class ApiStream extends StatelessWidget {
+  final Api api;
+  ApiStream(this.api);
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<String>(
-      stream: device.apiCharacteristic?.defaultStream,
-      initialData: device.apiCharacteristic?.lastValue,
+      stream: api.characteristic?.defaultStream,
+      initialData: api.characteristic?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
         return Text("${snapshot.data}");
       },
@@ -466,9 +467,9 @@ class EspmApiStream extends StatelessWidget {
   }
 }
 
-class EspmApiCli extends StatelessWidget with Debug {
-  final ESPM device;
-  EspmApiCli(this.device);
+class ApiCli extends StatelessWidget with Debug {
+  final Api api;
+  ApiCli(this.api);
 
   @override
   Widget build(BuildContext context) {
@@ -484,17 +485,17 @@ class EspmApiCli extends StatelessWidget with Debug {
         ),
       ),
       onSubmitted: (String command) async {
-        String? value = await device.api.request<String>(command);
+        String? value = await api.request<String>(command);
         debugLog("[ApiCli] api.request($command): $value");
       },
     );
   }
 }
 
-class EspmApiInterface extends StatelessWidget {
-  final ESPM device;
+class ApiInterface extends StatelessWidget {
+  final Api api;
 
-  EspmApiInterface(this.device);
+  ApiInterface(this.api);
 
   @override
   Widget build(BuildContext context) {
@@ -505,18 +506,18 @@ class EspmApiInterface extends StatelessWidget {
           fit: FlexFit.loose,
           child: Align(
             alignment: Alignment.topLeft,
-            child: EspmApiStream(device),
+            child: ApiStream(api),
           ),
         ),
-        EspmApiCli(device),
+        ApiCli(api),
       ],
     );
   }
 }
 
-class EspmApiSettingInput extends StatelessWidget with Debug {
-  final ESPM device;
-  final EspmApiCommand command;
+class ApiSettingInput extends StatelessWidget with Debug {
+  final Api api;
+  final int? command;
   final String? value;
   final bool enabled;
   final String? name;
@@ -525,8 +526,8 @@ class EspmApiSettingInput extends StatelessWidget with Debug {
   final Widget? suffix;
   final TextInputType? keyboardType;
 
-  EspmApiSettingInput({
-    required this.device,
+  ApiSettingInput({
+    required this.api,
     required this.command,
     this.value,
     this.enabled = true,
@@ -559,13 +560,17 @@ class EspmApiSettingInput extends StatelessWidget with Debug {
           ),
         ),
         onSubmitted: (String edited) async {
+          if (null == command) {
+            debugLog("command is null");
+            return;
+          }
           if (transformInput != null) edited = transformInput!(edited);
-          final result = await device.api.requestResultCode(
-            "${command.index}=$edited",
+          final result = await api.requestResultCode(
+            "$command=$edited",
             minDelayMs: 2000,
           );
-          if (name != null) snackbar("$name update${result == EspmApiResult.success.index ? "d" : " failed"}", context);
-          debugLog("[ApiSettingInput] api.request($command): $result");
+          if (name != null) snackbar("$name update${result == ApiResult.success ? "d" : " failed"}", context);
+          debugLog("api.requestResultCode($command): $result");
         },
       ),
     );
@@ -606,15 +611,15 @@ class SettingSwitch extends StatelessWidget with Debug {
   }
 }
 
-class EspmApiSettingSwitch extends StatelessWidget with Debug {
-  final ESPM device;
-  final EspmApiCommand command;
+class ApiSettingSwitch extends StatelessWidget with Debug {
+  final Api api;
+  final int? command;
   final ExtendedBool value;
   final String? name;
   final void Function()? onChanged;
 
-  EspmApiSettingSwitch({
-    required this.device,
+  ApiSettingSwitch({
+    required this.api,
     required this.command,
     required this.value,
     this.name,
@@ -630,13 +635,14 @@ class EspmApiSettingSwitch extends StatelessWidget with Debug {
             value: value == ExtendedBool.True ? true : false,
             activeColor: Colors.red,
             onChanged: (bool enabled) async {
+              if (null == command) return;
               if (onChanged != null) onChanged!();
-              final result = await device.api.requestResultCode(
-                "${command.index}=${enabled ? "1" : "0"}",
+              final result = await api.requestResultCode(
+                "$command=${enabled ? "1" : "0"}",
                 minDelayMs: 2000,
               );
-              if (name != null) snackbar("$name ${enabled ? "en" : "dis"}able${result == EspmApiResult.success.index ? "d" : " failed"}", context);
-              debugLog("[EspmApiSettingSwitch] api.requestResultCode($command): $result");
+              if (name != null) snackbar("$name ${enabled ? "en" : "dis"}able${result == ApiResult.success ? "d" : " failed"}", context);
+              debugLog("api.requestResultCode($command): $result");
             });
     return (name == null)
         ? onOff
@@ -716,12 +722,12 @@ class EspmuiDropdown extends StatelessWidget with Debug {
   }
 }
 
-class EspmApiSettingDropdown extends EspmuiDropdown {
-  final ESPM device;
-  final EspmApiCommand command;
+class ApiSettingDropdown extends EspmuiDropdown {
+  final Api api;
+  final int? command;
 
-  EspmApiSettingDropdown({
-    required this.device,
+  ApiSettingDropdown({
+    required this.api,
     required this.command,
     required String? value,
     required List<DropdownMenuItem<String>>? items,
@@ -732,12 +738,13 @@ class EspmApiSettingDropdown extends EspmuiDropdown {
           items: items,
           name: name,
           onChanged: (String? value) async {
+            if (null == command) return;
             if (onChanged != null) onChanged(value);
-            final result = await device.api.requestResultCode(
-              "${command.index}=${value ?? value.toString()}",
+            final result = await api.requestResultCode(
+              "$command=${value ?? value.toString()}",
               minDelayMs: 2000,
             );
-            if (name != null) snackbar("$name ${value ?? value.toString()} ${result == EspmApiResult.success.index ? "success" : " failure"}");
+            if (name != null) snackbar("$name ${value ?? value.toString()} ${result == ApiResult.success ? "success" : " failure"}");
             print("[ApiSettingDropdown] api.requestResultCode($command): $result");
           },
         );
@@ -762,141 +769,45 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
       );
     }
 
-    final wifiSettings = ValueListenableBuilder<ESPMWifiSettings>(
-      valueListenable: device.wifiSettings,
-      builder: (context, settings, child) {
-        //debugLog("changed: $settings");
-        var widgets = <Widget>[
-          EspmApiSettingSwitch(
-            device: device,
-            name: "Wifi",
-            command: EspmApiCommand.wifi,
-            value: settings.enabled,
-            onChanged: () {
-              device.wifiSettings.value.enabled = ExtendedBool.Waiting;
-              device.wifiSettings.notifyListeners();
-            },
-          ),
-        ];
-        if (settings.enabled == ExtendedBool.True) {
-          widgets.add(
-            EspmApiSettingSwitch(
-              device: device,
-              name: "Access Point",
-              command: EspmApiCommand.wifiApEnabled,
-              value: settings.apEnabled,
-              onChanged: () {
-                device.wifiSettings.value.apEnabled = ExtendedBool.Waiting;
-                device.wifiSettings.notifyListeners();
-              },
-            ),
-          );
-          if (settings.apEnabled == ExtendedBool.True)
-            widgets.add(
-              Row(
-                children: [
-                  EspmApiSettingInput(
-                    device: device,
-                    name: "SSID",
-                    command: EspmApiCommand.wifiApSSID,
-                    value: settings.apSSID,
-                    enabled: settings.apEnabled == ExtendedBool.True ? true : false,
-                  ),
-                  Empty(),
-                  EspmApiSettingInput(
-                    device: device,
-                    name: "Password",
-                    command: EspmApiCommand.wifiApPassword,
-                    value: "",
-                    isPassword: true,
-                    enabled: settings.apEnabled == ExtendedBool.True ? true : false,
-                  ),
-                ],
-              ),
-            );
-        }
-        if (settings.enabled == ExtendedBool.True) {
-          widgets.add(
-            EspmApiSettingSwitch(
-              device: device,
-              name: "Station",
-              command: EspmApiCommand.wifiStaEnabled,
-              value: settings.staEnabled,
-              onChanged: () {
-                device.wifiSettings.value.staEnabled = ExtendedBool.Waiting;
-                device.wifiSettings.notifyListeners();
-              },
-            ),
-          );
-          if (settings.staEnabled == ExtendedBool.True) {
-            widgets.add(
-              Row(
-                children: [
-                  EspmApiSettingInput(
-                    device: device,
-                    name: "SSID",
-                    command: EspmApiCommand.wifiStaSSID,
-                    value: settings.staSSID,
-                    enabled: settings.staEnabled == ExtendedBool.True ? true : false,
-                  ),
-                  Empty(),
-                  EspmApiSettingInput(
-                    device: device,
-                    name: "Password",
-                    command: EspmApiCommand.wifiStaPassword,
-                    value: "",
-                    isPassword: true,
-                    enabled: settings.staEnabled == ExtendedBool.True ? true : false,
-                  ),
-                ],
-              ),
-            );
-          }
-        }
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: widgets,
-        );
-      },
-    );
+    final apiWifiSettings = ApiWifiSettings(this.device.api, this.device.wifiSettings);
 
     final deviceSettings = ValueListenableBuilder<ESPMSettings>(
-      valueListenable: device.deviceSettings,
+      valueListenable: device.settings,
       builder: (_, settings, __) {
         //debugLog("changed: $settings");
         var widgets = <Widget>[
-          EspmApiSettingInput(
-            device: device,
+          ApiSettingInput(
+            api: device.api,
             name: "Crank Length",
-            command: EspmApiCommand.crankLength,
+            command: device.api.commandCode("crankLength"),
             value: settings.cranklength == null ? "" : settings.cranklength.toString(),
             suffix: Text("mm"),
             keyboardType: TextInputType.number,
           ),
-          EspmApiSettingSwitch(
-            device: device,
+          ApiSettingSwitch(
+            api: device.api,
             name: "Reverse Strain",
-            command: EspmApiCommand.reverseStrain,
+            command: device.api.commandCode("reverseStrain"),
             value: settings.reverseStrain,
             onChanged: () {
-              device.deviceSettings.value.reverseStrain = ExtendedBool.Waiting;
-              device.deviceSettings.notifyListeners();
+              device.settings.value.reverseStrain = ExtendedBool.Waiting;
+              device.settings.notifyListeners();
             },
           ),
-          EspmApiSettingSwitch(
-            device: device,
+          ApiSettingSwitch(
+            api: device.api,
             name: "Double Power",
-            command: EspmApiCommand.doublePower,
+            command: device.api.commandCode("doublePower"),
             value: settings.doublePower,
             onChanged: () {
-              device.deviceSettings.value.doublePower = ExtendedBool.Waiting;
-              device.deviceSettings.notifyListeners();
+              device.settings.value.doublePower = ExtendedBool.Waiting;
+              device.settings.notifyListeners();
             },
           ),
-          EspmApiSettingInput(
-            device: device,
+          ApiSettingInput(
+            api: device.api,
             name: "Sleep Delay",
-            command: EspmApiCommand.sleepDelay,
+            command: device.api.commandCode("sleepDelay"),
             value: settings.sleepDelay == null ? "" : settings.sleepDelay.toString(),
             transformInput: (value) {
               var ms = int.tryParse(value);
@@ -905,10 +816,10 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             suffix: Text("minutes"),
             keyboardType: TextInputType.number,
           ),
-          EspmApiSettingDropdown(
+          ApiSettingDropdown(
             name: "Negative Torque Method",
-            device: device,
-            command: EspmApiCommand.negativeTorqueMethod,
+            api: device.api,
+            command: device.api.commandCode("negativeTorqueMethod"),
             value: settings.negativeTorqueMethod.toString(),
             onChanged: (value) {
               debugLog("Negative Torque Method: $value");
@@ -926,10 +837,10 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                         ))
                     .toList(),
           ),
-          EspmApiSettingDropdown(
+          ApiSettingDropdown(
             name: "Motion Detection Method",
-            device: device,
-            command: EspmApiCommand.motionDetectionMethod,
+            api: device.api,
+            command: device.api.commandCode("motionDetectionMethod"),
             value: settings.motionDetectionMethod.toString(),
             onChanged: (value) {
               debugLog("Motion Detection Method: $value");
@@ -954,20 +865,20 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           widgets.add(
             Row(
               children: [
-                EspmApiSettingInput(
-                  device: device,
+                ApiSettingInput(
+                  api: device.api,
                   name: "Low Threshold",
-                  command: EspmApiCommand.strainThresLow,
+                  command: device.api.commandCode("strainThresLow"),
                   value: settings.strainThresLow == null ? null : settings.strainThresLow.toString(),
                   keyboardType: TextInputType.number,
                   enabled: settings.strainThresLow != null,
                   suffix: Text("kg"),
                 ),
                 Empty(),
-                EspmApiSettingInput(
-                  device: device,
+                ApiSettingInput(
+                  api: device.api,
                   name: "High Threshold",
-                  command: EspmApiCommand.strainThreshold,
+                  command: device.api.commandCode("strainThreshold"),
                   value: settings.strainThreshold == null ? null : settings.strainThreshold.toString(),
                   keyboardType: TextInputType.number,
                   enabled: settings.strainThreshold != null,
@@ -979,14 +890,14 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
         }
 
         widgets.add(
-          EspmApiSettingSwitch(
-            device: device,
+          ApiSettingSwitch(
+            api: device.api,
             name: "Auto Tare",
-            command: EspmApiCommand.autoTare,
+            command: device.api.commandCode("autoTare"),
             value: settings.autoTare,
             onChanged: () {
-              device.deviceSettings.value.autoTare = ExtendedBool.Waiting;
-              device.deviceSettings.notifyListeners();
+              device.settings.value.autoTare = ExtendedBool.Waiting;
+              device.settings.notifyListeners();
             },
           ),
         );
@@ -994,20 +905,20 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           widgets.add(
             Row(
               children: [
-                EspmApiSettingInput(
-                  device: device,
+                ApiSettingInput(
+                  api: device.api,
                   name: "Delay",
-                  command: EspmApiCommand.autoTareDelayMs,
+                  command: device.api.commandCode("autoTareDelayMs"),
                   value: settings.autoTareDelayMs == null ? null : settings.autoTareDelayMs.toString(),
                   keyboardType: TextInputType.number,
                   enabled: settings.autoTareDelayMs != null,
                   suffix: Text("ms"),
                 ),
                 Empty(),
-                EspmApiSettingInput(
-                  device: device,
+                ApiSettingInput(
+                  api: device.api,
                   name: "Max. Range",
-                  command: EspmApiCommand.autoTareRangeG,
+                  command: device.api.commandCode("autoTareRangeG"),
                   value: settings.autoTareRangeG == null ? null : settings.autoTareRangeG.toString(),
                   keyboardType: TextInputType.number,
                   enabled: settings.autoTareRangeG != null,
@@ -1033,12 +944,295 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
         Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            frame(wifiSettings),
+            frame(apiWifiSettings),
             frame(deviceSettings),
-            frame(EspmApiInterface(device)),
+            frame(ApiInterface(device.api)),
           ],
         )
       ],
+    );
+  }
+}
+
+class EspccPeersEditor extends StatelessWidget with Debug {
+  final ESPCC device;
+  EspccPeersEditor(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<ESPCCSettings>(
+        valueListenable: device.settings,
+        builder: (_, settings, __) {
+          return Column(
+            children: [
+              EspmuiElevatedButton(
+                child: Text(settings.scanning ? "Scanning..." : "Scan"),
+                onPressed: settings.scanning
+                    ? null
+                    : () {
+                        device.settings.value.scanning = true;
+                        device.settings.value.scanResults = [];
+                        device.settings.notifyListeners();
+                        device.api.sendCommand("scan=10");
+                      },
+              ),
+              PeersList(peers: settings.peers, action: "delete", api: device.api),
+              PeersList(
+                peers: settings.scanResults.where((element) => settings.peers.contains(element) ? false : true).toList(),
+                action: "add",
+                api: device.api,
+              ),
+            ],
+          );
+        });
+  }
+}
+
+class PeersList extends StatelessWidget with Debug {
+  final List<String> peers;
+  final String action;
+  final Api? api;
+
+  PeersList({required this.peers, this.action = "none", this.api});
+
+  @override
+  Widget build(BuildContext context) {
+    var list = Column(children: []);
+    peers.forEach((peer) {
+      // addr,addrType,deviceType,deviceName
+      var parts = peer.split(",");
+      if (parts.length != 4) return;
+      var icon = Icons.question_mark;
+      if (parts[2] == "P") icon = Icons.bolt;
+      if (parts[2] == "E") icon = Icons.offline_bolt;
+      if (parts[2] == "H") icon = Icons.favorite;
+      String? command;
+      IconData? commandIcon;
+      if (null != api) {
+        if ("add" == action) {
+          command = "addPeer=$peer";
+          commandIcon = Icons.link;
+        } else if ("delete" == action) {
+          command = "deletePeer=${parts[0]}";
+          commandIcon = Icons.link_off;
+        }
+      }
+      var button = null == command
+          ? Empty()
+          : EspmuiElevatedButton(
+              child: Icon(commandIcon),
+              onPressed: () {
+                api!.sendCommand(command!);
+                api!.sendCommand("peers");
+              },
+            );
+      list.children.add(Row(children: [
+        Flexible(child: Row(children: [Icon(icon), Text(" "), Text(parts[3])])),
+        button,
+      ]));
+    });
+    return list;
+  }
+}
+
+class EspccSettingsWidget extends StatelessWidget with Debug {
+  final ESPCC device;
+
+  EspccSettingsWidget(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    Widget frame(Widget child) {
+      return Container(
+        padding: EdgeInsets.all(5),
+        margin: EdgeInsets.only(bottom: 15),
+        decoration: BoxDecoration(
+            //color: Colors.white10,
+            border: Border.all(width: 1, color: Colors.white12),
+            borderRadius: BorderRadius.circular(5)),
+        child: child,
+      );
+    }
+
+    final apiWifiSettings = ApiWifiSettings(device.api, device.wifiSettings);
+
+    void editPeers({required List<String> peers}) async {
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            scrollable: true,
+            title: Text("Peers"),
+            content: Container(
+              child: Column(
+                children: [
+                  EspccPeersEditor(device),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    final deviceSettings = ValueListenableBuilder<ESPCCSettings>(
+      valueListenable: device.settings,
+      builder: (_, settings, __) {
+        var widgets = <Widget>[
+          Row(children: [
+            Flexible(
+              child: Column(
+                children: [
+                  Row(children: [Text("Peers:")]),
+                  PeersList(peers: settings.peers),
+                ],
+              ),
+            ),
+            EspmuiElevatedButton(
+              onPressed: () {
+                editPeers(peers: settings.peers);
+              },
+              child: Icon(Icons.edit),
+            ),
+          ]),
+          Text(" "),
+          ApiSettingInput(
+            api: device.api,
+            name: "TouchThres",
+            command: device.api.commandCode("touchThres"),
+            value: settings.touchThres.toString(),
+          ),
+        ];
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widgets,
+        );
+      },
+    );
+
+    return ExpansionTile(
+      title: Text("Settings"),
+      textColor: Colors.white,
+      iconColor: Colors.white,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            frame(apiWifiSettings),
+            frame(deviceSettings),
+            frame(ApiInterface(device.api)),
+          ],
+        )
+      ],
+    );
+  }
+}
+
+class ApiWifiSettings extends StatelessWidget {
+  final Api api;
+  final AlwaysNotifier<WifiSettings> wifiSettings;
+
+  ApiWifiSettings(this.api, this.wifiSettings);
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<WifiSettings>(
+      valueListenable: wifiSettings,
+      builder: (context, settings, child) {
+        //debugLog("changed: $settings");
+        var widgets = <Widget>[
+          ApiSettingSwitch(
+            api: api,
+            name: "Wifi",
+            command: api.commandCode("wifi"),
+            value: settings.enabled,
+            onChanged: () {
+              wifiSettings.value.enabled = ExtendedBool.Waiting;
+              wifiSettings.notifyListeners();
+            },
+          ),
+        ];
+        if (settings.enabled == ExtendedBool.True) {
+          widgets.add(
+            ApiSettingSwitch(
+              api: api,
+              name: "Access Point",
+              command: api.commandCode("wifiApEnabled"),
+              value: settings.apEnabled,
+              onChanged: () {
+                wifiSettings.value.apEnabled = ExtendedBool.Waiting;
+                wifiSettings.notifyListeners();
+              },
+            ),
+          );
+          if (settings.apEnabled == ExtendedBool.True)
+            widgets.add(
+              Row(
+                children: [
+                  ApiSettingInput(
+                    api: api,
+                    name: "SSID",
+                    command: api.commandCode("wifiApSSID"),
+                    value: settings.apSSID,
+                    enabled: settings.apEnabled == ExtendedBool.True ? true : false,
+                  ),
+                  Empty(),
+                  ApiSettingInput(
+                    api: api,
+                    name: "Password",
+                    command: api.commandCode("wifiApPassword"),
+                    value: "",
+                    isPassword: true,
+                    enabled: settings.apEnabled == ExtendedBool.True ? true : false,
+                  ),
+                ],
+              ),
+            );
+        }
+        if (settings.enabled == ExtendedBool.True) {
+          widgets.add(
+            ApiSettingSwitch(
+              api: api,
+              name: "Station",
+              command: api.commandCode("wifiStaEnabled"),
+              value: settings.staEnabled,
+              onChanged: () {
+                wifiSettings.value.staEnabled = ExtendedBool.Waiting;
+                wifiSettings.notifyListeners();
+              },
+            ),
+          );
+          if (settings.staEnabled == ExtendedBool.True) {
+            widgets.add(
+              Row(
+                children: [
+                  ApiSettingInput(
+                    api: api,
+                    name: "SSID",
+                    command: api.commandCode("wifiStaSSID"),
+                    value: settings.staSSID,
+                    enabled: settings.staEnabled == ExtendedBool.True ? true : false,
+                  ),
+                  Empty(),
+                  ApiSettingInput(
+                    api: api,
+                    name: "Password",
+                    command: api.commandCode("wifiStaPassword"),
+                    value: "",
+                    isPassword: true,
+                    enabled: settings.staEnabled == ExtendedBool.True ? true : false,
+                  ),
+                ],
+              ),
+            );
+          }
+        }
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widgets,
+        );
+      },
     );
   }
 }

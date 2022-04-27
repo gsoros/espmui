@@ -6,7 +6,8 @@ import 'device.dart';
 import 'util.dart';
 import 'debug.dart';
 
-enum EspmApiCommand {
+/*
+enum ApiCommand {
   invalid,
   wifi,
   hostName,
@@ -40,8 +41,10 @@ enum EspmApiCommand {
   autoTareRangeG,
   config,
 }
-
-enum EspmApiResult {
+*/
+/*
+enum ApiResult {
+  invalid,
   success,
   error,
   unknownCommand,
@@ -54,18 +57,40 @@ enum EspmApiResult {
   tareFailed,
   argInvalid,
 }
+*/
+class ApiResult {
+  static int get success => 1;
+}
 
-typedef void EspmApiCallback(EspmApiMessage message);
+typedef void ApiCallback(ApiMessage message);
 
-class EspmApiMessage with Debug {
+class ApiMessage with Debug {
+  Api api;
+
+  /// the original unparsed command
   String command;
+
+  /// parsed command string
   String? commandStr;
+
+  /// parsed command code
   int? commandCode;
+
+  /// parsed command arg
   String? arg;
-  EspmApiCallback? onDone;
+
+  /// callback when message is done
+  ApiCallback? onDone;
+
+  /// maximum number of resend attempts
   int maxAttempts = 3;
+
+  /// minimum delay between resends (ms)
   int minDelayMs = 1000;
+
+  /// maximum age before giving up (ms)
   int maxAgeMs = 5000;
+
   int createdAt = 0;
   int? lastSentAt;
   int? attempts;
@@ -75,7 +100,8 @@ class EspmApiMessage with Debug {
   String? value;
   bool? isDone;
 
-  EspmApiMessage(
+  ApiMessage(
+    this.api,
     this.command, {
     this.onDone,
     int? maxAttempts,
@@ -107,12 +133,11 @@ class EspmApiMessage with Debug {
       if (command.length > 0) commandStr = command.toString();
     }
     var intParsed = int.tryParse(command);
-    for (EspmApiCommand code in EspmApiCommand.values) {
-      var valStr = code.toString().split('.').last;
-      //debugLog("checking $valStr");
-      if (code.index == intParsed || valStr == command) {
-        commandCode = code.index;
-        commandStr = command;
+    for (int k in api.commands.keys) {
+      if (k == intParsed || api.commands[k] == command) {
+        commandCode = k;
+        commandStr = api.commands[k];
+        break;
       }
     }
     if (commandCode == null) {
@@ -185,20 +210,24 @@ class EspmApiMessage with Debug {
   String? get valueAsString => value;
 }
 
-class EspmApi with Debug {
-  ESPM device;
-  ApiCharacteristic? get _characteristic => device.apiCharacteristic;
+class Api with Debug {
+  Device device;
+  ApiCharacteristic? get characteristic => device.characteristic("api") as ApiCharacteristic?;
   late StreamSubscription<String>? _subscription;
-  final _doneController = StreamController<EspmApiMessage>.broadcast();
-  Stream<EspmApiMessage> get messageDoneStream => _doneController.stream;
-  final _queue = Queue<EspmApiMessage>();
+  final _doneController = StreamController<ApiMessage>.broadcast();
+  Stream<ApiMessage> get messageDoneStream => _doneController.stream;
+  final _queue = Queue<ApiMessage>();
   bool _running = false;
   Timer? _timer;
   final int queueDelayMs;
 
-  EspmApi(this.device, {this.queueDelayMs = 200}) {
+  Map<int, String> commands = {1: "init"};
+  int? commandCode(String s) => commands.containsValue(s) ? commands.keys.firstWhere((k) => commands[k] == s) : null;
+  String? commandStr(int commandCode) => commands.containsKey(commandCode) ? commands[commandCode] : null;
+
+  Api(this.device, {this.queueDelayMs = 200}) {
     //_characteristic?.subscribe();
-    _subscription = _characteristic?.defaultStream.listen((reply) => _onNotify(reply));
+    _subscription = characteristic?.defaultStream.listen((reply) => _onNotify(reply));
   }
 
   void _startQueueSchedule() {
@@ -224,80 +253,97 @@ class EspmApi with Debug {
     }
     String result = reply.substring(0, resultEnd);
     int colon = result.indexOf(":");
-    if (colon < 1) {
-      debugLog("Error parsing result: $result");
-      return;
-    }
-    String resultCodeStr = result.substring(0, colon);
-    int? resultCode = int.tryParse(resultCodeStr);
+    int? resultCode = -1;
+    String resultCodeStr = "";
+    String resultStr = "";
+    if (0 < colon) {
+      resultCodeStr = result.substring(0, colon);
+      resultStr = result.substring(colon + 1);
+      resultCode = int.tryParse(resultCodeStr);
+    } else
+      resultCode = int.tryParse(result);
     if (resultCode == null) {
-      debugLog("Error parsing resultCode as int: $resultCode");
+      debugLog("Error parsing resultCode as int");
       return;
     }
-    String resultStr = result.substring(colon + 1);
     String commandWithValue = reply.substring(resultEnd + 1);
-    colon = commandWithValue.indexOf(":");
-    if (colon < 1) {
+    int eq = commandWithValue.indexOf("=");
+    if (eq < 1) {
       debugLog("Error parsing commandWithValue: $commandWithValue");
       return;
     }
-    String commandCodeStr = commandWithValue.substring(0, colon);
+    String commandCodeStr = commandWithValue.substring(0, eq);
     int? commandCode = int.tryParse(commandCodeStr);
     if (commandCode == null) {
       debugLog("Error parsing commandCode as int: $commandCodeStr");
       return;
     }
-    String commandStrWithValue = commandWithValue.substring(colon + 1);
-    int eq = commandStrWithValue.indexOf("=");
-    if (eq < 1) {
-      debugLog("Error parsing commandStrWithValue: $commandStrWithValue");
-      return;
-    }
+    // String commandStrWithValue = commandWithValue.substring(colon + 1);
+    // int eq = commandStrWithValue.indexOf("=");
+    // if (eq < 1) {
+    //   debugLog("Error parsing commandStrWithValue: $commandStrWithValue");
+    //   return;
+    // }
     //String commandStr = commandStrWithValue.substring(0, eq);
-    String value = commandStrWithValue.substring(eq + 1);
+    String value = commandWithValue.substring(eq + 1);
     int matches = 0;
-    for (EspmApiMessage message in _queue) {
-      if (message.commandCode == commandCode) {
+    for (ApiMessage m in _queue) {
+      if (m.commandCode == commandCode) {
         matches++;
-        message.resultCode = resultCode;
-        message.resultStr = resultStr;
-        message.value = value;
-        message.isDone = true;
+        m.resultCode = resultCode;
+        m.resultStr = resultStr;
+        m.value = value;
+        m.isDone = true;
         // don't return on the first match, process all matching messages
       }
     }
-    if (matches == 0) debugLog("Warning: did not find a matching queued message for the reply $reply");
+    if (matches == 0) {
+      debugLog("No matching queued message for the reply $reply, generating new one");
+      var cStr = commandStr(commandCode);
+      if (null == cStr) {
+        debugLog("commandStr is null");
+        return;
+      }
+      var m = ApiMessage(
+        this,
+        cStr,
+      );
+      m.commandStr = cStr;
+      m.commandCode = commandCode;
+      m.resultCode = resultCode;
+      m.resultStr = resultStr;
+      m.value = value;
+      m.isDone = true;
+      _onDone(m);
+    }
   }
 
-  void _onDone(EspmApiMessage message) {
-    //debugLog("onDone $message");
+  void _onDone(ApiMessage message) {
+    debugLog("_onDone $message");
     streamSendIfNotClosed(_doneController, message);
+    if (null == message.onDone) return;
     var onDone = message.onDone;
-    if (onDone == null) return;
-    //if (onDone is ApiCallback) {
     message.onDone = null;
-    onDone(message);
-    //return;
-    //}
-    //debugLog("Incorrect callback type: $onDone");
+    onDone!(message);
   }
 
   /// Sends a command to the API.
   ///
   /// Command format: commandCode|commandStr[=[arg]]
   ///
-  /// If supplied, [onDone] will be called with the [EspmApiMessage] containing the
+  /// If supplied, [onDone] will be called with the [ApiMessage] containing the
   /// [resultCode] on completion.
   ///
-  /// Note the returned [EspmApiMessage] does not yet contain the reply.
-  EspmApiMessage sendCommand(
+  /// Note the returned [ApiMessage] does not yet contain the reply.
+  ApiMessage sendCommand(
     String command, {
-    EspmApiCallback? onDone,
+    ApiCallback? onDone,
     int? maxAttempts,
     int? minDelayMs,
     int? maxAgeMs,
   }) {
-    var message = EspmApiMessage(
+    var message = ApiMessage(
+      this,
       command,
       onDone: onDone,
       maxAttempts: maxAttempts,
@@ -329,7 +375,7 @@ class EspmApi with Debug {
       maxAgeMs: maxAgeMs,
     );
     await isDone(message);
-    if (T == EspmApiMessage) return message as T?;
+    if (T == ApiMessage) return message as T?;
     if (T == String) return message.valueAsString as T?;
     if (T == double) return message.valueAsDouble as T?;
     if (T == int) return message.valueAsInt as T?;
@@ -357,12 +403,12 @@ class EspmApi with Debug {
 
   /// Polls the message while [isDone] != true && [resultCode] == null
   /// TODO use a stream (each message could have an onChangedStream?)
-  Future<void> isDone(EspmApiMessage message) async {
+  Future<void> isDone(ApiMessage message) async {
     await Future.doWhile(() async {
       if (message.isDone != true && message.resultCode == null) {
         //debugLog("polling...");
         // TODO milliseconds: [message.minDelay, queueDelayMs].max
-        await Future.delayed(Duration(milliseconds: message.minDelayMs));
+        await Future.delayed(Duration(milliseconds: queueDelayMs));
         return true;
       }
       //debugLog("poll end");
@@ -370,8 +416,11 @@ class EspmApi with Debug {
     });
   }
 
-  bool queueContainsCommand({String? commandStr, EspmApiCommand? command}) {
-    for (EspmApiMessage message in _queue) if (message.commandStr == commandStr || message.commandCode == command?.index) return true;
+  bool queueContainsCommand({String? commandStr, int? command}) {
+    for (ApiMessage message in _queue)
+      if ((null != commandStr && message.commandStr == commandStr) //
+          ||
+          (null != command && message.commandCode == command)) return true;
     return false;
   }
 
@@ -404,7 +453,7 @@ class EspmApi with Debug {
     _running = false;
   }
 
-  void _send(EspmApiMessage message) async {
+  void _send(ApiMessage message) async {
     int now = uts();
     if (now < (message.lastSentAt ?? 0) + message.minDelayMs) return;
     //var device = Scanner().selected;
@@ -418,7 +467,7 @@ class EspmApi with Debug {
     var arg = message.arg;
     if (arg != null) toWrite += "=$arg";
     debugLog("_send() calling char.write($toWrite)");
-    _characteristic?.write(toWrite);
+    characteristic?.write(toWrite);
   }
 
   Future<void> destruct() async {

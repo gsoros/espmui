@@ -17,7 +17,7 @@ import 'ble_constants.dart';
 abstract class BleCharacteristic<T> with Debug {
   Peripheral _peripheral;
   final serviceUUID = "";
-  final characteristicUUID = "";
+  final charUUID = "";
   //CharacteristicWithValue? _characteristicWithValue;
   Characteristic? _characteristic;
   Stream<Uint8List>? _rawStream;
@@ -66,24 +66,26 @@ abstract class BleCharacteristic<T> with Debug {
     T value, {
     bool withResponse = false,
     String? transactionId,
+    Characteristic? char,
   }) async {
     await _init();
-    if (_characteristic == null) {
+    if (char == null) char = _characteristic;
+    if (char == null) {
       bleError(debugTag, "write() characteristic is null");
       return Future.value(null);
     }
-    if (!_characteristic!.isWritableWithoutResponse && !_characteristic!.isWritableWithResponse) {
+    if (!char.isWritableWithoutResponse && !char.isWritableWithResponse) {
       bleError(debugTag, "write() characteristic not writable");
       return Future.value(null);
     }
-    if (withResponse && !_characteristic!.isWritableWithResponse) {
+    if (withResponse && !char.isWritableWithResponse) {
       bleError(debugTag, "write() characteristic not writableWithResponse");
       return Future.value(null);
     }
     //debugLog("write($value)");
     await _exclusiveAccess.protect(() async {
-      if (null == _characteristic) return;
-      _characteristic!
+      if (null == char) return;
+      char
           .write(
         toUint8List(value),
         withResponse,
@@ -150,18 +152,14 @@ abstract class BleCharacteristic<T> with Debug {
 
   Future<void> _init() async {
     if (_characteristic != null) return; // already init'd
-    bool connected = await _peripheral.isConnected();
-    if (!connected) {
-      //bleError(debugTag, "_init() peripheral not connected");
-      return;
-    }
+    if (!(await _peripheral.isConnected())) return;
     try {
       //_characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
       List<Characteristic> chars = [];
       await _exclusiveAccess.protect(() async {
         chars = await _peripheral.characteristics(serviceUUID);
       });
-      _characteristic = chars.firstWhere((char) => char.uuid == characteristicUUID);
+      _characteristic = chars.firstWhere((char) => char.uuid == charUUID);
     } catch (e) {
       bleError(debugTag, "_init() readCharacteristic()", e);
       _characteristic = null;
@@ -187,7 +185,7 @@ abstract class BleCharacteristic<T> with Debug {
 
 class BatteryCharacteristic extends BleCharacteristic<int> {
   final serviceUUID = BleConstants.BATTERY_SERVICE_UUID;
-  final characteristicUUID = BleConstants.BATTERY_LEVEL_CHAR_UUID;
+  final charUUID = BleConstants.BATTERY_LEVEL_CHAR_UUID;
 
   BatteryCharacteristic(Peripheral peripheral) : super(peripheral) {
     histories['charge'] = CharacteristicHistory<int>(3600, 3600);
@@ -214,7 +212,7 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
 
 class PowerCharacteristic extends BleCharacteristic<Uint8List> {
   final serviceUUID = BleConstants.CYCLING_POWER_SERVICE_UUID;
-  final characteristicUUID = BleConstants.CYCLING_POWER_MEASUREMENT_CHAR_UUID;
+  final charUUID = BleConstants.CYCLING_POWER_MEASUREMENT_CHAR_UUID;
 
   int revolutions = 0;
   int lastCrankEvent = 0;
@@ -249,14 +247,31 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
 
   @override
   Future<Uint8List?> onNotify(Uint8List value) {
+    /// https://github.com/sputnikdev/bluetooth-gatt-parser/blob/master/src/main/resources/gatt/characteristic/org.bluetooth.characteristic.cycling_power_measurement.xml
     /// Format: little-endian
-    /// Bytes: [flags: 2][power: 2][revolutions: 2][last crank event: 2]
-    /// Flags: 0b0000000000100000;  // Crank rev data present
+    /// Bytes: [flags: 2][power: 2(int16)]...[revolutions: 2(uint16)][last crank event: 2(uint16)]
+    /// Flags: 0b00000000 00000001;  // Pedal Power Balance Present
+    /// Flags: 0b00000000 00000010;  // Pedal Power Balance Reference
+    /// Flags: 0b00000000 00000100;  // Accumulated Torque Present
+    /// Flags: 0b00000000 00001000;  // Accumulated Torque Source
+    /// Flags: 0b00000000 00010000;  // Wheel Revolution Data Present
+    /// Flags: 0b00000000 00100000;  // *** Crank Revolution Data Present
+    /// Flags: 0b00000000 01000000;  // Extreme Force Magnitudes Present
+    /// Flags: 0b00000000 10000000;  // Extreme Torque Magnitudes Present
+    /// Flags: 0b00000001 00000000;  // Extreme Angles Present
+    /// Flags: 0b00000010 00000000;  // Top Dead Spot Angle Present
+    /// Flags: 0b00000100 00000000;  // Bottom Dead Spot Angle Present
+    /// Flags: 0b00001000 00000000;  // Accumulated Energy Present
+    /// Flags: 0b00010000 00000000;  // Offset Compensation Indicator
+    /// Flags: 0b00100000 00000000;  // ReservedForFutureUse
+    /// Flags: 0b01000000 00000000;  // ReservedForFutureUse
+    /// Flags: 0b10000000 00000000;  // ReservedForFutureUse
     /// crank event time unit: 1/1024s, rolls over
     int power = value.buffer.asByteData().getUint16(2, Endian.little);
     lastPower = power;
     util.streamSendIfNotClosed(_powerController, power);
 
+    // TODO depending on the flag bits the offsets need shifting
     int newRevolutions = value.buffer.asByteData().getUint16(4, Endian.little);
     int newCrankEvent = value.buffer.asByteData().getUint16(6, Endian.little);
     double dTime = 0.0;
@@ -278,7 +293,7 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
       lastCrankEventTime = now;
     }
 
-    if (lastCadence != cadence && cadence > 0 || (lastCrankEventTime < now - 2000)) util.streamSendIfNotClosed(_cadenceController, cadence);
+    if ((lastCadence != cadence && cadence > 0) || (lastCrankEventTime < now - 2000)) util.streamSendIfNotClosed(_cadenceController, cadence);
     lastCadence = cadence;
     revolutions = newRevolutions;
 
@@ -294,10 +309,17 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
 }
 
 class ApiCharacteristic extends BleCharacteristic<String> {
-  final serviceUUID = BleConstants.ESPM_API_SERVICE_UUID;
-  final characteristicUUID = BleConstants.ESPM_API_CHAR_UUID;
+  final String serviceUUID;
+  final String txCharUUID;
+  final String rxCharUUID;
+  Characteristic? _rxChar;
 
-  ApiCharacteristic(Peripheral peripheral) : super(peripheral);
+  ApiCharacteristic(
+    Peripheral peripheral, {
+    this.serviceUUID = BleConstants.ESPM_API_SERVICE_UUID,
+    this.txCharUUID = BleConstants.API_TXCHAR_UUID,
+    this.rxCharUUID = BleConstants.API_RXCHAR_UUID,
+  }) : super(peripheral);
 
   @override
   String fromUint8List(Uint8List list) => String.fromCharCodes(list);
@@ -317,6 +339,51 @@ class ApiCharacteristic extends BleCharacteristic<String> {
   }
 
   @override
+  Future<void> write(
+    String value, {
+    bool withResponse = false,
+    String? transactionId,
+    Characteristic? char,
+  }) async {
+    return super.write(
+      value,
+      withResponse: withResponse,
+      transactionId: transactionId,
+      char: _rxChar,
+    );
+  }
+
+  @override
+  Future<void> _init() async {
+    //await super._init();
+    if (_rxChar != null || _characteristic != null) return; // already init'd
+    if (!(await _peripheral.isConnected())) return;
+    try {
+      List<Characteristic> chars = [];
+      await _exclusiveAccess.protect(() async {
+        chars = await _peripheral.characteristics(serviceUUID);
+      });
+      if (chars.where((char) => char.uuid == rxCharUUID).isNotEmpty) {
+        _rxChar = chars.firstWhere((char) => char.uuid == rxCharUUID);
+      }
+      if (chars.where((char) => char.uuid == txCharUUID).isNotEmpty) {
+        _characteristic = chars.firstWhere((char) => char.uuid == txCharUUID);
+      }
+    } catch (e) {
+      bleError(debugTag, "_init() readCharacteristic()", e);
+      _rxChar = null;
+      _characteristic = null;
+    }
+  }
+
+  @override
+  Future<void> deinit() async {
+    await super.deinit();
+    _rxChar = null;
+    _characteristic = null;
+  }
+
+  @override
   Future<String?> onNotify(String value) {
     if (value.length < 20) return Future.value(value);
     // read full value as the notification is limited to 20 bytes
@@ -326,7 +393,7 @@ class ApiCharacteristic extends BleCharacteristic<String> {
 
 class WeightScaleCharacteristic extends BleCharacteristic<double> {
   final serviceUUID = BleConstants.WEIGHT_SCALE_SERVICE_UUID;
-  final characteristicUUID = BleConstants.WEIGHT_MEASUREMENT_CHAR_UUID;
+  final charUUID = BleConstants.WEIGHT_MEASUREMENT_CHAR_UUID;
 
   WeightScaleCharacteristic(Peripheral peripheral) : super(peripheral) {
     histories['measurement'] = CharacteristicHistory<double>(360, 60);
@@ -352,7 +419,7 @@ class WeightScaleCharacteristic extends BleCharacteristic<double> {
 
 class HallCharacteristic extends BleCharacteristic<int> {
   final serviceUUID = BleConstants.ESPM_API_SERVICE_UUID;
-  final characteristicUUID = BleConstants.ESPM_HALL_CHAR_UUID;
+  final charUUID = BleConstants.ESPM_HALL_CHAR_UUID;
 
   HallCharacteristic(Peripheral peripheral) : super(peripheral);
 
@@ -368,7 +435,7 @@ class HallCharacteristic extends BleCharacteristic<int> {
 
 class HeartRateCharacteristic extends BleCharacteristic<int> {
   final serviceUUID = BleConstants.HEART_RATE_SERVICE_UUID;
-  final characteristicUUID = BleConstants.HEART_RATE_MEASUREMENT_CHAR_UUID;
+  final charUUID = BleConstants.HEART_RATE_MEASUREMENT_CHAR_UUID;
 
   HeartRateCharacteristic(Peripheral peripheral) : super(peripheral) {
     histories['measurement'] = CharacteristicHistory<int>(120, 120);
@@ -383,8 +450,24 @@ class HeartRateCharacteristic extends BleCharacteristic<int> {
 
   @override
   int fromUint8List(Uint8List list) {
+    /// https://github.com/oesmith/gatt-xml/blob/master/org.bluetooth.characteristic.heart_rate_measurement.xml
+    ///
     /// Format: little-endian
-    /// Bytes: [Flags: 1][Heart rate: 1 or 2, depending on bit 0 of the Flags field]
+    /// Bytes:
+    /// [Flags: 1]
+    /// [Heart rate: 1 or 2, depending on bit 0 of the Flags field]
+    /// [Energy Expended: 2, presence dependent upon bit 3 of the Flags field]
+    /// [RR-Interval: 2, presence dependent upon bit 4 of the Flags field]
+    ///
+    /// Flags: 0b00000001  // 0: Heart Rate Value Format is set to UINT8, 1: HRVF is UINT16
+    /// Flags: 0b00000010  // Sensor Contact Status bit 1
+    /// Flags: 0b00000100  // Sensor Contact Status bit 2
+    /// Flags: 0b00001000 // Energy Expended Status bit
+    /// Flags: 0b00010000 // RR-Interval bit
+    /// Flags: 0b00100000 // ReservedForFutureUse
+    /// Flags: 0b01000000 // ReservedForFutureUse
+    /// Flags: 0b10000000 // ReservedForFutureUse
+    ///
     if (list.isEmpty) return 0;
     int byteCount = list.last & 0 == 0 ? 1 : 2;
     var byteData = list.buffer.asByteData();

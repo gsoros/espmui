@@ -100,7 +100,7 @@ class BLE with Debug {
   }
 
   Future<void> _checkClient() async {
-    debugLog("_checkClient() start");
+    //debugLog("_checkClient() start");
     if (!_createClientCompleted) {
       while (!await BleManager().isClientCreated()) {
         // make sure createClient() is called only once
@@ -346,8 +346,8 @@ class BleDisabled extends StatelessWidget with Debug {
             crossAxisAlignment: CrossAxisAlignment.end, // Align right
             children: [
               EspmuiElevatedButton(
-                "Enable",
-                action: () {
+                child: Text("Enable"),
+                onPressed: () {
                   debugLog("Radio enable button pressed");
                   BLE().enableRadio();
                 },

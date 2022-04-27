@@ -109,7 +109,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
       initialData: scanner.scanning,
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
         bool scanning = snapshot.hasData ? snapshot.data! : false;
-        return EspmuiElevatedButton("Scan", action: scanning ? null : scanner.startScan);
+        return EspmuiElevatedButton(child: Text("Scan"), onPressed: scanning ? null : scanner.startScan);
       },
     );
   }
@@ -120,7 +120,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
       stream: DeviceList().stream,
       initialData: devices,
       builder: (BuildContext context, AsyncSnapshot<Map<String, Device>> snapshot) {
-        debugLog("_list() rebuilding");
+        //debugLog("_list() rebuilding");
         List<Widget> items = [];
         if (devices.length < 1)
           items.add(Center(child: Text("No devices")));
