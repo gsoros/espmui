@@ -112,6 +112,8 @@ class Device with Debug {
     Device device;
     if ("ESPM" == chunks[0])
       device = ESPM(peripheral);
+    else if ("ESPCC" == chunks[0])
+      device = ESPCC(peripheral);
     else if ("PowerMeter" == chunks[0])
       device = PowerMeter(peripheral);
     else if ("HeartRateMonitor" == chunks[0])
@@ -953,13 +955,7 @@ class ESPCC extends Device {
         int? k = int.tryParse(pair[0]);
         int? v = int.tryParse(pair[1]);
         if (null == k || null == v) return;
-        var values = MinCurMax<int>();
-        var touchRead = settings.value.touchRead;
-        if (touchRead.containsKey(k) && null != touchRead[k]) values = touchRead[k]!;
-        values.cur = v;
-        if (null == values.min || v < values.min!) values.min = v;
-        if (null == values.max || values.max! < v) values.max = v;
-        settings.value.touchRead.update(k, (_) => values, ifAbsent: () => values);
+        settings.value.touchRead.update(k, (_) => v, ifAbsent: () => v);
       });
       debugLog("touchRead: ${settings.value.touchRead}");
       settings.notifyListeners();
@@ -1106,22 +1102,12 @@ class ESPMSettings {
   }
 }
 
-class MinCurMax<T> {
-  T? min;
-  T? cur;
-  T? max;
-
-  String toString() {
-    return "($min, $cur, $max)";
-  }
-}
-
 class ESPCCSettings {
   List<String> peers = [];
   Map<int, int> touchThres = {};
   bool scanning = false;
   List<String> scanResults = [];
-  Map<int, MinCurMax<int>> touchRead = {};
+  Map<int, int> touchRead = {};
 
   @override
   bool operator ==(other) {

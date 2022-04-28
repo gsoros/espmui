@@ -180,6 +180,7 @@ class ApiMessage with Debug {
         "command: '$command'" +
         ((commandStr != null) ? ", commandStr='$commandStr'" : "") +
         ((commandCode != null) ? ", commandCode='$commandCode'" : "") +
+        ((arg != null) ? ", arg='$arg'" : "") +
         ((onDone != null) ? ", onDone='$onDone'" : "") +
         ", maxAttempts='$maxAttempts'" +
         ", minDelayMs='$minDelayMs'" +

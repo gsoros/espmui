@@ -988,6 +988,22 @@ class EspccPeersEditor extends StatelessWidget with Debug {
   }
 }
 
+class FullWidthTrackShape extends RoundedRectSliderTrackShape {
+  Rect getPreferredRect({
+    required RenderBox parentBox,
+    Offset offset = Offset.zero,
+    required SliderThemeData sliderTheme,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+  }) {
+    final double? trackHeight = sliderTheme.trackHeight;
+    final double trackLeft = offset.dx;
+    final double trackTop = offset.dy + (parentBox.size.height - (trackHeight ?? 0)) / 2;
+    final double trackWidth = parentBox.size.width;
+    return Rect.fromLTWH(trackLeft, trackTop, trackWidth, (trackHeight ?? 0));
+  }
+}
+
 class EspccTouchEditor extends StatelessWidget with Debug {
   final ESPCC device;
   EspccTouchEditor(this.device);
@@ -997,23 +1013,34 @@ class EspccTouchEditor extends StatelessWidget with Debug {
     return ValueListenableBuilder<ESPCCSettings>(
         valueListenable: device.settings,
         builder: (_, settings, __) {
-          List<Widget> items = [Text(settings.touchRead.toString())];
+          List<Widget> items = [];
           settings.touchThres.forEach((k, v) {
-            String mcm = settings.touchRead[k]?.toString() ?? "";
+            int cur = settings.touchRead.containsKey(k) ? settings.touchRead[k] ?? 0 : 0;
+            if (cur < 0) cur = 0;
+            if (100 < cur) cur = 100;
             items.add(Stack(
               children: [
-                Container(
-                  color: Colors.blue,
-                  child: Text(mcm),
+                FractionallySizedBox(
+                  widthFactor: map(cur.toDouble(), 0.0, 100.0, 0.0, 1.0),
+                  alignment: Alignment.topLeft,
+                  child: Container(
+                    color: Color.fromARGB(110, 36, 124, 28),
+                    child: Text(""),
+                  ),
                 ),
-                Slider(
-                  label: v.toString(),
-                  value: v.toDouble(),
-                  min: 0.0,
-                  max: 100.0,
-                  onChanged: (newValue) {
-                    device.api.sendCommand("touchThres=$k:${newValue.toInt()}");
-                  },
+                SliderTheme(
+                  data: SliderThemeData(
+                    trackShape: FullWidthTrackShape(),
+                  ),
+                  child: Slider(
+                    label: v.toString(),
+                    value: v.toDouble(),
+                    min: 0.0,
+                    max: 100.0,
+                    onChanged: (newValue) {
+                      device.api.sendCommand("touchThres=$k:${newValue.toInt()}");
+                    },
+                  ),
                 ),
               ],
             ));
@@ -1093,7 +1120,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
 
     void dialog({required Widget title, required Widget body}) async {
       final timer = Timer.periodic(const Duration(seconds: 2), (_) {
-        device.api.sendCommand("touchRead");
+        device.api.sendCommand("touchRead=disableFor:3");
       });
       await showDialog(
         context: context,
