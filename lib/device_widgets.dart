@@ -1118,11 +1118,8 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
 
     final apiWifiSettings = ApiWifiSettings(device.api, device.wifiSettings);
 
-    void dialog({required Widget title, required Widget body}) async {
-      final timer = Timer.periodic(const Duration(seconds: 2), (_) {
-        device.api.sendCommand("touchRead=disableFor:3");
-      });
-      await showDialog(
+    Future<void> dialog({required Widget title, required Widget body}) async {
+      return showDialog(
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
@@ -1138,7 +1135,6 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
           );
         },
       );
-      timer.cancel();
     }
 
     final deviceSettings = ValueListenableBuilder<ESPCCSettings>(
@@ -1175,11 +1171,15 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
               ),
             ),
             EspmuiElevatedButton(
-              onPressed: () {
-                dialog(
+              onPressed: () async {
+                final timer = Timer.periodic(const Duration(seconds: 2), (_) {
+                  device.api.sendCommand("touchRead=disableFor:3");
+                });
+                await dialog(
                   title: Text("Touch Thresholds"),
                   body: EspccTouchEditor(device),
                 );
+                timer.cancel();
               },
               child: Icon(Icons.edit),
             ),
