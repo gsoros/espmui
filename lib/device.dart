@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:developer' as dev;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
 import 'ble_constants.dart';
@@ -9,6 +11,7 @@ import 'ble.dart';
 import 'ble_characteristic.dart';
 import 'preferences.dart';
 import 'api.dart';
+import 'espcc_syncer.dart';
 import 'util.dart';
 import 'debug.dart';
 
@@ -739,8 +742,10 @@ class ESPM extends PowerMeter {
 
 class ESPCC extends Device {
   late Api api;
+  late ESPCCSyncer syncer;
   final settings = AlwaysNotifier<ESPCCSettings>(ESPCCSettings());
   final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
+  final files = AlwaysNotifier<ESPCCFileList>(ESPCCFileList());
   //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
   StreamSubscription<ApiMessage>? _apiSubsciption;
 
@@ -754,6 +759,7 @@ class ESPCC extends Device {
       ),
     });
     api = Api(this);
+    syncer = ESPCCSyncer(this);
     // listen to api message done events
     _apiSubsciption = api.messageDoneStream.listen((message) => _onApiDone(message));
   }
@@ -920,6 +926,76 @@ class ESPCC extends Device {
 
     //////////////////////////////////////////////////// rec
     if ("rec" == message.commandStr) {
+      String? val = message.valueAsString;
+      debugLog("received val=$val");
+      if (null == val) return;
+      if ("files:" == val.substring(0, 6)) {
+        List<String> names = val.substring(6).split(";");
+        debugLog("received names=$names");
+        names.forEach((name) async {
+          if (16 < name.length) {
+            debugLog("name too long: $name");
+            return;
+          }
+          ESPCCFile f = files.value.files.firstWhere(
+            (file) => file.name == name,
+            orElse: () {
+              final file = ESPCCFile();
+              file.name = name;
+              file.remoteExists = ExtendedBool.True;
+              files.value.files.add(file);
+              files.notifyListeners();
+              return file;
+            },
+          );
+          if (f.remoteSize < 0) {
+            api.requestResultCode("rec=info:${f.name}", expectValue: "info:${f.name}");
+            await Future.delayed(Duration(seconds: 1));
+          }
+        });
+        for (ESPCCFile f in files.value.files) {
+          if (f.localExists == ExtendedBool.Unknown) {
+            await f.updateLocalStatus();
+            files.notifyListeners();
+          }
+        }
+      } else if ("info:" == val.substring(0, 5)) {
+        List<String> tokens = val.substring(5).split(";");
+        debugLog("got info: $tokens");
+        var f = ESPCCFile();
+        f.remoteExists = ExtendedBool.True;
+        f.name = tokens[0];
+        if (8 <= f.name.length) {
+          tokens.removeAt(0);
+          tokens.forEach((token) {
+            if ("size:" == token.substring(0, 5)) {
+              int? s = int.tryParse(token.substring(5));
+              if (s != null && 0 <= s) f.remoteSize = s;
+            } else if ("distance:" == token.substring(0, 9)) {
+              double? s = double.tryParse(token.substring(9));
+              if (s != null && 0 <= s) f.distance = s.round();
+            } else if ("altGain:" == token.substring(0, 8)) {
+              int? s = int.tryParse(token.substring(8));
+              if (s != null && 0 <= s) f.altGain = s;
+            }
+          });
+          files.value.files.firstWhere(
+            (file) => file.name == f.name,
+            orElse: () {
+              files.value.files.add(f);
+              return f;
+            },
+          ).update(
+            name: f.name,
+            remoteSize: f.remoteSize,
+            distance: f.distance,
+            altGain: f.altGain,
+            remoteExists: f.remoteExists,
+          );
+          files.notifyListeners();
+        }
+      }
+      //debugLog("files.length=${files.value.files.length}");
       return;
     }
 
@@ -987,6 +1063,8 @@ class ESPCC extends Device {
     settings.notifyListeners();
     wifiSettings.value = WifiSettings();
     wifiSettings.notifyListeners();
+    files.value = ESPCCFileList();
+    files.notifyListeners();
   }
 
   /// request initial values, returned value is discarded
@@ -1121,6 +1199,105 @@ class ESPCCSettings {
     return "${describeIdentity(this)} ("
         "peers: $peers, "
         "touchThres: $touchThres"
+        ")";
+  }
+}
+
+class ESPCCFile {
+  String name = "";
+  int remoteSize = -1;
+  int localSize = -1;
+  int distance = -1;
+  int altGain = -1;
+  ExtendedBool remoteExists = ExtendedBool.Unknown;
+  ExtendedBool localExists = ExtendedBool.Unknown;
+
+  Future<void> updateLocalStatus() async {
+    String path = (await Path().documents) + "/$name";
+    final file = File(path);
+    if (await file.exists()) {
+      dev.log("local file $path exists");
+      localExists = ExtendedBool.True;
+      localSize = await file.length();
+    } else {
+      dev.log("local file $path does not exist");
+      localExists = ExtendedBool.False;
+      localSize = -1;
+    }
+  }
+
+  bool update(
+      {String name = "",
+      int remoteSize = -1,
+      int localSize = -1,
+      int distance = -1,
+      int altGain = -1,
+      ExtendedBool remoteExists = ExtendedBool.Unknown,
+      ExtendedBool localExists = ExtendedBool.Unknown}) {
+    if (name != "") this.name = name;
+    if (0 <= remoteSize) this.remoteSize = remoteSize;
+    if (0 <= localSize) this.localSize = localSize;
+    if (0 <= distance) this.distance = distance;
+    if (0 <= altGain) this.altGain = altGain;
+    if (ExtendedBool.Unknown != remoteExists) this.remoteExists = remoteExists;
+    if (ExtendedBool.Unknown != localExists) this.localExists = localExists;
+    return true;
+  }
+
+  @override
+  bool operator ==(other) {
+    return (other is ESPCCFile) &&
+        other.name == name &&
+        other.remoteSize == remoteSize &&
+        other.localSize == localSize &&
+        other.distance == distance &&
+        other.altGain == altGain &&
+        other.remoteExists == remoteExists &&
+        other.localExists == localExists;
+  }
+
+  @override
+  int get hashCode =>
+      name.hashCode ^ remoteSize.hashCode ^ localSize.hashCode ^ distance.hashCode ^ altGain.hashCode ^ remoteExists.hashCode ^ localExists.hashCode;
+
+  String toString() {
+    return "${describeIdentity(this)} ("
+        "name: $name, "
+        "remoteSize: $remoteSize, "
+        "localSize: $localSize, "
+        "distance: $distance, "
+        "altGain: $altGain, "
+        "remote: $remoteExists, "
+        "local: $localExists "
+        ")";
+  }
+}
+
+class ESPCCFileList {
+  List<ESPCCFile> files = [];
+
+  bool has(String name) {
+    bool exists = false;
+    for (ESPCCFile f in files) {
+      if (f.name == name) {
+        exists = true;
+        break;
+      }
+    }
+    return exists;
+  }
+
+  @override
+  bool operator ==(other) {
+    return (other is ESPCCFileList) && other.files == files;
+  }
+
+  @override
+  int get hashCode => files.hashCode;
+
+  String toString() {
+    return "${describeIdentity(this)} ("
+        "files: $files"
         ")";
   }
 }

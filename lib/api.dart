@@ -79,6 +79,9 @@ class ApiMessage with Debug {
   /// parsed command arg
   String? arg;
 
+  /// reply value expected to start with this string
+  String? expectValue;
+
   /// callback when message is done
   ApiCallback? onDone;
 
@@ -86,10 +89,10 @@ class ApiMessage with Debug {
   int maxAttempts = 3;
 
   /// minimum delay between resends (ms)
-  int minDelayMs = 1000;
+  int minDelayMs = 3000;
 
   /// maximum age before giving up (ms)
-  int maxAgeMs = 5000;
+  int maxAgeMs = 10000;
 
   int createdAt = 0;
   int? lastSentAt;
@@ -103,6 +106,7 @@ class ApiMessage with Debug {
   ApiMessage(
     this.api,
     this.command, {
+    this.expectValue,
     this.onDone,
     int? maxAttempts,
     int? minDelayMs,
@@ -180,6 +184,7 @@ class ApiMessage with Debug {
         "command: '$command'" +
         ((commandStr != null) ? ", commandStr='$commandStr'" : "") +
         ((commandCode != null) ? ", commandCode='$commandCode'" : "") +
+        ((expectValue != null) ? ", expectValue='$expectValue'" : "") +
         ((arg != null) ? ", arg='$arg'" : "") +
         ((onDone != null) ? ", onDone='$onDone'" : "") +
         ", maxAttempts='$maxAttempts'" +
@@ -290,6 +295,8 @@ class Api with Debug {
     int matches = 0;
     for (ApiMessage m in _queue) {
       if (m.commandCode == commandCode) {
+        // no match if expected value is set and value does not begin with it
+        if (m.expectValue != null && m.expectValue != value.substring(0, m.expectValue!.length)) continue;
         matches++;
         m.resultCode = resultCode;
         m.resultStr = resultStr;
@@ -338,6 +345,7 @@ class Api with Debug {
   /// Note the returned [ApiMessage] does not yet contain the reply.
   ApiMessage sendCommand(
     String command, {
+    String? expectValue,
     ApiCallback? onDone,
     int? maxAttempts,
     int? minDelayMs,
@@ -346,6 +354,7 @@ class Api with Debug {
     var message = ApiMessage(
       this,
       command,
+      expectValue: expectValue,
       onDone: onDone,
       maxAttempts: maxAttempts,
       minDelayMs: minDelayMs,
@@ -365,12 +374,14 @@ class Api with Debug {
   /// Requests a value from the device API
   Future<T?> request<T>(
     String command, {
+    String? expectValue,
     int? maxAttempts,
     int? minDelayMs,
     int? maxAgeMs,
   }) async {
     var message = sendCommand(
       command,
+      expectValue: expectValue,
       maxAttempts: maxAttempts,
       minDelayMs: minDelayMs,
       maxAgeMs: maxAgeMs,
@@ -388,12 +399,14 @@ class Api with Debug {
   /// Requests a result from the device API
   Future<int?> requestResultCode(
     String command, {
+    String? expectValue,
     int? maxAttempts,
     int? minDelayMs,
     int? maxAgeMs,
   }) async {
     var message = sendCommand(
       command,
+      expectValue: expectValue,
       maxAttempts: maxAttempts,
       minDelayMs: minDelayMs,
       maxAgeMs: maxAgeMs,
@@ -457,7 +470,6 @@ class Api with Debug {
   void _send(ApiMessage message) async {
     int now = uts();
     if (now < (message.lastSentAt ?? 0) + message.minDelayMs) return;
-    //var device = Scanner().selected;
     if (!await device.ready()) {
       debugLog("_send() not ready");
       return;

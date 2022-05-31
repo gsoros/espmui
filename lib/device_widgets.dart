@@ -1050,6 +1050,79 @@ class EspccTouchEditor extends StatelessWidget with Debug {
   }
 }
 
+class EspccSync extends StatelessWidget with Debug {
+  final ESPCC device;
+  EspccSync(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    if (0 == device.files.value.files.length) device.api.requestResultCode("rec=files", expectValue: "files:");
+    //debugLog("files: ${device.files.value.files}");
+    return ValueListenableBuilder<ESPCCFileList>(
+      valueListenable: device.files,
+      builder: (_, filelist, __) {
+        List<Widget> items = [];
+        filelist.files.sort((a, b) => b.name.compareTo(a.name)); // desc
+        filelist.files.forEach((f) {
+          String details = "";
+          if (0 <= f.remoteSize) details += bytesToString(f.remoteSize);
+          if (0 <= f.localSize) details += " (${bytesToString(f.localSize)})";
+          if (0 < f.distance) details += " →${distanceToString(f.distance)}";
+          if (0 < f.altGain) details += " ↑${f.altGain.toString()}m";
+          List<Widget> actions = [];
+          bool isQueued = device.syncer.isQueued(f);
+          String downloadedPercent = isQueued
+              ? map(
+                    0 <= f.localSize ? f.localSize.toDouble() : 0,
+                    0,
+                    0 <= f.remoteSize ? f.remoteSize.toDouble() : 0,
+                    0,
+                    100,
+                  ).toStringAsFixed(0) +
+                  "%"
+              : "";
+          actions.add(EspmuiElevatedButton(
+            child: isQueued ? Text(downloadedPercent) : Icon(Icons.download),
+            padding: EdgeInsets.all(0),
+            onPressed: isQueued
+                ? null
+                : () {
+                    device.syncer.queue(f);
+                    device.files.notifyListeners();
+                  },
+          ));
+          var item = Card(
+            child: ListTile(
+              title: Text(f.name),
+              subtitle: Text(details),
+              trailing: Wrap(children: actions),
+              //isThreeLine: true,
+              contentPadding: EdgeInsets.fromLTRB(0, 0, 0, 5),
+            ),
+          );
+          items.add(item);
+        });
+        return Column(
+          children: items +
+              [
+                EspmuiElevatedButton(
+                  onPressed: () {
+                    device.api.requestResultCode("rec=files");
+                  },
+                  child: Row(
+                    children: [
+                      Icon(Icons.sync),
+                      Text("Refresh"),
+                    ],
+                  ),
+                )
+              ],
+        );
+      },
+    );
+  }
+}
+
 class PeersList extends StatelessWidget with Debug {
   final List<String> peers;
   final String action;
@@ -1118,12 +1191,12 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
 
     final apiWifiSettings = ApiWifiSettings(device.api, device.wifiSettings);
 
-    Future<void> dialog({required Widget title, required Widget body}) async {
+    Future<void> dialog({required Widget title, required Widget body, bool scrollable = true}) async {
       return showDialog(
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            scrollable: true,
+            scrollable: scrollable,
             title: title,
             content: Container(
               child: Column(
@@ -1160,7 +1233,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
               child: Icon(Icons.edit),
             ),
           ]),
-          Text(" "),
+          Divider(color: Colors.white38),
           Row(children: [
             Flexible(
               child: Column(
@@ -1184,6 +1257,22 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
               child: Icon(Icons.edit),
             ),
           ]),
+          Divider(color: Colors.white38),
+          EspmuiElevatedButton(
+            onPressed: () async {
+              await dialog(
+                title: Text("Sync recordings"),
+                body: EspccSync(device),
+                //scrollable: false,
+              );
+            },
+            child: Row(
+              children: [
+                Icon(Icons.sync),
+                Text("Sync recordings"),
+              ],
+            ),
+          ),
         ];
 
         return Column(
