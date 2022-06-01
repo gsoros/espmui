@@ -941,7 +941,8 @@ class ESPCC extends Device {
           ESPCCFile f = files.value.files.firstWhere(
             (file) => file.name == name,
             orElse: () {
-              final file = ESPCCFile(name, this, remoteExists: ExtendedBool.True);
+              var file = syncer.getFromQueue(name: name);
+              if (file == null) file = ESPCCFile(name, this, remoteExists: ExtendedBool.True);
               files.value.files.add(file);
               files.notifyListeners();
               return file;
@@ -1277,7 +1278,7 @@ class ESPCCFile with Debug {
         other.device == device &&
         other.name == name &&
         other.remoteSize == remoteSize &&
-        other.localSize == localSize &&
+        //other.localSize == localSize &&
         other.distance == distance &&
         other.altGain == altGain &&
         other.remoteExists == remoteExists &&

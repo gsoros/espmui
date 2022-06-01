@@ -1057,6 +1057,7 @@ class EspccSync extends StatelessWidget with Debug {
   @override
   Widget build(BuildContext context) {
     if (0 == device.files.value.files.length) device.api.requestResultCode("rec=files", expectValue: "files:");
+    device.syncer.start();
     //debugLog("files: ${device.files.value.files}");
     return ValueListenableBuilder<ESPCCFileList>(
       valueListenable: device.files,
@@ -1071,21 +1072,27 @@ class EspccSync extends StatelessWidget with Debug {
           if (0 < f.altGain) details += " ↑${f.altGain.toString()}m";
           List<Widget> actions = [];
           bool isQueued = device.syncer.isQueued(f);
-          bool downloadable =
-              !isQueued && f.remoteExists == ExtendedBool.True && 0 < f.remoteSize && f.localExists != ExtendedBool.Unknown && f.localSize < f.remoteSize;
-          String downloadedPercent = isQueued
-              ? map(
-                    0 <= f.localSize ? f.localSize.toDouble() : 0,
-                    0,
-                    0 <= f.remoteSize ? f.remoteSize.toDouble() : 0,
-                    0,
-                    100,
-                  ).toStringAsFixed(0) +
-                  "%"
-              : "";
+          bool isDownloading = device.syncer.isDownloading(f);
+          bool isDownloadable = !isQueued &&
+              !isDownloading &&
+              f.remoteExists == ExtendedBool.True &&
+              0 < f.remoteSize &&
+              f.localExists != ExtendedBool.Unknown &&
+              f.localSize < f.remoteSize;
+          String downloadedPercent = map(
+                0 <= f.localSize ? f.localSize.toDouble() : 0,
+                0,
+                0 <= f.remoteSize ? f.remoteSize.toDouble() : 0,
+                0,
+                100,
+              ).toStringAsFixed(0) +
+              "%";
           if (isQueued) {
             actions.add(EspmuiElevatedButton(
-              child: Text(downloadedPercent),
+              child: Wrap(children: [
+                Icon(isDownloading ? Icons.downloading : Icons.queue),
+                Text(downloadedPercent),
+              ]),
               padding: EdgeInsets.all(0),
             ));
           }
@@ -1095,7 +1102,7 @@ class EspccSync extends StatelessWidget with Debug {
               device.syncer.unqueue(f);
               device.files.notifyListeners();
             };
-          else if (downloadable)
+          else if (isDownloadable)
             onPressed = () {
               device.syncer.queue(f);
               device.files.notifyListeners();

@@ -10,11 +10,16 @@ import 'debug.dart';
 class ESPCCSyncer with Debug {
   ESPCC device;
   final _queue = Queue<ESPCCFile>();
+  ESPCCFile? _current;
   bool _running = false;
   Timer? _timer;
-  final int queueDelayMs = 1000;
+  final int queueDelayMs = 500;
 
   ESPCCSyncer(this.device);
+
+  void start() {
+    if (!_queue.isEmpty) _startQueueSchedule();
+  }
 
   void queue(ESPCCFile f) {
     debugLog("queue ${f.name}");
@@ -25,17 +30,33 @@ class ESPCCSyncer with Debug {
 
   void unqueue(ESPCCFile f) {
     debugLog("unqueue ${f.name}");
-    f.cancelDownload = true;
+    var file = getFromQueue(file: f);
+    if (null != file) file.cancelDownload = true;
   }
 
   bool isQueued(ESPCCFile f) {
-    for (ESPCCFile g in _queue) if (f.name == g.name && !g.cancelDownload) return true;
+    var file = getFromQueue(file: f);
+    if (null != file && !file.cancelDownload) return true;
     return false;
+  }
+
+  ESPCCFile? getFromQueue({
+    ESPCCFile? file,
+    String? name,
+  }) {
+    if (null == file && null == name) return null;
+    for (ESPCCFile g in _queue) if (file?.name == g.name || (name != null && name == g.name)) return g;
+    return null;
+  }
+
+  bool isDownloading(ESPCCFile f) {
+    //if (f.name == _current?.name) debugLog("f: $f _current: $_current");
+    return _current == f && (_running || _timer != null);
   }
 
   Future<void> _runQueue() async {
     if (_running) {
-      debugLog("_runQueue: already _running");
+      //debugLog("_runQueue: already _running");
       return;
     }
     _running = true;
@@ -45,6 +66,7 @@ class ESPCCSyncer with Debug {
       return;
     }
     ESPCCFile ef = _queue.removeFirst();
+    _current = ef;
     if (ef.cancelDownload) {
       debugLog("cancelling download of $ef");
       // ef is not placed back into the queue
@@ -79,6 +101,12 @@ class ESPCCSyncer with Debug {
       _running = false;
       return;
     }
+    if (!await device.connected) {
+      debugLog("not connected");
+      _queue.add(ef);
+      _running = false;
+      return;
+    }
     int offset = ef.localSize <= 0 ? 0 : ef.localSize + 1;
     String request = "rec=get:${ef.name};offset:$offset";
     String expect = "get:${ef.name}:$offset;";
@@ -99,7 +127,7 @@ class ESPCCSyncer with Debug {
       return;
     }
     String value = reply.substring(answerPos + 1);
-    debugLog("value: $value");
+    //debugLog("value: $value");
     if (!await f.exists()) {
       try {
         f = await f.create(recursive: true);
