@@ -1071,6 +1071,8 @@ class EspccSync extends StatelessWidget with Debug {
           if (0 < f.altGain) details += " ↑${f.altGain.toString()}m";
           List<Widget> actions = [];
           bool isQueued = device.syncer.isQueued(f);
+          bool downloadable =
+              !isQueued && f.remoteExists == ExtendedBool.True && 0 < f.remoteSize && f.localExists != ExtendedBool.Unknown && f.localSize < f.remoteSize;
           String downloadedPercent = isQueued
               ? map(
                     0 <= f.localSize ? f.localSize.toDouble() : 0,
@@ -1081,15 +1083,27 @@ class EspccSync extends StatelessWidget with Debug {
                   ).toStringAsFixed(0) +
                   "%"
               : "";
+          if (isQueued) {
+            actions.add(EspmuiElevatedButton(
+              child: Text(downloadedPercent),
+              padding: EdgeInsets.all(0),
+            ));
+          }
+          var onPressed;
+          if (isQueued)
+            onPressed = () {
+              device.syncer.unqueue(f);
+              device.files.notifyListeners();
+            };
+          else if (downloadable)
+            onPressed = () {
+              device.syncer.queue(f);
+              device.files.notifyListeners();
+            };
           actions.add(EspmuiElevatedButton(
-            child: isQueued ? Text(downloadedPercent) : Icon(Icons.download),
+            child: Icon(isQueued ? Icons.stop : Icons.download),
             padding: EdgeInsets.all(0),
-            onPressed: isQueued
-                ? null
-                : () {
-                    device.syncer.queue(f);
-                    device.files.notifyListeners();
-                  },
+            onPressed: onPressed,
           ));
           var item = Card(
             child: ListTile(

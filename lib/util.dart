@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as dev;
+import 'dart:io';
 import 'dart:math';
 
 import 'package:espmui/main.dart';
@@ -133,6 +134,7 @@ String distanceToString(int d, {int digits = 2}) {
 /// singleton class
 class Path {
   String? _documents;
+  String? _external;
   static final Path _instance = Path._construct();
 
   factory Path() {
@@ -140,9 +142,32 @@ class Path {
   }
   Path._construct();
 
-  Future<String> get documents async {
-    if (_documents != null) return Future.value(_documents);
-    _documents = (await getApplicationDocumentsDirectory()).path;
-    return Future.value(_documents);
+  Future<String?> get documents async {
+    if (_documents != null) return _documents;
+    try {
+      _documents = (await getApplicationDocumentsDirectory()).path;
+    } catch (e) {
+      dev.log("could not getApplicationDocumentsDirectory(), error: $e");
+      return null;
+    }
+    return _documents;
+  }
+
+  Future<String?> get external async {
+    if (_external != null) return _external;
+    if (!Platform.isAndroid) return null;
+    try {
+      var dir = await getExternalStorageDirectory();
+      if (null == dir) return null;
+      _external = dir.path;
+    } catch (e) {
+      dev.log("could not getExternalStorageDirectory(), error: $e");
+      return null;
+    }
+    return _external;
+  }
+
+  String sanitize(String s) {
+    return s.replaceAll("[^A-Za-z0-9]", "_");
   }
 }

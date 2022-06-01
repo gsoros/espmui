@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math';
 
 import 'ble_characteristic.dart';
 import 'device.dart';
@@ -296,7 +297,7 @@ class Api with Debug {
     for (ApiMessage m in _queue) {
       if (m.commandCode == commandCode) {
         // no match if expected value is set and value does not begin with it
-        if (m.expectValue != null && m.expectValue != value.substring(0, m.expectValue!.length)) continue;
+        if (m.expectValue != null && m.expectValue != value.substring(0, min(m.expectValue!.length, value.length))) continue;
         matches++;
         m.resultCode = resultCode;
         m.resultStr = resultStr;
@@ -306,10 +307,10 @@ class Api with Debug {
       }
     }
     if (matches == 0) {
-      debugLog("No matching queued message for the reply $reply, generating new one");
+      // debugLog("_onNotify() No matching queued message for the reply $reply, generating new one");
       var cStr = commandStr(commandCode);
       if (null == cStr) {
-        debugLog("commandStr is null");
+        debugLog("_onNotify() commandStr is null");
         return;
       }
       var m = ApiMessage(
@@ -327,7 +328,7 @@ class Api with Debug {
   }
 
   void _onDone(ApiMessage message) {
-    debugLog("_onDone $message");
+    //debugLog("_onDone $message");
     streamSendIfNotClosed(_doneController, message);
     if (null == message.onDone) return;
     var onDone = message.onDone;
@@ -479,7 +480,7 @@ class Api with Debug {
     String toWrite = message.commandCode.toString();
     var arg = message.arg;
     if (arg != null) toWrite += "=$arg";
-    debugLog("_send() calling char.write($toWrite)");
+    //debugLog("_send() calling char.write($toWrite)");
     characteristic?.write(toWrite);
   }
 
