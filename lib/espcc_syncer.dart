@@ -28,7 +28,7 @@ class ESPCCSyncer with Debug {
     _startQueueSchedule();
   }
 
-  void unqueue(ESPCCFile f) {
+  void dequeue(ESPCCFile f) {
     debugLog("unqueue ${f.name}");
     var file = getFromQueue(file: f);
     if (null != file) file.cancelDownload = true;

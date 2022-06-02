@@ -296,6 +296,7 @@ class Api with Debug {
     int matches = 0;
     for (ApiMessage m in _queue) {
       if (m.commandCode == commandCode) {
+        //debugLog("expected: '${m.expectValue}' got '${value.substring(0, min(m.expectValue!.length, value.length))}'");
         // no match if expected value is set and value does not begin with it
         if (m.expectValue != null && m.expectValue != value.substring(0, min(m.expectValue!.length, value.length))) continue;
         matches++;

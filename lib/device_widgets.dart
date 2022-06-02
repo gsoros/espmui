@@ -1079,19 +1079,18 @@ class EspccSync extends StatelessWidget with Debug {
               0 < f.remoteSize &&
               f.localExists != ExtendedBool.Unknown &&
               f.localSize < f.remoteSize;
-          String downloadedPercent = map(
-                0 <= f.localSize ? f.localSize.toDouble() : 0,
-                0,
-                0 <= f.remoteSize ? f.remoteSize.toDouble() : 0,
-                0,
-                100,
-              ).toStringAsFixed(0) +
-              "%";
+          int downloadedPercent = map(
+            0 <= f.localSize ? f.localSize.toDouble() : 0,
+            0,
+            0 <= f.remoteSize ? f.remoteSize.toDouble() : 0,
+            0,
+            100,
+          ).toInt();
           if (isQueued) {
             actions.add(EspmuiElevatedButton(
               child: Wrap(children: [
                 Icon(isDownloading ? Icons.downloading : Icons.queue),
-                Text(downloadedPercent),
+                Text("$downloadedPercent%"),
               ]),
               padding: EdgeInsets.all(0),
             ));
@@ -1099,7 +1098,7 @@ class EspccSync extends StatelessWidget with Debug {
           var onPressed;
           if (isQueued)
             onPressed = () {
-              device.syncer.unqueue(f);
+              device.syncer.dequeue(f);
               device.files.notifyListeners();
             };
           else if (isDownloadable)
@@ -1112,23 +1111,106 @@ class EspccSync extends StatelessWidget with Debug {
             padding: EdgeInsets.all(0),
             onPressed: onPressed,
           ));
+          actions.add(EspmuiElevatedButton(
+            child: Icon(Icons.delete),
+            padding: EdgeInsets.all(0),
+            onPressed: () async {
+              bool sure = false;
+              await showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    scrollable: false,
+                    title: Text("Delete ${f.name}?"),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Downloaded $downloadedPercent%",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text("$details"),
+                      ],
+                    ),
+                    actions: [
+                      EspmuiElevatedButton(
+                        child: Text("Yes"),
+                        onPressed: () {
+                          sure = true;
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                      EspmuiElevatedButton(
+                        child: Text("No"),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ],
+                  );
+                },
+              );
+              debugLog("delete: ${f.name} sure: $sure");
+              if (sure) {
+                int? code = await device.api.requestResultCode("rec=delete:${f.name}", expectValue: "deleted: ${f.name}");
+                if (code == 1) {
+                  device.syncer.dequeue(f);
+                  device.files.value.files.removeWhere((file) => file.name == f.name);
+                  device.files.notifyListeners();
+                  snackbar("Deleted ${f.name}");
+                } else
+                  snackbar("Could not delete ${f.name}");
+              }
+            },
+          ));
           var item = Card(
-            child: ListTile(
-              title: Text(f.name),
-              subtitle: Text(details),
-              trailing: Wrap(children: actions),
-              //isThreeLine: true,
-              contentPadding: EdgeInsets.fromLTRB(0, 0, 0, 5),
+            color: Colors.black12,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(5, 0, 5, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    f.name,
+                    style: const TextStyle(
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    details,
+                    style: const TextStyle(
+                      fontSize: 14.0,
+                      color: Colors.white54,
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: actions,
+                  ),
+                ],
+              ),
             ),
+            // ListTile(
+            //   title: Text(f.name),
+            //   subtitle: Text(details),
+            //   trailing: Wrap(children: actions),
+            //   //isThreeLine: true,
+            //   contentPadding: EdgeInsets.fromLTRB(0, 0, 0, 5),
+            // ),
           );
           items.add(item);
         });
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: items +
               [
                 EspmuiElevatedButton(
                   onPressed: () {
                     device.api.requestResultCode("rec=files");
+                    for (ESPCCFile f in device.files.value.files) f.updateLocalStatus();
+                    device.files.notifyListeners();
                   },
                   child: Row(
                     children: [
@@ -1235,6 +1317,22 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
       valueListenable: device.settings,
       builder: (_, settings, __) {
         var widgets = <Widget>[
+          EspmuiElevatedButton(
+            onPressed: () async {
+              await dialog(
+                title: Text("Sync recordings"),
+                body: EspccSync(device),
+                //scrollable: false,
+              );
+            },
+            child: Row(
+              children: [
+                Icon(Icons.sync),
+                Text("Sync recordings"),
+              ],
+            ),
+          ),
+          Divider(color: Colors.white38),
           Row(children: [
             Flexible(
               child: Column(
@@ -1279,20 +1377,47 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
             ),
           ]),
           Divider(color: Colors.white38),
-          EspmuiElevatedButton(
-            onPressed: () async {
-              await dialog(
-                title: Text("Sync recordings"),
-                body: EspccSync(device),
-                //scrollable: false,
-              );
-            },
-            child: Row(
-              children: [
-                Icon(Icons.sync),
-                Text("Sync recordings"),
-              ],
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              EspmuiElevatedButton(
+                onPressed: settings.otaMode
+                    ? null
+                    : () async {
+                        int? code = await device.api.requestResultCode("system=ota");
+                        if (1 == code) {
+                          device.settings.value.otaMode = true;
+                          device.settings.notifyListeners();
+                          snackbar("Waiting for OTA update, reboot to cancel");
+                        } else
+                          snackbar("Failed to enter OTA mode");
+                      },
+                child: Row(
+                  children: [
+                    Icon(Icons.system_update),
+                    Text("OTA"),
+                  ],
+                ),
+              ),
+              EspmuiElevatedButton(
+                onPressed: () async {
+                  int? code = await device.api.requestResultCode("system=reboot");
+                  if (code == 1) {
+                    snackbar("Rebooting");
+                    device.disconnect();
+                    await Future.delayed(Duration(seconds: 2));
+                    device.connect();
+                  } else
+                    snackbar("Failed to reboot");
+                },
+                child: Row(
+                  children: [
+                    Icon(Icons.restart_alt),
+                    Text("Reboot"),
+                  ],
+                ),
+              ),
+            ],
           ),
         ];
 

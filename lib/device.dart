@@ -1036,7 +1036,7 @@ class ESPCC extends Device {
       return;
     }
 
-    snackbar("${message.info} ${message.command}");
+    //snackbar("${message.info} ${message.command}");
     debugLog("unhandled api response: $message");
   }
 
@@ -1184,6 +1184,7 @@ class ESPCCSettings {
   bool scanning = false;
   List<String> scanResults = [];
   Map<int, int> touchRead = {};
+  bool otaMode = false;
 
   @override
   bool operator ==(other) {
