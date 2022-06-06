@@ -1056,7 +1056,6 @@ class EspccSync extends StatelessWidget with Debug {
 
   @override
   Widget build(BuildContext context) {
-    if (0 == device.files.value.files.length) device.api.requestResultCode("rec=files", expectValue: "files:");
     device.syncer.start();
     //debugLog("files: ${device.files.value.files}");
     return ValueListenableBuilder<ESPCCFileList>(
@@ -1202,16 +1201,18 @@ class EspccSync extends StatelessWidget with Debug {
           );
           items.add(item);
         });
+        if (filelist.syncing == ExtendedBool.True) items.add(Text("Syncing..."));
+        if (0 == items.length) items.add(Text("No files"));
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: items +
               [
                 EspmuiElevatedButton(
-                  onPressed: () {
-                    device.api.requestResultCode("rec=files");
-                    for (ESPCCFile f in device.files.value.files) f.updateLocalStatus();
-                    device.files.notifyListeners();
-                  },
+                  onPressed: filelist.syncing == ExtendedBool.True
+                      ? null
+                      : () {
+                          device.refreshFileList();
+                        },
                   child: Row(
                     children: [
                       Icon(Icons.sync),
@@ -1319,6 +1320,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
         var widgets = <Widget>[
           EspmuiElevatedButton(
             onPressed: () async {
+              device.refreshFileList();
               await dialog(
                 title: Text("Sync recordings"),
                 body: EspccSync(device),

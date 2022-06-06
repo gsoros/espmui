@@ -938,11 +938,18 @@ class ESPCC extends Device {
             debugLog("_onApiDone() rec:name too long: $name");
             return;
           }
+          if (name.length <= 2) {
+            debugLog("_onApiDone() rec:name too short: $name");
+            return;
+          }
           ESPCCFile f = files.value.files.firstWhere(
             (file) => file.name == name,
             orElse: () {
               var file = syncer.getFromQueue(name: name);
-              if (file == null) file = ESPCCFile(name, this, remoteExists: ExtendedBool.True);
+              if (file == null) {
+                file = ESPCCFile(name, this, remoteExists: ExtendedBool.True);
+                file.updateLocalStatus();
+              }
               files.value.files.add(file);
               files.notifyListeners();
               return file;
@@ -1078,6 +1085,19 @@ class ESPCC extends Device {
       maxAttempts: 3,
     );
     //await Future.delayed(Duration(milliseconds: 250));
+  }
+
+  Future<void> refreshFileList() async {
+    if (files.value.syncing == ExtendedBool.True) {
+      debugLog("refreshFileList() already refreshing");
+      return;
+    }
+    files.value.syncing = ExtendedBool.True;
+    files.notifyListeners();
+    await api.requestResultCode("rec=files", expectValue: "files:");
+    for (ESPCCFile f in files.value.files) f.updateLocalStatus();
+    files.value.syncing = ExtendedBool.False;
+    files.notifyListeners();
   }
 }
 
@@ -1313,6 +1333,7 @@ class ESPCCFile with Debug {
 
 class ESPCCFileList {
   List<ESPCCFile> files = [];
+  var syncing = ExtendedBool.Unknown;
 
   bool has(String name) {
     bool exists = false;
