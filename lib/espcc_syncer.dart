@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
-import 'dart:developer' as dev;
+//import 'dart:developer' as dev;
 
 import 'device.dart';
 import 'util.dart';
@@ -18,7 +18,7 @@ class ESPCCSyncer with Debug {
   ESPCCSyncer(this.device);
 
   void start() {
-    if (!_queue.isEmpty) _startQueueSchedule();
+    if (_queue.isNotEmpty) _startQueueSchedule();
   }
 
   void queue(ESPCCFile f) {

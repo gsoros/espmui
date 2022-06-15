@@ -832,6 +832,50 @@ class ESPCC extends Device {
       return;
     }
 
+    //////////////////////////////////////////////////// touch
+    ///// reply format: read:r0,...|thresholds:t0,...|enabled:0|1
+    if ("touch" == message.commandStr) {
+      String? v = message.valueAsString;
+      if (null == v) return;
+      if (0 == v.indexOf("read:")) {
+        List<String> values = v.substring("read:".length).split(",");
+        int index = 0;
+        Map<int, int> readings = {};
+        values.forEach((value) {
+          int? i = int.tryParse(value);
+          if (null == i) return;
+          readings[index] = i;
+          index++;
+        });
+        settings.value.touchRead = readings;
+        settings.notifyListeners();
+        debugLog("touchRead=${settings.value.touchRead}");
+      }
+      if (0 == v.indexOf("thresholds:")) {
+        List<String> values = v.substring("thresholds:".length).split(",");
+        int index = 0;
+        Map<int, int> thresholds = {};
+        values.forEach((value) {
+          int? i = int.tryParse(value);
+          if (null == i) return;
+          thresholds[index] = i;
+          index++;
+        });
+        settings.value.touchThres = thresholds;
+        settings.notifyListeners();
+        debugLog("touchThres=${settings.value.touchThres}");
+      }
+      if (0 == v.indexOf("enabled:")) {
+        int? i = int.tryParse(v.substring("enabled:".length));
+        if (null != i) {
+          settings.value.touchEnabled = 0 < i;
+          settings.notifyListeners();
+          debugLog("touchEnabled=${settings.value.touchEnabled}");
+        }
+      }
+      return;
+    }
+
     //////////////////////////////////////////////////// touchThres
     if ("touchThres" == message.commandStr) {
       String? v = message.valueAsString;
@@ -1204,6 +1248,7 @@ class ESPCCSettings {
   bool scanning = false;
   List<String> scanResults = [];
   Map<int, int> touchRead = {};
+  bool touchEnabled = true;
   bool otaMode = false;
 
   @override

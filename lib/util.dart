@@ -59,8 +59,25 @@ class EspmuiElevatedButton extends StatelessWidget {
   final Widget child;
   final void Function()? onPressed;
   final EdgeInsetsGeometry? padding;
+  late Color foregroundColorEnabled;
+  late Color foregroundColorDisabled;
+  late Color backgroundColorEnabled;
+  late Color backgroundColorDisabled;
 
-  EspmuiElevatedButton({required this.child, this.onPressed, this.padding});
+  EspmuiElevatedButton({
+    required this.child,
+    this.onPressed,
+    this.padding,
+    Color? foregroundColorEnabled,
+    Color? foregroundColorDisabled,
+    Color? backgroundColorEnabled,
+    Color? backgroundColorDisabled,
+  }) {
+    this.foregroundColorEnabled = foregroundColorEnabled ?? Colors.white;
+    this.foregroundColorDisabled = foregroundColorDisabled ?? Colors.grey;
+    this.backgroundColorEnabled = backgroundColorEnabled ?? Colors.red.shade900;
+    this.backgroundColorDisabled = backgroundColorDisabled ?? Colors.red.shade400;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,10 +87,10 @@ class EspmuiElevatedButton extends StatelessWidget {
       style: ButtonStyle(
         padding: MaterialStateProperty.all<EdgeInsetsGeometry?>(padding),
         backgroundColor: MaterialStateProperty.resolveWith((state) {
-          return state.contains(MaterialState.disabled) ? Colors.red.shade400 : Colors.red.shade900;
+          return state.contains(MaterialState.disabled) ? backgroundColorDisabled : backgroundColorEnabled;
         }),
         foregroundColor: MaterialStateProperty.resolveWith((state) {
-          return state.contains(MaterialState.disabled) ? Colors.grey : Colors.white;
+          return state.contains(MaterialState.disabled) ? foregroundColorDisabled : foregroundColorEnabled;
         }),
       ),
     );

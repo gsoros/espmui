@@ -1038,7 +1038,15 @@ class EspccTouchEditor extends StatelessWidget with Debug {
                     min: 0.0,
                     max: 100.0,
                     onChanged: (newValue) {
-                      device.api.sendCommand("touchThres=$k:${newValue.toInt()}");
+                      String thres = "";
+                      device.settings.value.touchThres.forEach((key, value) {
+                        if (0 < thres.length) thres += ",";
+                        if (key == k)
+                          thres += "$key:${newValue.toInt()}";
+                        else
+                          thres += "$key:$value";
+                      });
+                      device.api.sendCommand("touch=thresholds:$thres");
                     },
                   ),
                 ),
@@ -1339,7 +1347,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
             Flexible(
               child: Column(
                 children: [
-                  Row(children: [Text("Peers:")]),
+                  Row(children: [Text("Peers")]),
                   PeersList(peers: settings.peers),
                 ],
               ),
@@ -1359,15 +1367,22 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
             Flexible(
               child: Column(
                 children: [
-                  Row(children: [Text("Touch Thresholds:")]),
-                  Text(settings.touchThres.values.join(", ")),
+                  Row(children: [Text("Touch")]),
                 ],
               ),
             ),
             EspmuiElevatedButton(
+              backgroundColorEnabled: settings.touchEnabled ? Color.fromARGB(255, 2, 150, 2) : Color.fromARGB(255, 141, 2, 2),
+              onPressed: () {
+                device.api.sendCommand("touch=enabled:${settings.touchEnabled ? 0 : 1}");
+              },
+              child: Icon(settings.touchEnabled ? Icons.pan_tool : Icons.do_not_touch),
+            ),
+            EspmuiElevatedButton(
               onPressed: () async {
                 final timer = Timer.periodic(const Duration(seconds: 2), (_) {
-                  device.api.sendCommand("touchRead=disableFor:3");
+                  device.api.sendCommand("touch=disableFor:3");
+                  device.api.sendCommand("touch=read");
                 });
                 await dialog(
                   title: Text("Touch Thresholds"),
