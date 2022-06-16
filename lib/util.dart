@@ -59,10 +59,10 @@ class EspmuiElevatedButton extends StatelessWidget {
   final Widget child;
   final void Function()? onPressed;
   final EdgeInsetsGeometry? padding;
-  late Color foregroundColorEnabled;
-  late Color foregroundColorDisabled;
-  late Color backgroundColorEnabled;
-  late Color backgroundColorDisabled;
+  late final Color? foregroundColorEnabled;
+  late final Color? foregroundColorDisabled;
+  late final Color? backgroundColorEnabled;
+  late final Color? backgroundColorDisabled;
 
   EspmuiElevatedButton({
     required this.child,

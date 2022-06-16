@@ -1327,6 +1327,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
       builder: (_, settings, __) {
         var widgets = <Widget>[
           EspmuiElevatedButton(
+            backgroundColorEnabled: Colors.cyan.shade900,
             onPressed: () async {
               device.refreshFileList();
               await dialog(
@@ -1398,6 +1399,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               EspmuiElevatedButton(
+                backgroundColorEnabled: Colors.blue.shade900,
                 onPressed: settings.otaMode
                     ? null
                     : () async {
@@ -1417,6 +1419,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
                 ),
               ),
               EspmuiElevatedButton(
+                backgroundColorEnabled: Colors.yellow.shade900,
                 onPressed: () async {
                   int? code = await device.api.requestResultCode("system=reboot");
                   if (code == 1) {
