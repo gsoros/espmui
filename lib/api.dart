@@ -61,6 +61,15 @@ enum ApiResult {
 */
 class ApiResult {
   static int get success => 1;
+
+  /// generic local error
+  static int get localError => 100;
+
+  /// local filesystem error
+  static int get localFsError => 110;
+
+  /// local BT error
+  static int get localBtError => 120;
 }
 
 typedef void ApiCallback(ApiMessage message);

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 import 'dart:developer' as dev;
 
 import 'package:flutter/foundation.dart';
@@ -469,10 +470,7 @@ class ESPM extends PowerMeter {
   ESPM(Peripheral peripheral) : super(peripheral) {
     _characteristics.addAll({
       'api': CharacteristicListItem(
-        ApiCharacteristic(
-          peripheral,
-          serviceUUID: BleConstants.ESPM_API_SERVICE_UUID,
-        ),
+        EspmApiCharacteristic(peripheral),
       ),
       'weightScale': CharacteristicListItem(
         WeightScaleCharacteristic(peripheral),
@@ -484,7 +482,7 @@ class ESPM extends PowerMeter {
       ),
     });
     api = Api(this);
-    api.commands = {1: "config"};
+    //api.commands = {1: "config"};
     // listen to api message done events
     _apiSubsciption = api.messageDoneStream.listen((message) => _onApiDone(message));
     tileStreams.addAll({
@@ -753,10 +751,7 @@ class ESPCC extends Device {
   ESPCC(Peripheral peripheral) : super(peripheral) {
     _characteristics.addAll({
       'api': CharacteristicListItem(
-        ApiCharacteristic(
-          peripheral,
-          serviceUUID: BleConstants.ESPCC_API_SERVICE_UUID,
-        ),
+        EspccApiCharacteristic(peripheral, device: this),
       ),
     });
     api = Api(this);
@@ -1317,6 +1312,59 @@ class ESPCCFile with Debug {
     if (null == p) return null;
     return File(p);
   }
+
+  Future<int> appendLocal({
+    int? offset,
+    String? data,
+    Uint8List? byteData,
+  }) async {
+    String tag = "appendLocal ($name)";
+    if (null != data && null != byteData) {
+      debugLog("$tag both data and byteData present");
+      return 0;
+    }
+
+    File? f = await getLocal();
+    if (null == f) {
+      debugLog("$tag could not get local file");
+      return 0;
+    }
+    if (!await f.exists()) {
+      try {
+        f = await f.create(recursive: true);
+      } catch (e) {
+        debugLog("$tag could not create ${await path}, error: $e");
+        return 0;
+      }
+    }
+    int sizeBefore = await f.length();
+    if (null != offset && sizeBefore != (offset <= 0 ? 0 : offset - 1)) {
+      debugLog("$tag local size is $sizeBefore but offset is $offset");
+      return 0;
+    }
+    if (null != data && 0 < data.length)
+      f = await f.writeAsString(
+        data,
+        mode: FileMode.append,
+        flush: true,
+      );
+    else if (null != byteData && 0 < byteData.length)
+      f = await f.writeAsBytes(
+        byteData.toList(growable: false),
+        mode: FileMode.append,
+        flush: true,
+      );
+    else {
+      debugLog("$tag need either data or byteData");
+      return 0;
+    }
+    await updateLocalStatus();
+
+    return localSize - sizeBefore;
+  }
+
+  /// any file with a dot in the name is treated as non-binary :)
+  bool get isBinary => name.indexOf(".") < 0;
 
   void update({
     String? name,

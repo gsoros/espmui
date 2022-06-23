@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:espmui/api.dart';
 import 'package:flutter/material.dart';
 
 import 'package:espmui/debug.dart';
@@ -13,6 +14,7 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'util.dart' as util;
 import 'ble.dart';
 import 'ble_constants.dart';
+import 'device.dart';
 
 abstract class BleCharacteristic<T> with Debug {
   Peripheral _peripheral;
@@ -43,23 +45,33 @@ abstract class BleCharacteristic<T> with Debug {
 
   /// Reads value from characteristic and sets [lastValue]
   Future<T?> read() async {
+    var value = await readAsUint8List();
+    if (value != null) lastValue = fromUint8List(value);
+    return lastValue;
+  }
+
+  Future<Uint8List?> readAsUint8List() async {
     await _init();
     if (null == _characteristic) {
-      bleError(debugTag, "read() characteristic is null");
-      return fromUint8List(Uint8List.fromList([]));
+      bleError(debugTag, "readAsUint8List() characteristic is null");
+      return null;
     }
     if (!_characteristic!.isReadable) {
-      bleError(debugTag, "read() characteristic not readable");
-      return fromUint8List(Uint8List.fromList([]));
+      bleError(debugTag, "readAsUint8List() characteristic not readable");
+      return null;
     }
+    Uint8List? value;
     await _exclusiveAccess.protect(() async {
-      var value = await _characteristic?.read().catchError((e) {
-        bleError(debugTag, "read()", e);
+      value = await _characteristic?.read().catchError((e) {
+        bleError(debugTag, "readAsUint8List()", e);
         return Uint8List.fromList([]);
       });
-      if (value != null) lastValue = fromUint8List(value);
     });
-    return lastValue;
+    return null != value
+        ? 0 < value!.length
+            ? value
+            : null
+        : null;
   }
 
   Future<void> write(
@@ -308,7 +320,7 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
   }
 }
 
-class ApiCharacteristic extends BleCharacteristic<String> {
+abstract class ApiCharacteristic extends BleCharacteristic<String> {
   final String serviceUUID;
   final String txCharUUID;
   final String rxCharUUID;
@@ -316,7 +328,7 @@ class ApiCharacteristic extends BleCharacteristic<String> {
 
   ApiCharacteristic(
     Peripheral peripheral, {
-    this.serviceUUID = BleConstants.ESPM_API_SERVICE_UUID,
+    this.serviceUUID = "",
     this.txCharUUID = BleConstants.API_TXCHAR_UUID,
     this.rxCharUUID = BleConstants.API_RXCHAR_UUID,
   }) : super(peripheral);
@@ -388,6 +400,83 @@ class ApiCharacteristic extends BleCharacteristic<String> {
     if (value.length < 20) return Future.value(value);
     // read full value as the notification is limited to 20 bytes
     return read();
+  }
+}
+
+class EspmApiCharacteristic extends ApiCharacteristic {
+  EspmApiCharacteristic(
+    Peripheral peripheral,
+  ) : super(peripheral, serviceUUID: BleConstants.ESPM_API_SERVICE_UUID);
+}
+
+class EspccApiCharacteristic extends ApiCharacteristic {
+  ESPCC device;
+  EspccApiCharacteristic(
+    Peripheral peripheral, {
+    required this.device,
+  }) : super(peripheral, serviceUUID: BleConstants.ESPCC_API_SERVICE_UUID);
+
+  @override
+  Future<String?> onNotify(String value) async {
+    // do not read the binary data after "success;rec=get:01231234:0;"
+    String tag = "onNotify:";
+    debugLog("$tag '$value'");
+    final int success = ApiResult.success;
+    final int? rec = device.api.commandCode("rec");
+    if (null == rec) {
+      debugLog("$tag could not find command code for 'rec'");
+      return super.onNotify(value);
+    }
+    final reg = RegExp('(^$success;$rec=get:([0-9a-zA-Z]{8}):([0-9]+);*)(.+)');
+    RegExpMatch? match = reg.firstMatch(value);
+    String? noBinary = match?.group(1);
+    if (null != noBinary && 0 < noBinary.length) {
+      debugLog("$tag found match: '$noBinary'");
+      Uint8List? valueAsList = await readAsUint8List();
+      if (null == valueAsList || 0 == valueAsList.length) {
+        debugLog("$tag could not get valueAsList");
+        return super.onNotify(noBinary);
+      }
+      String fullValue = fromUint8List(valueAsList);
+      match = reg.firstMatch(fullValue);
+      String? fileName = match?.group(2);
+      if (null == fileName || fileName.length < 8) {
+        debugLog("$tag could not get filename");
+        return super.onNotify(noBinary);
+      }
+      String? offsetStr = match?.group(3);
+      if (null == offsetStr || offsetStr.length < 1) {
+        debugLog("$tag could not get offsetStr");
+        return super.onNotify(noBinary);
+      }
+      int? offset = int.tryParse(offsetStr);
+      if (null == offset || offset < 0) {
+        debugLog("$tag could not get offset");
+        return super.onNotify(noBinary);
+      }
+      int? binaryStart = match?.group(1)?.length;
+      if (null == binaryStart || binaryStart < 0 || valueAsList.length <= binaryStart) {
+        debugLog("$tag could not get binaryStart");
+        return super.onNotify(noBinary);
+      }
+      Uint8List byteData = Uint8List.sublistView(valueAsList, binaryStart);
+      debugLog("$tag file: $fileName, offset: $offset, byteData: $byteData");
+      ESPCCFile f = device.files.value.files.firstWhere(
+        (candidate) => candidate.name == fileName,
+        orElse: () {
+          var f = ESPCCFile(fileName, device);
+          f.updateLocalStatus();
+          device.files.value.files.add(f);
+          device.files.notifyListeners();
+          return f;
+        },
+      );
+      int written = await f.appendLocal(offset: offset, byteData: byteData);
+      if (written == byteData.length) return super.onNotify(noBinary);
+      debugLog("$tag file: $fileName, received: ${byteData.length}, written: $written");
+      return super.onNotify("${ApiResult.localFsError};$rec=get:$fileName:$offset;");
+    }
+    return super.onNotify(value);
   }
 }
 

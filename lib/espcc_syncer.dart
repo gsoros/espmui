@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:io';
+//import 'dart:io';
 //import 'dart:developer' as dev;
 
 import 'device.dart';
@@ -94,13 +94,6 @@ class ESPCCSyncer with Debug {
       _running = false;
       return;
     }
-    File? f = await ef.getLocal();
-    if (null == f) {
-      debugLog("could not get local file for ${ef.name}");
-      _queue.add(ef);
-      _running = false;
-      return;
-    }
     if (!await device.connected) {
       debugLog("not connected");
       _queue.add(ef);
@@ -118,7 +111,7 @@ class ESPCCSyncer with Debug {
       _running = false;
       return;
     }
-    //debugLog("reply: $reply");
+    debugLog("$ef reply: $reply");
     int answerPos = reply.indexOf(";");
     if (answerPos < 0) {
       debugLog("invalid answer to $request");
@@ -126,28 +119,17 @@ class ESPCCSyncer with Debug {
       _running = false;
       return;
     }
-    String value = reply.substring(answerPos + 1);
-    //debugLog("value: $value");
-    if (!await f.exists()) {
-      try {
-        f = await f.create(recursive: true);
-      } catch (e) {
-        debugLog("could not create ${await ef.path}, error: $e");
-        _queue.add(ef);
-        _running = false;
-        return;
+    if (!ef.isBinary) {
+      String value = reply.substring(answerPos + 1);
+      debugLog("$ef value: $value");
+      int written = await ef.appendLocal(offset: offset, data: value);
+      if (written != value.length) {
+        debugLog("$ef, received: ${value.length}, written: $written");
       }
     }
-    int localSize = await f.length();
-    if (localSize != (offset <= 0 ? 0 : offset - 1)) {
-      debugLog("local size is $localSize but offset is $offset");
-      _queue.add(ef);
-      _running = false;
-      return;
-    }
-    f = await f.writeAsString(value, mode: FileMode.append, flush: true);
+    // in case of a binary (rec) file, at this point the local file should be
+    // updated by EspccApiCharacteristic::onNotify()
     await ef.updateLocalStatus();
-    debugLog("Wrote ${value.length} bytes to ${ef.name} at offset $offset. Local: ${ef.localSize}, remote: ${ef.remoteSize}.");
     device.files.notifyListeners();
     _queue.addFirst(ef);
     _running = false;
