@@ -13,7 +13,7 @@ class ESPCCSyncer with Debug {
   ESPCCFile? _current;
   bool _running = false;
   Timer? _timer;
-  final int queueDelayMs = 500;
+  final int queueDelayMs = 100;
 
   ESPCCSyncer(this.device);
 
@@ -29,9 +29,11 @@ class ESPCCSyncer with Debug {
   }
 
   void dequeue(ESPCCFile f) {
-    debugLog("unqueue ${f.name}");
+    debugLog("dequeue ${f.name}");
+    f.cancelDownload = true;
     var file = getFromQueue(file: f);
     if (null != file) file.cancelDownload = true;
+    device.files.notifyListeners();
   }
 
   bool isQueued(ESPCCFile f) {
@@ -51,7 +53,7 @@ class ESPCCSyncer with Debug {
 
   bool isDownloading(ESPCCFile f) {
     //if (f.name == _current?.name) debugLog("f: $f _current: $_current");
-    return _current == f && (_running || _timer != null);
+    return !f.cancelDownload && _current == f && (_running || _timer != null);
   }
 
   Future<void> _runQueue() async {
@@ -91,6 +93,12 @@ class ESPCCSyncer with Debug {
       debugLog("finished downloading ${ef.name}");
       device.files.notifyListeners();
       if (ef.remoteSize < ef.localSize) debugLog("!!! remote size ${ef.remoteSize} < local size ${ef.localSize}");
+      if (ef.isRec) {
+        String msg = "generating ${ef.name}.gpx";
+        snackbar(msg);
+        await ef.generateGpx();
+        snackbar("done $msg");
+      }
       _running = false;
       return;
     }
@@ -111,7 +119,7 @@ class ESPCCSyncer with Debug {
       _running = false;
       return;
     }
-    debugLog("$ef reply: $reply");
+    //debugLog("$ef reply: $reply");
     int answerPos = reply.indexOf(";");
     if (answerPos < 0) {
       debugLog("invalid answer to $request");

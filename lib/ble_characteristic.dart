@@ -17,7 +17,7 @@ import 'ble_constants.dart';
 import 'device.dart';
 
 abstract class BleCharacteristic<T> with Debug {
-  Peripheral _peripheral;
+  Device device;
   final serviceUUID = "";
   final charUUID = "";
   //CharacteristicWithValue? _characteristicWithValue;
@@ -26,6 +26,7 @@ abstract class BleCharacteristic<T> with Debug {
   StreamSubscription<Uint8List>? _subscription;
   final _controller = StreamController<T>.broadcast();
   T? lastValue;
+  Uint8List? lastRawValue;
 
   /// mutex shared with BLE
   final _exclusiveAccess = BLE().mutex;
@@ -35,8 +36,8 @@ abstract class BleCharacteristic<T> with Debug {
 
   Stream<T> get defaultStream => _controller.stream;
 
-  BleCharacteristic(this._peripheral) {
-    debugLog("construct ${_peripheral.identifier}");
+  BleCharacteristic(this.device) {
+    debugLog("construct ${device.peripheral?.identifier}");
     lastValue = fromUint8List(Uint8List.fromList([]));
   }
 
@@ -46,32 +47,39 @@ abstract class BleCharacteristic<T> with Debug {
   /// Reads value from characteristic and sets [lastValue]
   Future<T?> read() async {
     var value = await readAsUint8List();
-    if (value != null) lastValue = fromUint8List(value);
-    return lastValue;
+    if (value != null) {
+      lastValue = fromUint8List(value);
+      return lastValue;
+    }
+    return null;
   }
 
+  /// Reads raw value from characteristic and sets [lastRawValue]
   Future<Uint8List?> readAsUint8List() async {
     await _init();
+    String tag = "readAsUint8List()";
     if (null == _characteristic) {
-      bleError(debugTag, "readAsUint8List() characteristic is null");
+      bleError(debugTag, "$tag characteristic is null");
       return null;
     }
     if (!_characteristic!.isReadable) {
-      bleError(debugTag, "readAsUint8List() characteristic not readable");
+      bleError(debugTag, "$tag characteristic not readable");
       return null;
     }
     Uint8List? value;
+    bool error = false;
     await _exclusiveAccess.protect(() async {
       value = await _characteristic?.read().catchError((e) {
-        bleError(debugTag, "readAsUint8List()", e);
+        bleError(debugTag, tag, e);
+        error = true;
         return Uint8List.fromList([]);
       });
     });
-    return null != value
-        ? 0 < value!.length
-            ? value
-            : null
-        : null;
+    if (null != value && !error) {
+      lastRawValue = value;
+      return value;
+    }
+    return null;
   }
 
   Future<void> write(
@@ -134,6 +142,7 @@ abstract class BleCharacteristic<T> with Debug {
     await _exclusiveAccess.protect(() async {
       _subscription = _rawStream?.listen(
         (value) async {
+          lastRawValue = value;
           lastValue = await onNotify(fromUint8List(value));
           //debugLog("$lastValue");
           util.streamSendIfNotClosed(_controller, lastValue);
@@ -164,12 +173,16 @@ abstract class BleCharacteristic<T> with Debug {
 
   Future<void> _init() async {
     if (_characteristic != null) return; // already init'd
-    if (!(await _peripheral.isConnected())) return;
+    if (null == device.peripheral) {
+      debugLog("_init(): peripheral is null");
+      return;
+    }
+    if (!(await device.peripheral!.isConnected())) return;
     try {
       //_characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
       List<Characteristic> chars = [];
       await _exclusiveAccess.protect(() async {
-        chars = await _peripheral.characteristics(serviceUUID);
+        chars = await device.peripheral!.characteristics(serviceUUID);
       });
       _characteristic = chars.firstWhere((char) => char.uuid == charUUID);
     } catch (e) {
@@ -199,7 +212,7 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
   final serviceUUID = BleConstants.BATTERY_SERVICE_UUID;
   final charUUID = BleConstants.BATTERY_LEVEL_CHAR_UUID;
 
-  BatteryCharacteristic(Peripheral peripheral) : super(peripheral) {
+  BatteryCharacteristic(Device device) : super(device) {
     histories['charge'] = CharacteristicHistory<int>(3600, 3600);
   }
 
@@ -237,7 +250,7 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
   final _cadenceController = StreamController<int>.broadcast();
   Stream<int> get cadenceStream => _cadenceController.stream;
 
-  PowerCharacteristic(Peripheral peripheral) : super(peripheral) {
+  PowerCharacteristic(Device device) : super(device) {
     histories['power'] = CharacteristicHistory<int>(3600, 3600);
     histories['cadence'] = CharacteristicHistory<int>(3600, 3600);
   }
@@ -327,11 +340,11 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
   Characteristic? _rxChar;
 
   ApiCharacteristic(
-    Peripheral peripheral, {
+    Device device, {
     this.serviceUUID = "",
     this.txCharUUID = BleConstants.API_TXCHAR_UUID,
     this.rxCharUUID = BleConstants.API_RXCHAR_UUID,
-  }) : super(peripheral);
+  }) : super(device);
 
   @override
   String fromUint8List(Uint8List list) => String.fromCharCodes(list);
@@ -369,11 +382,15 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
   Future<void> _init() async {
     //await super._init();
     if (_rxChar != null || _characteristic != null) return; // already init'd
-    if (!(await _peripheral.isConnected())) return;
+    if (null == device.peripheral) {
+      debugLog("_init(): peripheral is null");
+      return;
+    }
+    if (!(await device.peripheral!.isConnected())) return;
     try {
       List<Characteristic> chars = [];
       await _exclusiveAccess.protect(() async {
-        chars = await _peripheral.characteristics(serviceUUID);
+        chars = await device.peripheral!.characteristics(serviceUUID);
       });
       if (chars.where((char) => char.uuid == rxCharUUID).isNotEmpty) {
         _rxChar = chars.firstWhere((char) => char.uuid == rxCharUUID);
@@ -396,31 +413,30 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
   }
 
   @override
-  Future<String?> onNotify(String value) {
-    if (value.length < 20) return Future.value(value);
-    // read full value as the notification is limited to 20 bytes
-    return read();
+  Future<String?> onNotify(String value) async {
+    if (null != device.mtu && 0 < device.mtu! && value.length < device.mtu! - 3) return value;
+    // read full value as the notification is limited to the size of one packet
+    String? fullValue = await read();
+    debugLog("ApiCharacteristic::onNotify() mtu=${device.mtu} value(${value.length}) fullValue(${fullValue?.length})");
+    return fullValue;
   }
 }
 
 class EspmApiCharacteristic extends ApiCharacteristic {
   EspmApiCharacteristic(
-    Peripheral peripheral,
-  ) : super(peripheral, serviceUUID: BleConstants.ESPM_API_SERVICE_UUID);
+    Device device,
+  ) : super(device, serviceUUID: BleConstants.ESPM_API_SERVICE_UUID);
 }
 
 class EspccApiCharacteristic extends ApiCharacteristic {
-  ESPCC device;
-  EspccApiCharacteristic(
-    Peripheral peripheral, {
-    required this.device,
-  }) : super(peripheral, serviceUUID: BleConstants.ESPCC_API_SERVICE_UUID);
+  ESPCC get device => super.device as ESPCC;
+  EspccApiCharacteristic(Device device) : super(device, serviceUUID: BleConstants.ESPCC_API_SERVICE_UUID);
 
   @override
   Future<String?> onNotify(String value) async {
     // do not read the binary data after "success;rec=get:01231234:0;"
-    String tag = "onNotify:";
-    debugLog("$tag '$value'");
+    String tag = "EspccApiCharacteristic::onNotify:";
+    //debugLog("$tag '$value'");
     final int success = ApiResult.success;
     final int? rec = device.api.commandCode("rec");
     if (null == rec) {
@@ -432,7 +448,11 @@ class EspccApiCharacteristic extends ApiCharacteristic {
     String? noBinary = match?.group(1);
     if (null != noBinary && 0 < noBinary.length) {
       debugLog("$tag found match: '$noBinary'");
-      Uint8List? valueAsList = await readAsUint8List();
+      Uint8List? valueAsList;
+      if (null != device.mtu && 0 < device.mtu! && null != lastRawValue && lastRawValue!.length < device.mtu! - 5)
+        valueAsList = lastRawValue;
+      else
+        valueAsList = await readAsUint8List();
       if (null == valueAsList || 0 == valueAsList.length) {
         debugLog("$tag could not get valueAsList");
         return super.onNotify(noBinary);
@@ -460,7 +480,7 @@ class EspccApiCharacteristic extends ApiCharacteristic {
         return super.onNotify(noBinary);
       }
       Uint8List byteData = Uint8List.sublistView(valueAsList, binaryStart);
-      debugLog("$tag file: $fileName, offset: $offset, byteData: $byteData");
+      debugLog("$tag file: $fileName, offset: $offset, byteData: ${byteData.length}B");
       ESPCCFile f = device.files.value.files.firstWhere(
         (candidate) => candidate.name == fileName,
         orElse: () {
@@ -484,7 +504,7 @@ class WeightScaleCharacteristic extends BleCharacteristic<double> {
   final serviceUUID = BleConstants.WEIGHT_SCALE_SERVICE_UUID;
   final charUUID = BleConstants.WEIGHT_MEASUREMENT_CHAR_UUID;
 
-  WeightScaleCharacteristic(Peripheral peripheral) : super(peripheral) {
+  WeightScaleCharacteristic(Device device) : super(device) {
     histories['measurement'] = CharacteristicHistory<double>(360, 60);
   }
 
@@ -510,7 +530,7 @@ class HallCharacteristic extends BleCharacteristic<int> {
   final serviceUUID = BleConstants.ESPM_API_SERVICE_UUID;
   final charUUID = BleConstants.ESPM_HALL_CHAR_UUID;
 
-  HallCharacteristic(Peripheral peripheral) : super(peripheral);
+  HallCharacteristic(Device device) : super(device);
 
   @override
   int fromUint8List(Uint8List list) {
@@ -526,7 +546,7 @@ class HeartRateCharacteristic extends BleCharacteristic<int> {
   final serviceUUID = BleConstants.HEART_RATE_SERVICE_UUID;
   final charUUID = BleConstants.HEART_RATE_MEASUREMENT_CHAR_UUID;
 
-  HeartRateCharacteristic(Peripheral peripheral) : super(peripheral) {
+  HeartRateCharacteristic(Device device) : super(device) {
     histories['measurement'] = CharacteristicHistory<int>(120, 120);
   }
 

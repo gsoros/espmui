@@ -1093,6 +1093,7 @@ class EspccSync extends StatelessWidget with Debug {
             0,
             100,
           ).toInt();
+          //debugLog("${f.name}: isQueued: $isQueued, isDownloading: $isDownloading, isDownloadable: $isDownloadable, downloadedPercent: $downloadedPercent");
           if (isQueued) {
             actions.add(EspmuiElevatedButton(
               child: Wrap(children: [

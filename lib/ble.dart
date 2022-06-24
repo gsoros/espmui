@@ -8,6 +8,7 @@ import 'package:mutex/mutex.dart';
 
 import 'util.dart';
 import 'debug.dart';
+import 'device.dart';
 //import 'scanner.dart';
 
 /// singleton class
@@ -175,16 +176,21 @@ class BLE with Debug {
     });
   }
 
-  Future<int> requestMtu(Peripheral peripheral, int mtu) async {
-    String call = "requestMtu(${peripheral.name}, $mtu)";
+  Future<int?> requestMtu(Device device, int mtuRequest) async {
+    String call = "requestMtu(${device.peripheral?.name}, $mtuRequest)";
     //debugLog("$call");
+    if (null == device.peripheral) {
+      debugLog("requestMtu: peripheral is null");
+      return null;
+    }
     await _exclusiveAccess.protect(() async {
-      int result = await peripheral.requestMtu(mtu).catchError((e) {
+      int result = await device.peripheral!.requestMtu(mtuRequest).catchError((e) {
         bleError(debugTag, call, e);
         return 0;
-      }).then((mtu) {
-        debugLog("$call got MTU=$mtu");
-        return mtu;
+      }).then((newMtu) {
+        debugLog("$call got MTU=$newMtu");
+        device.mtu = newMtu;
+        return newMtu;
       });
       return result;
     });

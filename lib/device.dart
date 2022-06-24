@@ -39,6 +39,9 @@ class Device with Debug {
   /// Signal strength in dBm at the time of the last scan
   int lastScanRssi = 0;
 
+  /// the received mtu size, if requested
+  int? mtu;
+
   String? get name => peripheral?.name;
   set name(String? name) => peripheral?.name = name;
   String get identifier => peripheral?.identifier ?? "";
@@ -72,7 +75,7 @@ class Device with Debug {
     debugLog("construct");
     if (null != peripheral)
       _characteristics.addAll({
-        'battery': CharacteristicListItem(BatteryCharacteristic(peripheral!)),
+        'battery': CharacteristicListItem(BatteryCharacteristic(this)),
       });
     tileStreams.addAll({
       "battery": DeviceTileStream(
@@ -305,6 +308,7 @@ class Device with Debug {
     if (!await discovered()) return;
     await _characteristics.forEachListItem((_, item) async {
       if (item.subscribeOnConnect) {
+        if (null == item.characteristic) return;
         debugLog('_subscribeCharacteristics ${item.characteristic?.charUUID} start');
         await item.characteristic?.subscribe();
         debugLog('_subscribeCharacteristics ${item.characteristic?.charUUID} end');
@@ -401,7 +405,7 @@ class PowerMeter extends Device {
 
   PowerMeter(Peripheral peripheral) : super(peripheral) {
     _characteristics.addAll({
-      'power': CharacteristicListItem(PowerCharacteristic(peripheral)),
+      'power': CharacteristicListItem(PowerCharacteristic(this)),
     });
     tileStreams.addAll({
       "power": DeviceTileStream(
@@ -470,14 +474,14 @@ class ESPM extends PowerMeter {
   ESPM(Peripheral peripheral) : super(peripheral) {
     _characteristics.addAll({
       'api': CharacteristicListItem(
-        EspmApiCharacteristic(peripheral),
+        EspmApiCharacteristic(this),
       ),
       'weightScale': CharacteristicListItem(
-        WeightScaleCharacteristic(peripheral),
+        WeightScaleCharacteristic(this),
         subscribeOnConnect: false,
       ),
       'hall': CharacteristicListItem(
-        HallCharacteristic(peripheral),
+        HallCharacteristic(this),
         subscribeOnConnect: false,
       ),
     });
@@ -667,9 +671,8 @@ class ESPM extends PowerMeter {
 
   Future<void> _onConnected() async {
     debugLog("_onConnected()");
-    if (null == peripheral) return;
     // api char can use values longer than 20 bytes
-    await BLE().requestMtu(peripheral!, 512);
+    await BLE().requestMtu(this, 512);
     await super._onConnected();
     _requestInit();
   }
@@ -751,7 +754,7 @@ class ESPCC extends Device {
   ESPCC(Peripheral peripheral) : super(peripheral) {
     _characteristics.addAll({
       'api': CharacteristicListItem(
-        EspccApiCharacteristic(peripheral, device: this),
+        EspccApiCharacteristic(this),
       ),
     });
     api = Api(this);
@@ -1094,9 +1097,8 @@ class ESPCC extends Device {
 
   Future<void> _onConnected() async {
     debugLog("_onConnected()");
-    if (null == peripheral) return;
     // api char can use values longer than 20 bytes
-    await BLE().requestMtu(peripheral!, 512);
+    await BLE().requestMtu(this, 512);
     await super._onConnected();
     _requestInit();
   }
@@ -1145,7 +1147,7 @@ class HeartRateMonitor extends Device {
 
   HeartRateMonitor(Peripheral peripheral) : super(peripheral) {
     _characteristics.addAll({
-      'heartRate': CharacteristicListItem(HeartRateCharacteristic(peripheral)),
+      'heartRate': CharacteristicListItem(HeartRateCharacteristic(this)),
     });
     tileStreams.addAll({
       "heartRate": DeviceTileStream(
@@ -1271,6 +1273,7 @@ class ESPCCFile with Debug {
   int altGain;
   ExtendedBool remoteExists;
   ExtendedBool localExists;
+  bool _generatingGpx = false;
 
   /// flag for syncer queue
   bool cancelDownload = false;
@@ -1366,6 +1369,119 @@ class ESPCCFile with Debug {
   /// any file with a dot in the name is treated as non-binary :)
   bool get isBinary => name.indexOf(".") < 0;
 
+  bool get isRec => isBinary;
+
+  bool get isGpx => 0 < name.indexOf(".gpx");
+
+  Future<bool> generateGpx({bool overwrite = false}) async {
+    String tag = "ESPCCFile::generateGpx() $name";
+    if (_generatingGpx) {
+      debugLog("$tag already generating");
+      return false;
+    }
+    _generatingGpx = true;
+    if (!isRec) {
+      debugLog("$tag not a rec file");
+      _generatingGpx = false;
+      return false;
+    }
+    File? f = await getLocal();
+    if (null == f) {
+      debugLog("$tag could not get local file");
+      _generatingGpx = false;
+      return false;
+    }
+    if (!await f.exists()) {
+      debugLog("$tag local file does not exist");
+      _generatingGpx = false;
+      return false;
+    }
+    if (await f.length() <= 0) {
+      debugLog("$tag local file has no size");
+      _generatingGpx = false;
+      return false;
+    }
+    String? p = await path;
+    if (null == p || p.length < 5) {
+      debugLog("$tag could not get path");
+      _generatingGpx = false;
+      return false;
+    }
+    String gpxPath = "$p.gpx";
+    File g = File(gpxPath);
+    if (await g.exists() && !overwrite) {
+      debugLog("$tag gpx already exists, not overwriting");
+      _generatingGpx = false;
+      return false;
+    }
+    int size = await f.length();
+    var point = ESPCCDataPoint();
+    int chunkSize = point.sizeInBytes;
+    int toRead = 0;
+    int cursor = 0;
+    int pointsWritten = 0;
+    bool done = false;
+    // TODO lock file
+    while (!done) {
+      point = ESPCCDataPoint();
+      toRead = chunkSize;
+      if (size < cursor + chunkSize) {
+        toRead = size - cursor;
+        done = true;
+      }
+      if (toRead <= 0) {
+        done = true;
+        continue;
+      }
+      debugLog("$tag size: $size, cursor: $cursor, toRead: $toRead");
+      var raf = await f.open(mode: FileMode.read);
+      raf = await raf.setPosition(cursor);
+      point.fromList(await raf.read(toRead));
+      await raf.close();
+      if (0 == pointsWritten) {
+        await g.writeAsString(
+          _pointToGpxHeader(point),
+          mode: FileMode.write, // truncate to zero
+          flush: true,
+        );
+      }
+      await g.writeAsString(
+        _pointToGpx(point),
+        mode: FileMode.append,
+        flush: true,
+      );
+      cursor += toRead;
+      pointsWritten++;
+    }
+    if (0 < pointsWritten) {
+      await g.writeAsString(
+        _gpxFooter(),
+        mode: FileMode.append,
+        flush: true,
+      );
+    }
+    _generatingGpx = false;
+    return true;
+  }
+
+  String _pointToGpxHeader(ESPCCDataPoint p) {
+    String s = "header ${p.time}\n";
+    debugLog(s);
+    return s;
+  }
+
+  String _pointToGpx(ESPCCDataPoint p) {
+    String s = "  point (${p.debug}) ${p.time} ${p.lat} ${p.lon} ${p.alt} ${p.power} ${p.cadence} ${p.heartrate} \n";
+    debugLog(s);
+    return s;
+  }
+
+  String _gpxFooter() {
+    String s = "footer";
+    debugLog(s);
+    return s;
+  }
+
   void update({
     String? name,
     ESPCC? device,
@@ -1422,6 +1538,132 @@ class ESPCCFile with Debug {
         "local: $localExists "
         ")";
   }
+}
+
+/*
+    struct DataPoint {
+        byte flags = 0;           // length: 1;
+        time_t time = 0;          // length: 4; unit: seconds; UTS
+        double lat = 0.0;         // length: 8; GCS latitude 0°... 90˚
+        double lon = 0.0;         // length: 8; GCS longitude 0°... 180˚
+        int16_t altitude = 0;     // length: 2; unit: m
+        uint16_t power = 0;       // length: 2; unit: W
+        uint8_t cadence = 0;      // length: 1; unit: rpm
+        uint8_t heartrate = 0;    // length: 1; unit: bpm
+        int16_t temperature = 0;  // length: 2; unit: ˚C / 10; unused
+    };
+*/
+class ESPCCDataPoint with Debug {
+  static const String _tag = "ESPCCDataPoint";
+  static const Endian _endian = Endian.little;
+
+  var _flags = Uint8List(1);
+  var _time = Uint8List(4);
+  var _lat = Uint8List(8);
+  var _lon = Uint8List(8);
+  var _alt = Uint8List(2);
+  var _power = Uint8List(2);
+  var _cadence = Uint8List(1);
+  var _heartrate = Uint8List(1);
+  var _temperature = Uint8List(2);
+
+  bool fromList(Uint8List bytes) {
+    String tag = "$_tag fromList()";
+    if (bytes.length < sizeInBytes) {
+      debugLog("$tag incorrect length: ${bytes.length}, need at least $sizeInBytes");
+      return false;
+    }
+    debugLog("$tag $bytes");
+    int cursor = 0;
+    _flags = bytes.sublist(cursor, cursor + 1);
+    cursor += 1;
+    _time = bytes.sublist(cursor, cursor + 4);
+    cursor += 4;
+    if (hasLocation) _lat = bytes.sublist(cursor, cursor + 8);
+    cursor += 8;
+    if (hasLocation) _lon = bytes.sublist(cursor, cursor + 8);
+    cursor += 8;
+    if (hasAltitude) _alt = bytes.sublist(cursor, cursor + 2);
+    cursor += 2;
+    if (hasPower) _power = bytes.sublist(cursor, cursor + 2);
+    cursor += 2;
+    if (hasCadence) _cadence = bytes.sublist(cursor, cursor + 1);
+    cursor += 1;
+    if (hasHeartrate) _heartrate = bytes.sublist(cursor, cursor + 1);
+    cursor += 1;
+    if (hasTemperature) _temperature = bytes.sublist(cursor, cursor + 2);
+    return true;
+  }
+
+  bool get hasLocation => 0 < _flags[0] & ESPCCDataPointFlags.location;
+  bool get hasAltitude => 0 < _flags[0] & ESPCCDataPointFlags.altitude;
+  bool get hasPower => 0 < _flags[0] & ESPCCDataPointFlags.power;
+  bool get hasCadence => 0 < _flags[0] & ESPCCDataPointFlags.cadence;
+  bool get hasHeartrate => 0 < _flags[0] & ESPCCDataPointFlags.heartrate;
+  bool get hasTemperature => 0 < _flags[0] & ESPCCDataPointFlags.temperature;
+  bool get hasLap => 0 < _flags[0] & ESPCCDataPointFlags.lap;
+
+  int get flags => _flags.buffer.asByteData().getUint8(0);
+  int get time => _time.buffer.asByteData().getInt32(0, _endian);
+  double get lat => _lat.buffer.asByteData().getFloat64(0, _endian);
+  double get lon => _lon.buffer.asByteData().getFloat64(0, _endian);
+  int get alt => _alt.buffer.asByteData().getInt16(0, _endian);
+  int get power => _power.buffer.asByteData().getUint16(0, _endian);
+  int get cadence => _cadence.buffer.asByteData().getUint8(0);
+  int get heartrate => _power.buffer.asByteData().getUint8(0);
+  int get temperature => _power.buffer.asByteData().getInt16(0, _endian);
+
+  String get debug => "flags: ${_flags.toList()}, time: ${_time.toList()}, ";
+
+  /*
+  set flags(int v) {
+    if (v < 0 || 255 < v) {
+      debugLog("$_tag set flags out of range: $v");
+      return;
+    }
+    _flags.buffer.asByteData().setUint8(0, v);
+  }
+  set time(int v) {
+    if (v < -2147483648 || 2147483647 < v) {
+      debugLog("$_tag set time out of range: $v");
+      return;
+    }
+    _time.buffer.asByteData().setInt32(0, v, _endian);
+  }
+  ...
+  */
+
+  int get sizeInBytes =>
+      _flags.length + //
+      _time.length +
+      _lat.length +
+      _lon.length +
+      _alt.length +
+      _power.length +
+      _cadence.length +
+      _heartrate.length +
+      _temperature.length;
+}
+
+/*
+    struct Flags {
+        const byte location = 1;
+        const byte altitude = 2;
+        const byte power = 4;
+        const byte cadence = 8;
+        const byte heartrate = 16;
+        const byte temperature = 32;  // unused
+        const byte lap = 64;          // unused
+    } const Flags;
+*/
+class ESPCCDataPointFlags {
+  static const int location = 1;
+  static const int altitude = 2;
+  static const int power = 4;
+  static const int cadence = 8;
+  static const int heartrate = 16;
+  static const int temperature = 32;
+  static const int lap = 64;
 }
 
 class ESPCCFileList {
