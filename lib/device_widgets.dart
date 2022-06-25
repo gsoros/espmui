@@ -1038,6 +1038,10 @@ class EspccTouchEditor extends StatelessWidget with Debug {
                     min: 0.0,
                     max: 100.0,
                     onChanged: (newValue) {
+                      //debugLog("$k changed to $newValue");
+                      device.settings.value.touchThres[k] = newValue.toInt();
+                    },
+                    onChangeEnd: (newValue) {
                       String thres = "";
                       device.settings.value.touchThres.forEach((key, value) {
                         if (0 < thres.length) thres += ",";

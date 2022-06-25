@@ -7,6 +7,8 @@ import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
 //import 'package:flutter/painting.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:sprintf/sprintf.dart';
+//import 'package:intl/intl.dart';
 
 import 'ble_constants.dart';
 import 'ble.dart';
@@ -1407,10 +1409,10 @@ class ESPCCFile with Debug {
       _generatingGpx = false;
       return false;
     }
-    String gpxPath = "$p.gpx";
+    String gpxPath = "$p-local.gpx";
     File g = File(gpxPath);
     if (await g.exists() && !overwrite) {
-      debugLog("$tag gpx already exists, not overwriting");
+      debugLog("$tag $gpxPath already exists, not overwriting");
       _generatingGpx = false;
       return false;
     }
@@ -1465,20 +1467,78 @@ class ESPCCFile with Debug {
   }
 
   String _pointToGpxHeader(ESPCCDataPoint p) {
-    String s = "header ${p.time}\n";
-    debugLog(s);
+    const String header = """<?xml version="1.0" encoding="UTF-8"?>
+<gpx creator="espmui" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd http://www.garmin.com/xmlschemas/GpxExtensions/v3 http://www.garmin.com/xmlschemas/GpxExtensionsv3.xsd http://www.garmin.com/xmlschemas/TrackPointExtension/v1 http://www.garmin.com/xmlschemas/TrackPointExtensionv1.xsd" version="1.1" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3">
+  <metadata>
+    <time>%s</time>
+  </metadata>
+  <trk>
+    <name>ride</name>
+    <type>1</type>
+    <trkseg>""";
+    String s = sprintf(header, [p.timeAsIso8601]);
+    //debugLog(s);
     return s;
   }
 
   String _pointToGpx(ESPCCDataPoint p) {
-    String s = "  point (${p.debug}) ${p.time} ${p.lat} ${p.lon} ${p.alt} ${p.power} ${p.cadence} ${p.heartrate} \n";
-    debugLog(s);
+    const String pointFormat = """
+
+      <trkpt%s>
+        <time>%s</time>%s%s
+      </trkpt>""";
+    const String locationFormat = ' lat="%.7f" lon="%.7f"';
+    const String altFormat = """
+
+        <ele>%d</ele>""";
+    const String extFormat = """
+
+        <extensions>%s%s
+        </extensions>""";
+    const String powerFormat = """
+
+          <power>%d</power>""";
+    const String tpxFormat = """
+
+          <gpxtpx:TrackPointExtension>%s%s
+          </gpxtpx:TrackPointExtension>""";
+    const String hrFormat = """
+
+            <gpxtpx:hr>%d</gpxtpx:hr>""";
+    const String cadFormat = """
+
+            <gpxtpx:cad>%d</gpxtpx:cad>""";
+
+    bool hasTpx = p.hasHeartrate || p.hasCadence;
+    bool hasExt = p.hasPower || hasTpx;
+
+    final String s = sprintf(pointFormat, [
+      p.hasLocation ? sprintf(locationFormat, [p.lat, p.lon]) : "",
+      p.timeAsIso8601,
+      p.hasAltitude ? sprintf(altFormat, [p.alt]) : "",
+      hasExt
+          ? sprintf(extFormat, [
+              p.hasPower ? sprintf(powerFormat, [p.power]) : "",
+              hasTpx
+                  ? sprintf(tpxFormat, [
+                      p.hasHeartrate ? sprintf(hrFormat, [p.heartrate]) : "",
+                      p.hasCadence ? sprintf(cadFormat, [p.cadence]) : "",
+                    ])
+                  : "",
+            ])
+          : "",
+    ]);
+    //debugLog(s);
     return s;
   }
 
   String _gpxFooter() {
-    String s = "footer";
-    debugLog(s);
+    const String s = """
+
+    </trkseg>
+  </trk>
+</gpx>""";
+    //debugLog(s);
     return s;
   }
 
@@ -1610,8 +1670,14 @@ class ESPCCDataPoint with Debug {
   int get alt => _alt.buffer.asByteData().getInt16(0, _endian);
   int get power => _power.buffer.asByteData().getUint16(0, _endian);
   int get cadence => _cadence.buffer.asByteData().getUint8(0);
-  int get heartrate => _power.buffer.asByteData().getUint8(0);
+  int get heartrate => _heartrate.buffer.asByteData().getUint8(0);
   int get temperature => _power.buffer.asByteData().getInt16(0, _endian);
+
+  /// example: 2022-03-25T12:58:13Z
+  // String get timeAsIso8601 => DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true));
+
+  /// example: 2022-03-25T12:58:13.000Z
+  String get timeAsIso8601 => DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true).toIso8601String();
 
   String get debug => "flags: ${_flags.toList()}, time: ${_time.toList()}, ";
 
