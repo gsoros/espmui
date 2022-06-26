@@ -15,6 +15,8 @@ import 'util.dart' as util;
 import 'ble.dart';
 import 'ble_constants.dart';
 import 'device.dart';
+import 'espm.dart';
+import 'espcc.dart';
 
 abstract class BleCharacteristic<T> with Debug {
   Device device;
@@ -399,7 +401,7 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
         _characteristic = chars.firstWhere((char) => char.uuid == txCharUUID);
       }
     } catch (e) {
-      bleError(debugTag, "_init() readCharacteristic()", e);
+      bleError(debugTag, "_init() characteristics()", e);
       _rxChar = null;
       _characteristic = null;
     }
@@ -423,9 +425,8 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
 }
 
 class EspmApiCharacteristic extends ApiCharacteristic {
-  EspmApiCharacteristic(
-    Device device,
-  ) : super(device, serviceUUID: BleConstants.ESPM_API_SERVICE_UUID);
+  ESPM get device => super.device as ESPM;
+  EspmApiCharacteristic(Device device) : super(device, serviceUUID: BleConstants.ESPM_API_SERVICE_UUID);
 }
 
 class EspccApiCharacteristic extends ApiCharacteristic {

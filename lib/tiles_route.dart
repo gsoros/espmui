@@ -397,7 +397,7 @@ class _TileGridState extends State<TileGrid> with Debug {
                 ),
               );
 
-            var sourceDropdown = EspmuiDropdown(
+            var sourceDropdown = EspmuiDropdownWidget(
               value: valuePresent ? value : "",
               items: items,
               onChanged: (value) {
@@ -511,7 +511,7 @@ class _TileGridState extends State<TileGrid> with Debug {
                 child: Text("No Tap Action"),
               ),
             );
-            return EspmuiDropdown(
+            return EspmuiDropdownWidget(
               value: valuePresent ? tile.tap : "",
               items: items,
               onChanged: (value) {

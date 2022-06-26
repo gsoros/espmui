@@ -159,6 +159,7 @@ class ApiMessage with Debug {
       resultStr = "ClientError";
       info = "Unrecognized command";
       isDone = true;
+      debugLog("parseCommand() failed: $command");
     }
     //debugLog("parsed: " + toString());
   }
@@ -231,18 +232,29 @@ class Api with Debug {
   ApiCharacteristic? get characteristic => device.characteristic("api") as ApiCharacteristic?;
   late StreamSubscription<String>? _subscription;
   final _doneController = StreamController<ApiMessage>.broadcast();
-  Stream<ApiMessage> get messageDoneStream => _doneController.stream;
+  Stream<ApiMessage> get messageSuccessStream => _doneController.stream;
   final _queue = Queue<ApiMessage>();
   bool _running = false;
   Timer? _timer;
   final int queueDelayMs;
 
-  Map<int, String> commands = {1: "init"};
-  int? commandCode(String s) => commands.containsValue(s) ? commands.keys.firstWhere((k) => commands[k] == s) : null;
-  String? commandStr(int commandCode) => commands.containsKey(commandCode) ? commands[commandCode] : null;
+  final Map<int, String> _initialCommands = {1: "init"};
+  Map<int, String> commands = {};
+
+  int? commandCode(String s) {
+    if (commands.containsValue(s)) return commands.keys.firstWhere((k) => commands[k] == s);
+    debugLog("code not found for command $s");
+    return null;
+  }
+
+  String? commandStr(int code) {
+    if (commands.containsKey(code)) return commands[code];
+    debugLog("str not found for command code $code");
+    return null;
+  }
 
   Api(this.device, {this.queueDelayMs = 200}) {
-    //_characteristic?.subscribe();
+    commands.addAll(_initialCommands);
     _subscription = characteristic?.defaultStream.listen((reply) => _onNotify(reply));
   }
 
@@ -323,10 +335,7 @@ class Api with Debug {
         debugLog("_onNotify() commandStr is null");
         return;
       }
-      var m = ApiMessage(
-        this,
-        cStr,
-      );
+      var m = ApiMessage(this, cStr);
       m.commandStr = cStr;
       m.commandCode = commandCode;
       m.resultCode = resultCode;
@@ -337,13 +346,114 @@ class Api with Debug {
     }
   }
 
-  void _onDone(ApiMessage message) {
-    //debugLog("_onDone $message");
+  Future<void> _onDone(ApiMessage message) async {
+    // debugLog("_onDone $message");
+    if (null != message.onDone) {
+      var onDone = message.onDone;
+      message.onDone = null;
+      onDone!(message);
+    }
+    if (message.resultCode != ApiResult.success) return;
+    if (await handleApiMessageSuccess(message)) return;
     streamSendIfNotClosed(_doneController, message);
-    if (null == message.onDone) return;
-    var onDone = message.onDone;
-    message.onDone = null;
-    onDone!(message);
+  }
+
+  /// returns true if the message does not need any further handling
+  Future<bool> handleApiMessageSuccess(ApiMessage message) async {
+    //debugLog("handleApiMessageSuccess $message");
+
+    if ("init" == message.commandStr) {
+      if (null == message.value) {
+        debugLog("init value null");
+        return true;
+      }
+      List<String> tokens = message.value!.split(";");
+      tokens.forEach((token) {
+        int? code;
+        String? command;
+        String? value;
+        List<String> parts = token.split("=");
+        if (parts.length == 1) {
+          //debugLog("parts.length == 1; $parts");
+          value = null;
+        } else
+          value = parts[1];
+        List<String> c = parts[0].split(":");
+        if (c.length != 2) {
+          //debugLog("c.length != 2; $c");
+          return;
+        }
+        code = int.tryParse(c[0]);
+        command = c[1];
+        //debugLog("handleApiMessageSuccess() init: $code:$command=$value");
+
+        if (null == code) {
+          debugLog("code is null");
+        } else if (commands.containsKey(code) && commands[code] == command) {
+          // debugLog("skipping already existing command $command ($code)");
+        } else if (commands.containsKey(code)) {
+          debugLog("command code already exists: $code");
+        } else if (commands.containsValue(command)) {
+          debugLog("command already exists: $command");
+        } else {
+          debugLog("handleApiMessageSuccess: adding command $command ($code)");
+          commands.addAll({code: command});
+        }
+
+        if (null == value) {
+          //debugLog("value is null");
+          //} else if (value.length < 1) {
+          //  //debugLog("value is empty");
+        } else {
+          // generate a message
+          ApiMessage m = ApiMessage(this, command);
+          m.resultCode = ApiResult.success;
+          m.commandCode = code;
+          m.commandStr = command;
+          m.value = value;
+          m.isDone = true;
+          // call the message done processor
+          _onDone(m);
+        }
+      });
+      return true;
+    }
+
+    if ("system" == message.commandStr) {
+      String? v = message.valueAsString;
+      if (null == v) return false;
+
+      if (0 == v.indexOf("hostname:")) {
+        String name = v.substring("hostname:".length);
+        if (0 < name.length) {
+          device.name = name;
+          debugLog("device name: $name");
+        }
+        return true;
+      }
+
+      if (0 == v.indexOf("build:")) {
+        debugLog(v);
+        return true;
+      }
+
+      if (0 == v.indexOf("reboot")) {
+        snackbar("Rebooting...");
+        device.disconnect();
+        await Future.delayed(Duration(seconds: 2));
+        device.connect();
+        return true;
+      }
+
+      return false;
+    }
+
+    if ("bat" == message.commandStr) {
+      debugLog("battery: ${message.valueAsString}");
+      return true;
+    }
+
+    return false;
   }
 
   /// Sends a command to the API.
@@ -422,6 +532,7 @@ class Api with Debug {
       minDelayMs: minDelayMs,
       maxAgeMs: maxAgeMs,
     );
+    //debugLog("requestResultCode: $message");
     await isDone(message);
     return message.resultCode;
   }
@@ -492,6 +603,14 @@ class Api with Debug {
     if (arg != null) toWrite += "=$arg";
     //debugLog("_send() calling char.write($toWrite)");
     characteristic?.write(toWrite);
+  }
+
+  void reset() {
+    _stopQueueSchedule();
+    _queue.clear();
+    commands.clear();
+    commands.addAll(_initialCommands);
+    debugLog("reset() commands: $commands");
   }
 
   Future<void> destruct() async {

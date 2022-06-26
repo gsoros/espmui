@@ -11,6 +11,8 @@ import 'ble.dart';
 import 'device.dart';
 import 'device_list.dart';
 import 'device_widgets.dart';
+import 'espm.dart';
+import 'espcc.dart';
 
 class DeviceRoute extends StatefulWidget with Debug {
   final Device device;
@@ -94,7 +96,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
           valueListenable: device.autoConnect,
           builder: (_, value, __) {
             //debugLog("autoconnect changed: $value");
-            return SettingSwitch(
+            return SettingSwitchWidget(
               name: "Auto Connect",
               value: extendedBoolFrom(value),
               onChanged: (value) {
@@ -106,7 +108,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
         colSpan: 6,
       ),
       StaggeredGridItem(
-        value: Battery(device),
+        value: BatteryWidget(device),
         colSpan: 2,
       ),
     ];
@@ -161,11 +163,11 @@ class PowerMeterRouteState extends DeviceRouteState {
   _devicePropertyItems() {
     return [
       StaggeredGridItem(
-        value: PowerCadence(powerMeter, mode: "power"),
+        value: PowerCadenceWidget(powerMeter, mode: "power"),
         colSpan: 3,
       ),
       StaggeredGridItem(
-        value: PowerCadence(powerMeter, mode: "cadence"),
+        value: PowerCadenceWidget(powerMeter, mode: "cadence"),
         colSpan: 3,
       ),
     ]..addAll(super._devicePropertyItems());
@@ -182,11 +184,11 @@ class ESPMRouteState extends PowerMeterRouteState {
     return super._devicePropertyItems()
       ..addAll([
         StaggeredGridItem(
-          value: EspmWeightScale(espm),
+          value: EspmWeightScaleWidget(espm),
           colSpan: 2,
         ),
         StaggeredGridItem(
-          value: EspmHallSensor(espm),
+          value: EspmHallSensorWidget(espm),
           colSpan: 2,
         ),
         StaggeredGridItem(
@@ -223,7 +225,7 @@ class HeartRateMonitorRouteState extends DeviceRouteState {
   _devicePropertyItems() {
     return [
       StaggeredGridItem(
-        value: HeartRate(hrm),
+        value: HeartRateWidget(hrm),
         colSpan: 3,
       ),
     ]..addAll(super._devicePropertyItems());

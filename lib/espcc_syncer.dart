@@ -3,7 +3,7 @@ import 'dart:collection';
 //import 'dart:io';
 //import 'dart:developer' as dev;
 
-import 'device.dart';
+import 'espcc.dart';
 import 'util.dart';
 import 'debug.dart';
 
