@@ -68,7 +68,8 @@ class ESPCC extends Device {
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    //debugLog("handleApiDoneMessage $message");
+    String tag = "handleApiMessageSuccess()";
+    //debugLog("$tag $message");
 
     if (await wifiSettings.value.handleApiMessageSuccess(message)) {
       wifiSettings.notifyListeners();
@@ -82,18 +83,18 @@ class ESPCC extends Device {
 
     if ("rec" == message.commandStr) {
       String? val = message.valueAsString;
-      //debugLog("_onApiDone() rec: received val=$val");
+      //debugLog("$tag rec: received val=$val");
       if (null == val) return true;
       if ("files:" == val.substring(0, min(6, val.length))) {
         List<String> names = val.substring(6).split(";");
-        debugLog("_onApiDone() rec: received names=$names");
+        debugLog("$tag rec:files received names=$names");
         names.forEach((name) async {
           if (16 < name.length) {
-            debugLog("_onApiDone() rec:name too long: $name");
+            debugLog("$tag rec:files name too long: $name");
             return;
           }
           if (name.length <= 2) {
-            debugLog("_onApiDone() rec:name too short: $name");
+            debugLog("$tag rec:files name too short: $name");
             return;
           }
           ESPCCFile f = files.value.files.firstWhere(
@@ -111,7 +112,7 @@ class ESPCC extends Device {
           );
           if (f.remoteSize < 0) {
             api.requestResultCode("rec=info:${f.name}", expectValue: "info:${f.name}");
-            await Future.delayed(Duration(seconds: 1));
+            await Future.delayed(Duration(milliseconds: 500));
           }
         });
         for (ESPCCFile f in files.value.files) {
@@ -122,7 +123,7 @@ class ESPCC extends Device {
         }
       } else if ("info:" == val.substring(0, min(5, val.length))) {
         List<String> tokens = val.substring(5).split(";");
-        debugLog("got info: $tokens");
+        debugLog("$tag got info: $tokens");
         var f = ESPCCFile(tokens[0], this, remoteExists: ExtendedBool.True);
         if (8 <= f.name.length) {
           tokens.removeAt(0);
@@ -179,6 +180,7 @@ class ESPCC extends Device {
   }
 
   Future<void> onDisconnected() async {
+    debugLog("onDisconnected()");
     await super.onDisconnected();
     settings.value = ESPCCSettings();
     settings.notifyListeners();
@@ -639,13 +641,12 @@ class ESPCCSettings with Debug {
 
     if ("rec" == message.commandStr) {
       int? i = message.valueAsInt;
-      recording = null == i
-          ? ESPCCRecordingState.UNKNOWN
-          : (ESPCCRecordingState.MIN < i && i < ESPCCRecordingState.MAX)
-              ? i
-              : ESPCCRecordingState.UNKNOWN;
-      debugLog("onApiDone() rec: received $recording");
-      return true;
+      String? s = message.valueAsString;
+      if (null != i && null != s && 1 == s.length && int.tryParse(s) == i) {
+        recording = (ESPCCRecordingState.MIN < i && i < ESPCCRecordingState.MAX) ? i : ESPCCRecordingState.UNKNOWN;
+        debugLog("onApiDone() rec: received $recording");
+        return true;
+      }
     }
 
     if ("system" == message.commandStr) {
@@ -725,7 +726,7 @@ class ESPCCDataPoint with Debug {
       debugLog("$tag incorrect length: ${bytes.length}, need at least $sizeInBytes");
       return false;
     }
-    debugLog("$tag $bytes");
+    //debugLog("$tag $bytes");
     int cursor = 0;
     _flags = bytes.sublist(cursor, cursor + 1);
     cursor += 1;
