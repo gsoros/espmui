@@ -360,7 +360,7 @@ class EspmHallSensorWidget extends StatelessWidget {
   }
 }
 
-class PowerCadenceWidget extends StatelessWidget {
+class PowerCadenceWidget extends StatelessWidget with Debug {
   final PowerMeter device;
   final String mode;
 
@@ -389,6 +389,7 @@ class PowerCadenceWidget extends StatelessWidget {
       stream: stream,
       initialData: lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
+        //debugLog(snapshot.hasData ? snapshot.data!.toString() : "no data");
         return Text(
           snapshot.hasData ? (snapshot.data! > 0 ? snapshot.data.toString() : "--") : "--",
           style: const TextStyle(fontSize: 60),
@@ -873,6 +874,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
         if (settings.motionDetectionMethod ==
             settings.motionDetectionMethods.keys.firstWhere((k) => settings.motionDetectionMethods[k] == "Strain gauge", orElse: () => -1)) {
           //debugLog("MDM==SG strainThresLow: ${settings.strainThresLow}");
+          widgets.add(Divider(color: Colors.white38));
           widgets.add(
             Row(
               children: [
@@ -939,6 +941,51 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             ),
           );
         }
+
+        widgets.add(
+          Column(
+            children: [
+              Divider(color: Colors.white38),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  EspmuiElevatedButton(
+                    backgroundColorEnabled: Colors.blue.shade900,
+                    onPressed: settings.otaMode
+                        ? null
+                        : () async {
+                            int? code = await device.api.requestResultCode("system=ota");
+                            if (1 == code) {
+                              device.settings.value.otaMode = true;
+                              device.settings.notifyListeners();
+                              snackbar("Waiting for OTA update, reboot to cancel", context);
+                            } else
+                              snackbar("Failed to enter OTA mode", context);
+                          },
+                    child: Row(
+                      children: [
+                        Icon(Icons.system_update),
+                        Text("OTA"),
+                      ],
+                    ),
+                  ),
+                  EspmuiElevatedButton(
+                    backgroundColorEnabled: Colors.yellow.shade900,
+                    onPressed: () async {
+                      device.api.request<String>("system=reboot");
+                    },
+                    child: Row(
+                      children: [
+                        Icon(Icons.restart_alt),
+                        Text("Reboot"),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
 
         return Column(
           mainAxisSize: MainAxisSize.min,

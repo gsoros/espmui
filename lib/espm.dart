@@ -169,6 +169,7 @@ class ESPMSettings {
   var autoTare = ExtendedBool.Unknown;
   int? autoTareDelayMs;
   int? autoTareRangeG;
+  bool otaMode = false;
 
   final motionDetectionMethods = {
     0: "Hall effect sensor",
@@ -236,6 +237,13 @@ class ESPMSettings {
     if ("atr" == message.commandStr) {
       if (message.valueAsInt != null) autoTareRangeG = message.valueAsInt!;
       return true;
+    }
+    if ("system" == message.commandStr) {
+      if ("ota" == message.valueAsString) {
+        otaMode = true;
+        return true;
+      }
+      return false;
     }
 
     return false;

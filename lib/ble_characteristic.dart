@@ -246,13 +246,30 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
   int lastCrankEventTime = 0;
   int lastPower = 0;
   int lastCadence = 0;
+  int lastCadenceZeroTime = 0;
 
   final _powerController = StreamController<int>.broadcast();
   Stream<int> get powerStream => _powerController.stream;
   final _cadenceController = StreamController<int>.broadcast();
   Stream<int> get cadenceStream => _cadenceController.stream;
+  Timer? _timer;
 
   PowerCharacteristic(Device device) : super(device) {
+    _cadenceController.onListen = () {
+      _timer = Timer.periodic(Duration(seconds: 2), (timer) {
+        int now = DateTime.now().millisecondsSinceEpoch;
+        int cutoff = now - 4000;
+        if (lastCrankEventTime < cutoff && //
+            lastCadenceZeroTime < cutoff &&
+            lastCadenceZeroTime < lastCrankEventTime) {
+          util.streamSendIfNotClosed(_cadenceController, 0);
+          lastCadenceZeroTime = now;
+        }
+      });
+    };
+    _cadenceController.onCancel = () {
+      _timer?.cancel();
+    };
     histories['power'] = CharacteristicHistory<int>(3600, 3600);
     histories['cadence'] = CharacteristicHistory<int>(3600, 3600);
   }
