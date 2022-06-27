@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:sprintf/sprintf.dart';
+import 'package:listenable_stream/listenable_stream.dart';
 
 import 'device.dart';
 import 'api.dart';
@@ -24,6 +25,7 @@ class ESPCC extends Device {
   final files = AlwaysNotifier<ESPCCFileList>(ESPCCFileList());
   //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
   StreamSubscription<ApiMessage>? _apiSubsciption;
+  Stream<ESPCCSettings>? _settingsStream;
 
   ESPCC(Peripheral peripheral) : super(peripheral) {
     characteristics.addAll({
@@ -32,8 +34,36 @@ class ESPCC extends Device {
       ),
     });
     api = Api(this);
-    _apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
     syncer = ESPCCSyncer(this);
+    _apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
+    _settingsStream = settings.toValueStream().asBroadcastStream();
+    tileStreams.addAll({
+      "recording": DeviceTileStream(
+        label: "Recording status",
+        stream: _settingsStream?.map<String>((value) => ESPCCRecordingState.getString(value.recording)),
+        initialData: () => ESPCCRecordingState.getString(settings.value.recording),
+        units: "",
+      ),
+    });
+    tileActions.addAll({
+      "startStop": DeviceTileAction(
+        label: "Start/stop recording",
+        action: () async {
+          String action = "start";
+          String succ = "Started";
+          String fail = "Error starting";
+          int expect = ESPCCRecordingState.RECORDING;
+          if (ESPCCRecordingState.NOT_RECORDING < settings.value.recording) {
+            action = "end";
+            succ = "Stopped";
+            fail = "Error stopping";
+            expect = ESPCCRecordingState.NOT_RECORDING;
+          }
+          var state = await api.request<int>("rec=$action");
+          snackbar((state == expect ? succ : fail) + " recording");
+        },
+      ),
+    });
   }
 
   /// returns true if the message does not need any further handling
@@ -530,6 +560,7 @@ class ESPCCSettings with Debug {
   bool scanning = false;
   bool touchEnabled = true;
   bool otaMode = false;
+  int recording = ESPCCRecordingState.UNKNOWN;
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
@@ -606,6 +637,17 @@ class ESPCCSettings with Debug {
       return true;
     }
 
+    if ("rec" == message.commandStr) {
+      int? i = message.valueAsInt;
+      recording = null == i
+          ? ESPCCRecordingState.UNKNOWN
+          : (ESPCCRecordingState.MIN < i && i < ESPCCRecordingState.MAX)
+              ? i
+              : ESPCCRecordingState.UNKNOWN;
+      debugLog("onApiDone() rec: received $recording");
+      return true;
+    }
+
     if ("system" == message.commandStr) {
       if ("ota" == message.valueAsString) {
         otaMode = true;
@@ -630,6 +672,23 @@ class ESPCCSettings with Debug {
         "peers: $peers, "
         "touchThres: $touchThres"
         ")";
+  }
+}
+
+class ESPCCRecordingState {
+  static const int MIN = -2;
+  static const int UNKNOWN = -1;
+  static const int NOT_RECORDING = 0;
+  static const int RECORDING = 1;
+  static const int PAUSED = 2; // TODO
+  static const int MAX = 3;
+
+  static String getString(int value) {
+    if (value <= MIN || MAX <= value) return "invalid";
+    if (value == NOT_RECORDING) return "stopped";
+    if (value == RECORDING) return "recording";
+    if (value == PAUSED) return "paused";
+    return "...";
   }
 }
 

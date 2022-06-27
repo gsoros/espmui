@@ -347,7 +347,7 @@ class Api with Debug {
   }
 
   Future<void> _onDone(ApiMessage message) async {
-    // debugLog("_onDone $message");
+    //debugLog("_onDone $message");
     if (null != message.onDone) {
       var onDone = message.onDone;
       message.onDone = null;
