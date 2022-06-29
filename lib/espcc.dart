@@ -647,6 +647,7 @@ class ESPCCSettings with Debug {
         debugLog("onApiDone() rec: received $recording");
         return true;
       }
+      return false;
     }
 
     if ("system" == message.commandStr) {
