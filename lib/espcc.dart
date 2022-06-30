@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:sprintf/sprintf.dart';
 import 'package:listenable_stream/listenable_stream.dart';
+import 'package:intl/intl.dart';
 
 import 'device.dart';
 import 'api.dart';
@@ -329,6 +330,7 @@ class ESPCCFile with Debug {
 
   bool get isGpx => 0 < name.indexOf(".gpx");
 
+  /// generates non-standard format for exporting to str%v#
   Future<bool> generateGpx({bool overwrite = false}) async {
     String tag = "ESPCCFile::generateGpx() $name";
     if (_generatingGpx) {
@@ -436,6 +438,9 @@ class ESPCCFile with Debug {
   }
 
   String _pointToGpx(ESPCCDataPoint p) {
+    if (!p.hasTime) return "";
+
+    // TODO FIX sprintf strips the first newline
     const String pointFormat = """
 
       <trkpt%s>
@@ -749,12 +754,51 @@ class ESPCCDataPoint with Debug {
     return true;
   }
 
-  bool get hasLocation => 0 < _flags[0] & ESPCCDataPointFlags.location;
-  bool get hasAltitude => 0 < _flags[0] & ESPCCDataPointFlags.altitude;
-  bool get hasPower => 0 < _flags[0] & ESPCCDataPointFlags.power;
-  bool get hasCadence => 0 < _flags[0] & ESPCCDataPointFlags.cadence;
-  bool get hasHeartrate => 0 < _flags[0] & ESPCCDataPointFlags.heartrate;
-  bool get hasTemperature => 0 < _flags[0] & ESPCCDataPointFlags.temperature;
+  /// 2022-01-01 00:00:00 < time < 2122-01-01 00:00:00
+  bool get hasTime {
+    int t = time;
+    return 1640995200 < t && t < 4796668800;
+  }
+
+  bool get hasLocation {
+    if (_flags[0] & ESPCCDataPointFlags.location <= 0) return false;
+    double d = lat;
+    if (d < 0 || 90 < d) return false;
+    d = lon;
+    if (d < 0 || 180 < d) return false;
+    return true;
+  }
+
+  bool get hasAltitude {
+    if (_flags[0] & ESPCCDataPointFlags.altitude <= 0) return false;
+    int i = alt;
+    return (-500 < i && i < 10000);
+  }
+
+  bool get hasPower {
+    if (_flags[0] & ESPCCDataPointFlags.power <= 0) return false;
+    int i = power;
+    return (0 <= i && i < 3000);
+  }
+
+  bool get hasCadence {
+    if (_flags[0] & ESPCCDataPointFlags.cadence <= 0) return false;
+    int i = cadence;
+    return (0 <= i && i < 200);
+  }
+
+  bool get hasHeartrate {
+    if (_flags[0] & ESPCCDataPointFlags.heartrate <= 0) return false;
+    int i = heartrate;
+    return (30 <= i && i < 230);
+  }
+
+  bool get hasTemperature {
+    if (_flags[0] & ESPCCDataPointFlags.temperature <= 0) return false;
+    int i = temperature;
+    return (-50 <= i && i < 70);
+  }
+
   bool get hasLap => 0 < _flags[0] & ESPCCDataPointFlags.lap;
 
   int get flags => _flags.buffer.asByteData().getUint8(0);
@@ -768,10 +812,10 @@ class ESPCCDataPoint with Debug {
   int get temperature => _power.buffer.asByteData().getInt16(0, _endian);
 
   /// example: 2022-03-25T12:58:13Z
-  // String get timeAsIso8601 => DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true));
+  String get timeAsIso8601 => DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true));
 
   /// example: 2022-03-25T12:58:13.000Z
-  String get timeAsIso8601 => DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true).toIso8601String();
+  //String get timeAsIso8601 => DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true).toIso8601String();
 
   String get debug => "flags: ${_flags.toList()}, time: ${_time.toList()}, ";
 
