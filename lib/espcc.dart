@@ -738,19 +738,19 @@ class ESPCCDataPoint with Debug {
     cursor += 1;
     _time = bytes.sublist(cursor, cursor + 4);
     cursor += 4;
-    if (hasLocation) _lat = bytes.sublist(cursor, cursor + 8);
+    if (hasLocationFlag) _lat = bytes.sublist(cursor, cursor + 8);
     cursor += 8;
-    if (hasLocation) _lon = bytes.sublist(cursor, cursor + 8);
+    if (hasLocationFlag) _lon = bytes.sublist(cursor, cursor + 8);
     cursor += 8;
-    if (hasAltitude) _alt = bytes.sublist(cursor, cursor + 2);
+    if (hasAltitudeFlag) _alt = bytes.sublist(cursor, cursor + 2);
     cursor += 2;
-    if (hasPower) _power = bytes.sublist(cursor, cursor + 2);
+    if (hasPowerFlag) _power = bytes.sublist(cursor, cursor + 2);
     cursor += 2;
-    if (hasCadence) _cadence = bytes.sublist(cursor, cursor + 1);
+    if (hasCadenceFlag) _cadence = bytes.sublist(cursor, cursor + 1);
     cursor += 1;
-    if (hasHeartrate) _heartrate = bytes.sublist(cursor, cursor + 1);
+    if (hasHeartrateFlag) _heartrate = bytes.sublist(cursor, cursor + 1);
     cursor += 1;
-    if (hasTemperature) _temperature = bytes.sublist(cursor, cursor + 2);
+    if (hasTemperatureFlag) _temperature = bytes.sublist(cursor, cursor + 2);
     return true;
   }
 
@@ -760,8 +760,9 @@ class ESPCCDataPoint with Debug {
     return 1640995200 < t && t < 4796668800;
   }
 
+  bool get hasLocationFlag => 0 < _flags[0] & ESPCCDataPointFlags.location;
   bool get hasLocation {
-    if (_flags[0] & ESPCCDataPointFlags.location <= 0) return false;
+    if (!hasLocationFlag) return false;
     double d = lat;
     if (d < 0 || 90 < d) return false;
     d = lon;
@@ -769,32 +770,40 @@ class ESPCCDataPoint with Debug {
     return true;
   }
 
+  bool get hasAltitudeFlag => 0 < _flags[0] & ESPCCDataPointFlags.altitude;
   bool get hasAltitude {
-    if (_flags[0] & ESPCCDataPointFlags.altitude <= 0) return false;
+    if (!hasAltitudeFlag) return false;
     int i = alt;
     return (-500 < i && i < 10000);
   }
 
+  bool get hasPowerFlag => 0 < _flags[0] & ESPCCDataPointFlags.power;
   bool get hasPower {
-    if (_flags[0] & ESPCCDataPointFlags.power <= 0) return false;
+    if (!hasPowerFlag) return false;
     int i = power;
     return (0 <= i && i < 3000);
   }
 
+  bool get hasCadenceFlag => 0 < _flags[0] & ESPCCDataPointFlags.cadence;
   bool get hasCadence {
-    if (_flags[0] & ESPCCDataPointFlags.cadence <= 0) return false;
+    if (!hasCadenceFlag) return false;
     int i = cadence;
     return (0 <= i && i < 200);
   }
 
+  bool get hasHeartrateFlag => 0 < _flags[0] & ESPCCDataPointFlags.heartrate;
   bool get hasHeartrate {
-    if (_flags[0] & ESPCCDataPointFlags.heartrate <= 0) return false;
+    String tag = "$_tag hasHeartrate()";
+    //debugLog("$tag flags: ${_flags[0]}");
+    if (!hasHeartrateFlag) return false;
     int i = heartrate;
+    //debugLog("$tag heartrate: $i");
     return (30 <= i && i < 230);
   }
 
+  bool get hasTemperatureFlag => 0 < _flags[0] & ESPCCDataPointFlags.temperature;
   bool get hasTemperature {
-    if (_flags[0] & ESPCCDataPointFlags.temperature <= 0) return false;
+    if (!hasTemperatureFlag) return false;
     int i = temperature;
     return (-50 <= i && i < 70);
   }
