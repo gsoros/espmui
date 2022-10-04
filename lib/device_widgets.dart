@@ -1135,10 +1135,14 @@ class EspccSyncWidget extends StatelessWidget with Debug {
         filelist.files.sort((a, b) => b.name.compareTo(a.name)); // desc
         filelist.files.forEach((f) {
           String details = "";
+          String separator = "\n";
           if (0 <= f.remoteSize) details += bytesToString(f.remoteSize);
           if (0 <= f.localSize) details += " (${bytesToString(f.localSize)})";
-          if (0 < f.distance) details += " →${distanceToString(f.distance)}";
-          if (0 < f.altGain) details += " ↑${f.altGain.toString()}m";
+          if (0 < f.distance) {
+            details += "$separator→${distanceToString(f.distance)}";
+            separator = " ";
+          }
+          if (0 < f.altGain) details += "$separator↑${f.altGain.toString()}m";
           List<Widget> actions = [];
           bool isQueued = device.syncer.isQueued(f);
           bool isDownloading = device.syncer.isDownloading(f);

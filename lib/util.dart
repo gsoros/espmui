@@ -137,14 +137,14 @@ String bytesToString(int b, {int digits = 2}) {
   if (b >= pow(k, 4)) return (b / pow(k, 4)).toStringAsFixed(digits) + "TB";
   if (b >= pow(k, 3)) return (b / pow(k, 3)).toStringAsFixed(digits) + "GB";
   if (b >= pow(k, 2)) return (b / pow(k, 2)).toStringAsFixed(digits) + "MB";
-  if (b >= k) return (b / k).toStringAsFixed(digits) + "KB";
+  if (b >= k) return (b / k).toStringAsFixed(digits) + "kB";
   return "${b}B";
 }
 
 String distanceToString(int d, {int digits = 2}) {
   if (digits < 0) digits = 0;
   int k = 1000;
-  if (d >= k) return (d / k).toStringAsFixed(digits) + "Km";
+  if (d >= k) return (d / k).toStringAsFixed(digits) + "km";
   return "${d}m";
 }
 
