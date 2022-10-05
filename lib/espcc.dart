@@ -374,6 +374,7 @@ class ESPCCFile with Debug {
     }
     int size = await f.length();
     var point = ESPCCDataPoint();
+    var prevPoint = ESPCCDataPoint();
     int chunkSize = point.sizeInBytes;
     int toRead = 0;
     int cursor = 0;
@@ -403,6 +404,26 @@ class ESPCCFile with Debug {
           flush: true,
         );
       }
+      if (!point.hasAltitude && prevPoint.hasAltitude) {
+        point.alt = prevPoint.alt;
+        point.altitudeFlag = true;
+      }
+      if (!point.hasCadence && prevPoint.hasCadence) {
+        point.cadence = prevPoint.cadence;
+        point.cadenceFlag = true;
+      }
+      if (!point.hasPower && prevPoint.hasPower) {
+        point.power = prevPoint.power;
+        point.powerFlag = true;
+      }
+      if (!point.hasHeartrate && prevPoint.hasHeartrate) {
+        point.heartrate = prevPoint.heartrate;
+        point.heartrateFlag = true;
+      }
+      if (!point.hasTemperature && prevPoint.hasTemperature) {
+        point.temperature = prevPoint.temperature;
+        point.temperatureFlag = true;
+      }
       await g.writeAsString(
         _pointToGpx(point),
         mode: FileMode.append,
@@ -410,6 +431,7 @@ class ESPCCFile with Debug {
       );
       cursor += toRead;
       pointsWritten++;
+      prevPoint.from(point);
     }
     if (0 < pointsWritten) {
       await g.writeAsString(
@@ -469,13 +491,12 @@ class ESPCCFile with Debug {
             <gpxtpx:cad>%d</gpxtpx:cad>""";
 
     bool hasTpx = p.hasHeartrate || p.hasCadence;
-    bool hasExt = p.hasPower || hasTpx;
 
     final String s = sprintf(pointFormat, [
       p.hasLocation ? sprintf(locationFormat, [p.lat, p.lon]) : "",
       p.timeAsIso8601,
       p.hasAltitude ? sprintf(altFormat, [p.alt]) : "",
-      hasExt
+      p.hasPower || hasTpx
           ? sprintf(extFormat, [
               p.hasPower ? sprintf(powerFormat, [p.power]) : "",
               hasTpx
@@ -738,19 +759,32 @@ class ESPCCDataPoint with Debug {
     cursor += 1;
     _time = bytes.sublist(cursor, cursor + 4);
     cursor += 4;
-    if (hasLocationFlag) _lat = bytes.sublist(cursor, cursor + 8);
+    if (locationFlag) _lat = bytes.sublist(cursor, cursor + 8);
     cursor += 8;
-    if (hasLocationFlag) _lon = bytes.sublist(cursor, cursor + 8);
+    if (locationFlag) _lon = bytes.sublist(cursor, cursor + 8);
     cursor += 8;
-    if (hasAltitudeFlag) _alt = bytes.sublist(cursor, cursor + 2);
+    if (altitudeFlag) _alt = bytes.sublist(cursor, cursor + 2);
     cursor += 2;
-    if (hasPowerFlag) _power = bytes.sublist(cursor, cursor + 2);
+    if (powerFlag) _power = bytes.sublist(cursor, cursor + 2);
     cursor += 2;
-    if (hasCadenceFlag) _cadence = bytes.sublist(cursor, cursor + 1);
+    if (cadenceFlag) _cadence = bytes.sublist(cursor, cursor + 1);
     cursor += 1;
-    if (hasHeartrateFlag) _heartrate = bytes.sublist(cursor, cursor + 1);
+    if (heartrateFlag) _heartrate = bytes.sublist(cursor, cursor + 1);
     cursor += 1;
-    if (hasTemperatureFlag) _temperature = bytes.sublist(cursor, cursor + 2);
+    if (temperatureFlag) _temperature = bytes.sublist(cursor, cursor + 2);
+    return true;
+  }
+
+  bool from(ESPCCDataPoint p) {
+    _flags = Uint8List.fromList(p.flagsList);
+    _time = Uint8List.fromList(p.timeList);
+    _lat = Uint8List.fromList(p.latList);
+    _lon = Uint8List.fromList(p.lonList);
+    _alt = Uint8List.fromList(p.altList);
+    _power = Uint8List.fromList(p.powerList);
+    _cadence = Uint8List.fromList(p.cadenceList);
+    _heartrate = Uint8List.fromList(p.heartrateList);
+    _temperature = Uint8List.fromList(p.temperatureList);
     return true;
   }
 
@@ -760,9 +794,9 @@ class ESPCCDataPoint with Debug {
     return 1640995200 < t && t < 4796668800;
   }
 
-  bool get hasLocationFlag => 0 < _flags[0] & ESPCCDataPointFlags.location;
+  bool get locationFlag => 0 < _flags[0] & ESPCCDataPointFlags.location;
   bool get hasLocation {
-    if (!hasLocationFlag) return false;
+    if (!locationFlag) return false;
     double d = lat;
     if (d < 0 || 90 < d) return false;
     d = lon;
@@ -770,40 +804,45 @@ class ESPCCDataPoint with Debug {
     return true;
   }
 
-  bool get hasAltitudeFlag => 0 < _flags[0] & ESPCCDataPointFlags.altitude;
+  bool get altitudeFlag => 0 < _flags[0] & ESPCCDataPointFlags.altitude;
+  set altitudeFlag(bool b) => _flags[0] |= b ? ESPCCDataPointFlags.altitude : ~ESPCCDataPointFlags.altitude;
   bool get hasAltitude {
-    if (!hasAltitudeFlag) return false;
+    if (!altitudeFlag) return false;
     int i = alt;
     return (-500 < i && i < 10000);
   }
 
-  bool get hasPowerFlag => 0 < _flags[0] & ESPCCDataPointFlags.power;
+  bool get powerFlag => 0 < _flags[0] & ESPCCDataPointFlags.power;
+  set powerFlag(bool b) => _flags[0] |= b ? ESPCCDataPointFlags.power : ~ESPCCDataPointFlags.power;
   bool get hasPower {
-    if (!hasPowerFlag) return false;
+    if (!powerFlag) return false;
     int i = power;
     return (0 <= i && i < 3000);
   }
 
-  bool get hasCadenceFlag => 0 < _flags[0] & ESPCCDataPointFlags.cadence;
+  bool get cadenceFlag => 0 < _flags[0] & ESPCCDataPointFlags.cadence;
+  set cadenceFlag(bool b) => _flags[0] |= b ? ESPCCDataPointFlags.cadence : ~ESPCCDataPointFlags.cadence;
   bool get hasCadence {
-    if (!hasCadenceFlag) return false;
+    if (!cadenceFlag) return false;
     int i = cadence;
     return (0 <= i && i < 200);
   }
 
-  bool get hasHeartrateFlag => 0 < _flags[0] & ESPCCDataPointFlags.heartrate;
+  bool get heartrateFlag => 0 < _flags[0] & ESPCCDataPointFlags.heartrate;
+  set heartrateFlag(bool b) => _flags[0] |= b ? ESPCCDataPointFlags.heartrate : ~ESPCCDataPointFlags.heartrate;
   bool get hasHeartrate {
-    String tag = "$_tag hasHeartrate()";
+    //String tag = "$_tag hasHeartrate()";
     //debugLog("$tag flags: ${_flags[0]}");
-    if (!hasHeartrateFlag) return false;
+    if (!heartrateFlag) return false;
     int i = heartrate;
     //debugLog("$tag heartrate: $i");
     return (30 <= i && i < 230);
   }
 
-  bool get hasTemperatureFlag => 0 < _flags[0] & ESPCCDataPointFlags.temperature;
+  bool get temperatureFlag => 0 < _flags[0] & ESPCCDataPointFlags.temperature;
+  set temperatureFlag(bool b) => _flags[0] |= b ? ESPCCDataPointFlags.temperature : ~ESPCCDataPointFlags.temperature;
   bool get hasTemperature {
-    if (!hasTemperatureFlag) return false;
+    if (!temperatureFlag) return false;
     int i = temperature;
     return (-50 <= i && i < 70);
   }
@@ -811,14 +850,28 @@ class ESPCCDataPoint with Debug {
   bool get hasLap => 0 < _flags[0] & ESPCCDataPointFlags.lap;
 
   int get flags => _flags.buffer.asByteData().getUint8(0);
+  Uint8List get flagsList => _flags;
   int get time => _time.buffer.asByteData().getInt32(0, _endian);
+  Uint8List get timeList => _time;
   double get lat => _lat.buffer.asByteData().getFloat64(0, _endian);
+  Uint8List get latList => _lat;
   double get lon => _lon.buffer.asByteData().getFloat64(0, _endian);
+  Uint8List get lonList => _lon;
   int get alt => _alt.buffer.asByteData().getInt16(0, _endian);
+  Uint8List get altList => _alt;
+  set alt(int i) => _alt.buffer.asByteData().setInt16(0, i, _endian);
   int get power => _power.buffer.asByteData().getUint16(0, _endian);
+  Uint8List get powerList => _power;
+  set power(int i) => _power.buffer.asByteData().setUint16(0, i, _endian);
   int get cadence => _cadence.buffer.asByteData().getUint8(0);
+  Uint8List get cadenceList => _cadence;
+  set cadence(int i) => _cadence.buffer.asByteData().setUint8(0, i);
   int get heartrate => _heartrate.buffer.asByteData().getUint8(0);
+  Uint8List get heartrateList => _heartrate;
+  set heartrate(int i) => _heartrate.buffer.asByteData().setUint8(0, i);
   int get temperature => _power.buffer.asByteData().getInt16(0, _endian);
+  Uint8List get temperatureList => _temperature;
+  set temperature(int i) => _temperature.buffer.asByteData().setInt16(0, i, _endian);
 
   /// example: 2022-03-25T12:58:13Z
   String get timeAsIso8601 => DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true));
