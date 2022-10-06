@@ -113,7 +113,7 @@ class ESPCCSyncer with Debug {
     int offset = ef.localSize <= 0 ? 0 : ef.localSize + 1;
     String request = "rec=get:${ef.name};offset:$offset";
     String expect = "get:${ef.name}:$offset;";
-    debugLog("$tag requesting: $request, expecting: $expect");
+    //debugLog("$tag requesting: $request, expecting: $expect");
     String? reply = await device.api.request<String>(request, expectValue: expect);
     if (null == reply || reply.length < 1) {
       debugLog("$tag empty reply for $request");

@@ -465,7 +465,7 @@ class EspccApiCharacteristic extends ApiCharacteristic {
     RegExpMatch? match = reg.firstMatch(value);
     String? noBinary = match?.group(1);
     if (null != noBinary && 0 < noBinary.length) {
-      debugLog("$tag found match: '$noBinary'");
+      // debugLog("$tag found match: '$noBinary'");
       Uint8List? valueAsList;
       if (null != device.mtu && 0 < device.mtu! && null != lastRawValue && lastRawValue!.length < device.mtu! - 5)
         valueAsList = lastRawValue;
@@ -498,7 +498,7 @@ class EspccApiCharacteristic extends ApiCharacteristic {
         return super.onNotify(noBinary);
       }
       Uint8List byteData = Uint8List.sublistView(valueAsList, binaryStart);
-      debugLog("$tag file: $fileName, offset: $offset, byteData: ${byteData.length}B");
+      //debugLog("$tag file: $fileName, offset: $offset, byteData: ${byteData.length}B");
       ESPCCFile f = device.files.value.files.firstWhere(
         (candidate) => candidate.name == fileName,
         orElse: () {

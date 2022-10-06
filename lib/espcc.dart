@@ -404,6 +404,20 @@ class ESPCCFile with Debug {
           flush: true,
         );
       }
+      if (prevPoint.time != 0 && (point.time < prevPoint.time || prevPoint.time + 86400 < point.time)) {
+        // 1 day
+        debugLog("$tag invalid time ${point.time}");
+        cursor += toRead;
+        continue;
+      }
+      if (!point.hasLocation) {
+        debugLog("$tag no location at ${point.time}");
+        if (prevPoint.hasLocation) {
+          debugLog("$tag copying location from prev point");
+          point.lat = prevPoint.lat;
+          point.lon = prevPoint.lon;
+        }
+      }
       if (!point.hasAltitude && prevPoint.hasAltitude) {
         point.alt = prevPoint.alt;
         point.altitudeFlag = true;
@@ -855,8 +869,10 @@ class ESPCCDataPoint with Debug {
   Uint8List get timeList => _time;
   double get lat => _lat.buffer.asByteData().getFloat64(0, _endian);
   Uint8List get latList => _lat;
+  set lat(double f) => _lat.buffer.asByteData().setFloat64(0, f, _endian);
   double get lon => _lon.buffer.asByteData().getFloat64(0, _endian);
   Uint8List get lonList => _lon;
+  set lon(double f) => _lon.buffer.asByteData().setFloat64(0, f, _endian);
   int get alt => _alt.buffer.asByteData().getInt16(0, _endian);
   Uint8List get altList => _alt;
   set alt(int i) => _alt.buffer.asByteData().setInt16(0, i, _endian);
