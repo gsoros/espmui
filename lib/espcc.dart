@@ -392,7 +392,7 @@ class ESPCCFile with Debug {
         done = true;
         continue;
       }
-      debugLog("$tag size: $size, cursor: $cursor, toRead: $toRead");
+      //debugLog("$tag size: $size, cursor: $cursor, toRead: $toRead");
       var raf = await f.open(mode: FileMode.read);
       raf = await raf.setPosition(cursor);
       point.fromList(await raf.read(toRead));
@@ -403,15 +403,16 @@ class ESPCCFile with Debug {
           mode: FileMode.write, // truncate to zero
           flush: true,
         );
+        debugLog("$tag header written");
       }
       if (prevPoint.time != 0 && (point.time < prevPoint.time || prevPoint.time + 86400 < point.time)) {
         // 1 day
-        debugLog("$tag invalid time ${point.time}");
+        debugLog("$tag invalid time ${point.time} ${point.timeAsIso8601}");
         cursor += toRead;
         continue;
       }
       if (!point.hasLocation) {
-        debugLog("$tag no location at ${point.time}");
+        debugLog("$tag no location at point #$pointsWritten ${point.timeAsIso8601}");
         if (prevPoint.hasLocation) {
           debugLog("$tag copying location from prev point");
           point.lat = prevPoint.lat;
@@ -447,12 +448,15 @@ class ESPCCFile with Debug {
       pointsWritten++;
       prevPoint.from(point);
     }
+    debugLog("$tag $pointsWritten points written");
     if (0 < pointsWritten) {
       await g.writeAsString(
         _gpxFooter(),
         mode: FileMode.append,
         flush: true,
       );
+      var size = await g.length();
+      debugLog("$tag footer written, file size ${bytesToString(size)}");
     }
     _generatingGpx = false;
     return true;
