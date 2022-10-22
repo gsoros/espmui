@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
+// import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
@@ -34,7 +34,7 @@ class ESPCC extends Device {
         EspccApiCharacteristic(this),
       ),
     });
-    api = Api(this);
+    api = Api(this, queueDelayMs: 50);
     syncer = ESPCCSyncer(this);
     _apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
     _settingsStream = settings.toValueStream().asBroadcastStream();

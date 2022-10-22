@@ -60,7 +60,7 @@ class ESPCCSyncer with Debug {
     String tag = "_runQueue()";
 
     if (_running) {
-      //debugLog("$tag already _running");
+      // debugLog("$tag already _running");
       return;
     }
     _running = true;
@@ -113,7 +113,7 @@ class ESPCCSyncer with Debug {
     int offset = ef.localSize <= 0 ? 0 : ef.localSize + 1;
     String request = "rec=get:${ef.name};offset:$offset";
     String expect = "get:${ef.name}:$offset;";
-    //debugLog("$tag requesting: $request, expecting: $expect");
+    debugLog("$tag requesting: $request, expecting: $expect");
     String? reply = await device.api.request<String>(request, expectValue: expect);
     if (null == reply || reply.length < 1) {
       debugLog("$tag empty reply for $request");
@@ -121,7 +121,7 @@ class ESPCCSyncer with Debug {
       _running = false;
       return;
     }
-    //debugLog("$ef reply: $reply");
+    // debugLog("$ef reply: $reply");
     int answerPos = reply.indexOf(";");
     if (answerPos < 0) {
       debugLog("$tag invalid answer to $request");
@@ -131,7 +131,7 @@ class ESPCCSyncer with Debug {
     }
     if (!ef.isBinary) {
       String value = reply.substring(answerPos + 1);
-      //debugLog("$tag $ef value: $value");
+      // debugLog("$tag $ef got ${value.length}B");
       int written = await ef.appendLocal(offset: offset, data: value);
       if (written != value.length) {
         debugLog("$ef, received: ${value.length}, written: $written");

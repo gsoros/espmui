@@ -8,42 +8,6 @@ import 'util.dart';
 import 'debug.dart';
 
 /*
-enum ApiCommand {
-  invalid,
-  wifi,
-  hostName,
-  reboot,
-  passkey,
-  secureApi,
-  weightService,
-  calibrateStrain,
-  tare,
-  wifiApEnabled,
-  wifiApSSID,
-  wifiApPassword,
-  wifiStaEnabled,
-  wifiStaSSID,
-  wifiStaPassword,
-  crankLength,
-  reverseStrain,
-  doublePower,
-  sleepDelay,
-  hallChar,
-  hallOffset,
-  hallThreshold,
-  hallThresLow,
-  strainThreshold,
-  strainThresLow,
-  motionDetectionMethod,
-  sleep,
-  negativeTorqueMethod,
-  autoTare,
-  autoTareDelayMs,
-  autoTareRangeG,
-  config,
-}
-*/
-/*
 enum ApiResult {
   invalid,
   success,
@@ -542,12 +506,11 @@ class Api with Debug {
   Future<void> isDone(ApiMessage message) async {
     await Future.doWhile(() async {
       if (message.isDone != true && message.resultCode == null) {
-        //debugLog("polling...");
-        // TODO milliseconds: [message.minDelay, queueDelayMs].max
+        // debugLog("polling...");
         await Future.delayed(Duration(milliseconds: queueDelayMs));
         return true;
       }
-      //debugLog("poll end");
+      // debugLog("poll end");
       return false;
     });
   }
