@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 // import 'dart:typed_data';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:sprintf/sprintf.dart';
@@ -607,6 +608,7 @@ class ESPCCSettings with Debug {
   bool touchEnabled = true;
   bool otaMode = false;
   int recording = ESPCCRecordingState.UNKNOWN;
+  Map<String, TextEditingController> peerPasskeyEditingControllers = {};
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
@@ -718,6 +720,18 @@ class ESPCCSettings with Debug {
         "peers: $peers, "
         "touchThres: $touchThres"
         ")";
+  }
+
+  TextEditingController? getController({String? peer, String? initialValue}) {
+    if (null == peer || peer.length <= 0) return null;
+    if (null == peerPasskeyEditingControllers[peer]) peerPasskeyEditingControllers[peer] = TextEditingController(text: initialValue);
+    return peerPasskeyEditingControllers[peer];
+  }
+
+  void dispose() {
+    peerPasskeyEditingControllers.forEach((_, value) {
+      value.dispose();
+    });
   }
 }
 

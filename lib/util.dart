@@ -51,6 +51,10 @@ void streamSendIfNotClosed(StreamController stream, dynamic value) {
     dev.log("[streamSendIfNotClosed] Stream ${stream.toString()} is closed");
     return;
   }
+  if (null == value) {
+    dev.log("[streamSendIfNotClosed] not sending null to stream ${stream.toString()}");
+    return;
+  }
   //debugLog("[streamSendIfNotClosed] Stream ${stream.toString()} sending value: $value");
   stream.sink.add(value);
 }

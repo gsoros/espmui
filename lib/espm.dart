@@ -9,6 +9,7 @@ import 'ble.dart';
 import 'ble_characteristic.dart';
 
 import 'util.dart';
+import 'debug.dart';
 
 class ESPM extends PowerMeter {
   late Api api;
@@ -157,7 +158,7 @@ class ESPM extends PowerMeter {
   }
 }
 
-class ESPMSettings {
+class ESPMSettings with Debug {
   double? cranklength;
   var reverseStrain = ExtendedBool.Unknown;
   var doublePower = ExtendedBool.Unknown;
@@ -192,7 +193,7 @@ class ESPMSettings {
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    //debugLog("handleApiDoneMessage $message");
+    //debugLog("handleApiMessageSuccess $message");
 
     if ("cl" == message.commandStr) {
       cranklength = message.valueAsDouble;

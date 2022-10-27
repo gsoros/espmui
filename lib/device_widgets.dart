@@ -1,5 +1,6 @@
 import 'dart:async';
 //import 'dart:html';
+//import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
@@ -527,9 +528,7 @@ class ApiInterfaceWidget extends StatelessWidget {
   }
 }
 
-class ApiSettingInputWidget extends StatelessWidget with Debug {
-  final Api api;
-  final int? commandCode;
+class SettingInputWidget extends StatelessWidget with Debug {
   final String? value;
   final bool enabled;
   final String? name;
@@ -537,10 +536,10 @@ class ApiSettingInputWidget extends StatelessWidget with Debug {
   final String Function(String)? transformInput;
   final Widget? suffix;
   final TextInputType? keyboardType;
+  final void Function(String)? onSubmitted;
+  final TextEditingController? textController;
 
-  ApiSettingInputWidget({
-    required this.api,
-    required this.commandCode,
+  SettingInputWidget({
     this.value,
     this.enabled = true,
     this.name,
@@ -548,10 +547,17 @@ class ApiSettingInputWidget extends StatelessWidget with Debug {
     this.transformInput,
     this.suffix,
     this.keyboardType,
+    this.onSubmitted,
+    this.textController,
   });
+
+  String? getValue() => textController?.text;
+
+  void Function(String)? _onSubmitted(BuildContext context) => null;
 
   @override
   Widget build(BuildContext context) {
+    //debugLog("SettingInputWidget build() value: $value");
     return Flexible(
       fit: FlexFit.loose,
       child: TextField(
@@ -560,7 +566,7 @@ class ApiSettingInputWidget extends StatelessWidget with Debug {
         enableSuggestions: false,
         autocorrect: false,
         enabled: enabled,
-        controller: TextEditingController(text: value),
+        controller: textController ?? TextEditingController(text: value),
         decoration: InputDecoration(
           labelText: name,
           suffix: suffix,
@@ -571,22 +577,52 @@ class ApiSettingInputWidget extends StatelessWidget with Debug {
             borderSide: BorderSide(color: Colors.white24),
           ),
         ),
-        onSubmitted: (String edited) async {
-          if (null == commandCode) {
-            debugLog("command is null");
-            return;
-          }
-          if (transformInput != null) edited = transformInput!(edited);
-          final result = await api.requestResultCode(
-            "$commandCode=$edited",
-            minDelayMs: 2000,
-          );
-          if (name != null) snackbar("$name update${result == ApiResult.success ? "d" : " failed"}", context);
-          debugLog("api.requestResultCode($commandCode): $result");
-        },
+        onSubmitted: _onSubmitted(context),
       ),
     );
   }
+}
+
+class ApiSettingInputWidget extends SettingInputWidget {
+  final Api api;
+  final int? commandCode;
+
+  ApiSettingInputWidget({
+    required this.api,
+    required this.commandCode,
+    String? value,
+    bool enabled = true,
+    String? name,
+    bool isPassword = false,
+    String Function(String)? transformInput,
+    Widget? suffix,
+    TextInputType? keyboardType,
+    TextEditingController? textController,
+  }) : super(
+          value: value,
+          enabled: enabled,
+          name: name,
+          isPassword: isPassword,
+          transformInput: transformInput,
+          suffix: suffix,
+          keyboardType: keyboardType,
+          textController: textController,
+        );
+
+  @override
+  void Function(String)? _onSubmitted(BuildContext context) => (String edited) async {
+        if (null == commandCode) {
+          debugLog("command is null");
+          return;
+        }
+        if (transformInput != null) edited = transformInput!(edited);
+        final result = await api.requestResultCode(
+          "$commandCode=$edited",
+          minDelayMs: 2000,
+        );
+        if (name != null) snackbar("$name update${result == ApiResult.success ? "d" : " failed"}", context);
+        debugLog("api.requestResultCode($commandCode): $result");
+      };
 }
 
 class SettingSwitchWidget extends StatelessWidget with Debug {
@@ -1023,6 +1059,16 @@ class EspccPeersEditorWidget extends StatelessWidget with Debug {
         builder: (_, settings, __) {
           return Column(
             children: [
+              EspccPeersListWidget(
+                peers: settings.peers,
+                action: "delete",
+                device: device,
+              ),
+              EspccPeersListWidget(
+                peers: settings.scanResults.where((element) => settings.peers.contains(element) ? false : true).toList(),
+                action: "add",
+                device: device,
+              ),
               EspmuiElevatedButton(
                 child: Text(settings.scanning ? "Scanning..." : "Scan"),
                 onPressed: settings.scanning
@@ -1033,12 +1079,6 @@ class EspccPeersEditorWidget extends StatelessWidget with Debug {
                         device.settings.notifyListeners();
                         device.api.sendCommand("scan=10");
                       },
-              ),
-              EspccPeersListWidget(peers: settings.peers, action: "delete", api: device.api),
-              EspccPeersListWidget(
-                peers: settings.scanResults.where((element) => settings.peers.contains(element) ? false : true).toList(),
-                action: "add",
-                api: device.api,
               ),
             ],
           );
@@ -1305,9 +1345,9 @@ class EspccSyncWidget extends StatelessWidget with Debug {
 class EspccPeersListWidget extends StatelessWidget with Debug {
   final List<String> peers;
   final String action;
-  final Api? api;
+  final ESPCC? device;
 
-  EspccPeersListWidget({required this.peers, this.action = "none", this.api});
+  EspccPeersListWidget({required this.peers, this.action = "none", this.device});
 
   @override
   Widget build(BuildContext context) {
@@ -1315,14 +1355,37 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
     peers.forEach((peer) {
       // addr,addrType,deviceType,deviceName
       var parts = peer.split(",");
-      if (parts.length != 4) return;
+      if (parts.length < 4) return;
       var icon = Icons.question_mark;
-      if (parts[2] == "P") icon = Icons.bolt;
-      if (parts[2] == "E") icon = Icons.offline_bolt;
-      if (parts[2] == "H") icon = Icons.favorite;
       String? command;
+      String? Function(String?, SettingInputWidget?)? commandProcessor;
       IconData? commandIcon;
-      if (null != api) {
+      SettingInputWidget? passcodeEntry;
+      /* Powermeter */
+      if (parts[2] == "P") icon = Icons.bolt;
+      /* ESPM */
+      if (parts[2] == "E") {
+        icon = Icons.offline_bolt;
+        if ("add" == action) {
+          passcodeEntry = SettingInputWidget(
+            name: "Passcode",
+            keyboardType: TextInputType.number,
+            textController: device?.settings.value.getController(peer: peer),
+          );
+          commandProcessor = (command, passcodeEntry) {
+            if (null == command) return command;
+            String? value = passcodeEntry?.getValue();
+            debugLog("commandProcessor: value=$value");
+            if (null == value) return command;
+            command += ",${int.tryParse(value)}";
+            return command;
+          };
+        }
+      }
+      /* Heartrate monitor */
+      if (parts[2] == "H") icon = Icons.favorite;
+
+      if (null != device?.api) {
         if ("add" == action) {
           command = "addPeer=$peer";
           commandIcon = Icons.link;
@@ -1336,14 +1399,38 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
           : EspmuiElevatedButton(
               child: Icon(commandIcon),
               onPressed: () {
-                api!.sendCommand(command!);
-                api!.sendCommand("peers");
+                if (null != commandProcessor) command = commandProcessor(command, passcodeEntry);
+                device?.api.sendCommand(command!);
+                device?.api.sendCommand("peers");
               },
             );
-      list.children.add(Row(children: [
-        Flexible(child: Row(children: [Icon(icon), Text(" "), Text(parts[3])])),
-        button,
-      ]));
+      list.children.add(
+        Card(
+          color: Colors.black12,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(5, 0, 5, 0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon),
+                    Text(" "),
+                    Text(parts[3]),
+                  ],
+                ),
+                Row(
+                  children: [
+                    passcodeEntry ?? Text(" "),
+                    Text(" "),
+                    button,
+                  ],
+                )
+              ],
+            ),
+          ),
+        ),
+      );
     });
     return list;
   }

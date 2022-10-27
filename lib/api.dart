@@ -450,7 +450,7 @@ class Api with Debug {
     _queue.removeWhere((queued) => queued.command == message.command);
     int removed = before - _queue.length;
     if (removed > 0) debugLog("removed $removed duplicate messages");
-    //debugLog("adding to queue: $message");
+    debugLog("adding to queue: $message");
     _queue.add(message);
     _runQueue();
     return message;
