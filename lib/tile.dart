@@ -148,7 +148,15 @@ class Tile extends StatelessWidget with Debug {
         stream: stream?.stream,
         initialData: stream?.initialData != null ? stream?.initialData!() : null,
         builder: (_, snapshot) {
-          return charHistory.graph(timestamp: uts() - history * 1000);
+          return charHistory.graph(
+            timestamp: uts() - history * 1000,
+            color: Color.fromARGB(
+              127,
+              ((255 - color.blue)).round(),
+              ((255 - color.red)).round(),
+              ((255 - color.green)).round(),
+            ),
+          );
         },
       );
     }
