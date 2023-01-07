@@ -1361,10 +1361,9 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
       String? Function(String?, SettingInputWidget?)? commandProcessor;
       IconData? commandIcon;
       SettingInputWidget? passcodeEntry;
-      /* Powermeter */
-      if (parts[2] == "P") icon = Icons.bolt;
-      /* ESPM */
+
       if (parts[2] == "E") {
+        /* ESPM */
         icon = Icons.offline_bolt;
         if ("add" == action) {
           passcodeEntry = SettingInputWidget(
@@ -1381,10 +1380,16 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
             return command;
           };
         }
+      } else if (parts[2] == "P") {
+        /* Powermeter */
+        icon = Icons.bolt;
+      } else if (parts[2] == "H") {
+        /* Heartrate monitor */
+        icon = Icons.favorite;
+      } else if (parts[2] == "V") {
+        /* VESC */
+        icon = Icons.electric_bike;
       }
-      /* Heartrate monitor */
-      if (parts[2] == "H") icon = Icons.favorite;
-
       if (null != device?.api) {
         if ("add" == action) {
           command = "addPeer=$peer";
