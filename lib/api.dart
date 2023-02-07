@@ -194,6 +194,7 @@ class ApiMessage with Debug {
 class Api with Debug {
   Device device;
   ApiCharacteristic? get characteristic => device.characteristic("api") as ApiCharacteristic?;
+  ApiLogCharacteristic? get logCharacteristic => device.characteristic("apiLog") as ApiLogCharacteristic?;
   late StreamSubscription<String>? _subscription;
   final _doneController = StreamController<ApiMessage>.broadcast();
   Stream<ApiMessage> get messageSuccessStream => _doneController.stream;

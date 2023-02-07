@@ -15,6 +15,7 @@ import 'api.dart';
 import 'espcc_syncer.dart';
 import 'ble.dart';
 import 'ble_characteristic.dart';
+import 'ble_constants.dart';
 
 import 'util.dart';
 import 'debug.dart';
@@ -33,6 +34,11 @@ class ESPCC extends Device {
     characteristics.addAll({
       'api': CharacteristicListItem(
         EspccApiCharacteristic(this),
+      ),
+    });
+    characteristics.addAll({
+      'apiLog': CharacteristicListItem(
+        ApiLogCharacteristic(this, BleConstants.ESPCC_API_SERVICE_UUID),
       ),
     });
     api = Api(this, queueDelayMs: 50);

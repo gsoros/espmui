@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 
 import 'package:espmui/api.dart';
 import 'package:flutter/material.dart';
@@ -515,6 +516,64 @@ class EspccApiCharacteristic extends ApiCharacteristic {
       return super.onNotify("${ApiResult.localFsError};$rec=get:$fileName:$offset;");
     }
     return super.onNotify(value);
+  }
+}
+
+class ApiLogCharacteristic extends BleCharacteristic<String> {
+  final String serviceUUID;
+  String charUUID = "";
+
+  ApiLogCharacteristic(
+    Device device,
+    this.serviceUUID, {
+    String charUUID = BleConstants.API_LOGCHAR_UUID,
+  }) : super(device) {
+    this.charUUID = charUUID;
+  }
+
+  @override
+  String fromUint8List(Uint8List list) => String.fromCharCodes(list);
+
+  @override
+  Uint8List toUint8List(String value) {
+    return Uint8List(0);
+  }
+
+  @override
+  Future<String?> onNotify(String value) async {
+    String tag = "onNotify()";
+    debugLog("$tag ${device.name} \"$value\"");
+    if (null != device.mtu && 0 < device.mtu! && device.mtu! - 3 <= value.length) {
+      // read full value as the notification is limited to the size of one packet
+      String? fullValue = await read();
+      debugLog("$tag mtu=${device.mtu} value(${value.length}) fullValue(${fullValue?.length})");
+      if (null != fullValue) value = fullValue;
+    }
+    DateTime date = DateTime.now();
+    String fileName = "${date.year}-${date.month.toString().padLeft(10, '0')}-${date.day.toString().padLeft(10, '0')}.log";
+    String? path = Platform.isAndroid ? await util.Path().external : await util.Path().documents;
+    if (null == path) {
+      debugLog("$tag path is null");
+      return value;
+    }
+    String deviceName = "unnamedDevice";
+    if (device.name != null && 0 < device.name!.length) deviceName = util.Path().sanitize(device.name!);
+    path = "$path/$deviceName/log/$fileName";
+    File f = File(path);
+    if (!await f.exists()) {
+      try {
+        f = await f.create(recursive: true);
+      } catch (e) {
+        debugLog("$tag could not create $path, error: $e");
+        return value;
+      }
+    }
+    await f.writeAsString(
+      value,
+      mode: FileMode.append,
+      flush: true,
+    );
+    return value;
   }
 }
 
