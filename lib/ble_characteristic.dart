@@ -550,7 +550,7 @@ class ApiLogCharacteristic extends BleCharacteristic<String> {
       if (null != fullValue) value = fullValue;
     }
     DateTime date = DateTime.now();
-    String fileName = "${date.year}-${date.month.toString().padLeft(10, '0')}-${date.day.toString().padLeft(10, '0')}.log";
+    String fileName = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.log";
     String? path = Platform.isAndroid ? await util.Path().external : await util.Path().documents;
     if (null == path) {
       debugLog("$tag path is null");
