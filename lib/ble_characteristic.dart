@@ -569,7 +569,7 @@ class ApiLogCharacteristic extends BleCharacteristic<String> {
       }
     }
     await f.writeAsString(
-      value,
+      "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')} $value\n",
       mode: FileMode.append,
       flush: true,
     );
