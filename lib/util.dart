@@ -18,7 +18,12 @@ enum ExtendedBool {
 }
 
 /// converts bool to extended
-ExtendedBool extendedBoolFrom(bool value) => value ? ExtendedBool.True : ExtendedBool.False;
+ExtendedBool extendedBoolFromBool(bool value) => value ? ExtendedBool.True : ExtendedBool.False;
+ExtendedBool extendedBoolFromString(String value) {
+  if (value.toLowerCase() == "true" || value == "1") return ExtendedBool.True;
+  if (value.toLowerCase() == "false" || value == "0") return ExtendedBool.False;
+  return ExtendedBool.Unknown;
+}
 
 /// A [ValueNotifier] that notifies listeners in the setter even when [value] is replaced
 /// with something that is equal to the old value as evaluated by the equality operator ==.

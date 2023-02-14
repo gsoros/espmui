@@ -98,7 +98,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
             //debugLog("autoconnect changed: $value");
             return SettingSwitchWidget(
               name: "Auto Connect",
-              value: extendedBoolFrom(value),
+              value: extendedBoolFromBool(value),
               onChanged: (value) {
                 device.setAutoConnect(value);
               },

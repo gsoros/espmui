@@ -615,10 +615,21 @@ class ESPCCSettings with Debug {
   bool otaMode = false;
   int recording = ESPCCRecordingState.UNKNOWN;
   Map<String, TextEditingController> peerPasskeyEditingControllers = {};
+  int vescBattNumSeries = -1;
+  double vescBattCapacityWh = -1;
+  int vescMaxPower = -1;
+  double vescMinCurrent = -1;
+  double vescMaxCurrent = -1;
+  ExtendedBool vescRampUp = ExtendedBool.Unknown;
+  ExtendedBool vescRampDown = ExtendedBool.Unknown;
+  double vescRampMinCurrentDiff = -1;
+  int vescRampNumSteps = -1;
+  int vescRampTime = -1;
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    //debugLog("handleApiMessageSuccess $message");
+    String tag = "handleApiMessageSuccess";
+    //debugLog("$tag $message");
 
     if ("peers" == message.commandStr) {
       String? v = message.valueAsString;
@@ -629,7 +640,7 @@ class ESPCCSettings with Debug {
         if (token.length < 1) return;
         values.add(token);
       });
-      debugLog("peers=$values");
+      debugLog("$tag peers=$values");
       peers = values;
       return true;
     }
@@ -648,7 +659,7 @@ class ESPCCSettings with Debug {
           index++;
         });
         touchRead = readings;
-        debugLog("touchRead=$touchRead");
+        debugLog("$tag touchRead=$touchRead");
         return true;
       }
       if (0 == v.indexOf("thresholds:")) {
@@ -662,14 +673,14 @@ class ESPCCSettings with Debug {
           index++;
         });
         touchThres = thresholds;
-        debugLog("touchThres=$touchThres");
+        debugLog("$tag touchThres=$touchThres");
         return true;
       }
       if (0 == v.indexOf("enabled:")) {
         int? i = int.tryParse(v.substring("enabled:".length));
         if (null != i) {
           touchEnabled = 0 < i;
-          debugLog("touchEnabled=$touchEnabled");
+          debugLog("$tag touchEnabled=$touchEnabled");
         }
       }
       return true;
@@ -677,7 +688,7 @@ class ESPCCSettings with Debug {
 
     if ("scanResult" == message.commandStr) {
       String? result = message.valueAsString;
-      debugLog("onApiDone() scanResult: received $result");
+      debugLog("$tag scanResult: received $result");
       if (null == result) return false;
       if (scanResults.contains(result)) return false;
       scanResults.add(result);
@@ -686,7 +697,7 @@ class ESPCCSettings with Debug {
 
     if ("scan" == message.commandStr) {
       int? timeout = message.valueAsInt;
-      debugLog("onApiDone() scan: received scan=$timeout");
+      debugLog("$tag scan: received scan=$timeout");
       scanning = null != timeout && 0 < timeout;
       return true;
     }
@@ -696,10 +707,58 @@ class ESPCCSettings with Debug {
       String? s = message.valueAsString;
       if (null != i && null != s && 1 == s.length && int.tryParse(s) == i) {
         recording = (ESPCCRecordingState.MIN < i && i < ESPCCRecordingState.MAX) ? i : ESPCCRecordingState.UNKNOWN;
-        debugLog("onApiDone() rec: received $recording");
+        debugLog("$tag rec: received $recording");
         return true;
       }
       return false;
+    }
+
+    if ("vesc" == message.commandStr) {
+      if (null == message.valueAsString) return false;
+      List<String> tokens = message.valueAsString!.split("|");
+      tokens.forEach((token) {
+        List<String> pair = token.split(":");
+        if (2 != pair.length) {
+          debugLog("$tag invalid token: $token");
+          return;
+        }
+        switch (pair[0]) {
+          case "battNumSeries":
+            vescBattNumSeries = int.tryParse(pair[1]) ?? vescBattNumSeries;
+            break;
+          case "battCapacity":
+            vescBattCapacityWh = double.tryParse(pair[1]) ?? vescBattCapacityWh;
+            break;
+          case "maxPower":
+            vescMaxPower = int.tryParse(pair[1]) ?? vescMaxPower;
+            break;
+          case "minCurrent":
+            vescMinCurrent = double.tryParse(pair[1]) ?? vescMinCurrent;
+            break;
+          case "maxCurrent":
+            vescMaxCurrent = double.tryParse(pair[1]) ?? vescMaxCurrent;
+            break;
+          case "rampUp":
+            vescRampUp = extendedBoolFromString(pair[1]);
+            break;
+          case "rampDown":
+            vescRampDown = extendedBoolFromString(pair[1]);
+            break;
+          case "rampMinCurrentDiff":
+            vescRampMinCurrentDiff = double.tryParse(pair[1]) ?? vescRampMinCurrentDiff;
+            break;
+          case "rampNumSteps":
+            vescRampNumSteps = int.tryParse(pair[1]) ?? vescRampNumSteps;
+            break;
+          case "rampTime":
+            vescRampTime = int.tryParse(pair[1]) ?? vescRampTime;
+            break;
+          default:
+            debugLog("$tag unknown name: token: $token, name: ${pair[0]}, value: ${pair[1]}");
+        }
+      });
+      debugLog("$tag updated settings: $this");
+      return true;
     }
 
     if ("system" == message.commandStr) {
@@ -715,16 +774,62 @@ class ESPCCSettings with Debug {
 
   @override
   bool operator ==(other) {
-    return (other is ESPCCSettings) && other.peers == peers && other.touchThres == touchThres;
+    return (other is ESPCCSettings) &&
+        other.peers == peers &&
+        other.touchThres == touchThres &&
+        other.scanning == scanning &&
+        other.touchEnabled == touchEnabled &&
+        other.otaMode == otaMode &&
+        other.recording == recording &&
+        other.vescBattNumSeries == vescBattNumSeries &&
+        other.vescBattCapacityWh == vescBattCapacityWh &&
+        other.vescMaxPower == vescMaxPower &&
+        other.vescMinCurrent == vescMinCurrent &&
+        other.vescMaxCurrent == vescMaxCurrent &&
+        other.vescRampUp == vescRampUp &&
+        other.vescRampDown == vescRampDown &&
+        other.vescRampMinCurrentDiff == vescRampMinCurrentDiff &&
+        other.vescRampNumSteps == vescRampNumSteps &&
+        other.vescRampTime == vescRampTime;
   }
 
   @override
-  int get hashCode => peers.hashCode ^ touchThres.hashCode;
+  int get hashCode =>
+      peers.hashCode ^
+      touchThres.hashCode ^
+      scanning.hashCode ^
+      touchEnabled.hashCode ^
+      otaMode.hashCode ^
+      recording.hashCode ^
+      vescBattNumSeries.hashCode ^
+      vescBattCapacityWh.hashCode ^
+      vescMaxPower.hashCode ^
+      vescMinCurrent.hashCode ^
+      vescMaxCurrent.hashCode ^
+      vescRampUp.hashCode ^
+      vescRampDown.hashCode ^
+      vescRampMinCurrentDiff.hashCode ^
+      vescRampNumSteps.hashCode ^
+      vescRampTime.hashCode;
 
   String toString() {
     return "${describeIdentity(this)} ("
         "peers: $peers, "
-        "touchThres: $touchThres"
+        "touchThres: $touchThres, "
+        "scanning: $scanning, "
+        "touchEnabled: $touchEnabled, "
+        "otaMode: $otaMode, "
+        "recording: $recording, "
+        "vescBattNumSeries: $vescBattNumSeries, "
+        "vescBattCapacityWh: $vescBattCapacityWh, "
+        "vescMaxPower: $vescMaxPower, "
+        "vescMinCurrent: $vescMinCurrent, "
+        "vescMaxCurrent: $vescMaxCurrent, "
+        "vescRampUp: $vescRampUp, "
+        "vescRampDown: $vescRampDown, "
+        "vescRampMinCurrentDiff: $vescRampMinCurrentDiff, "
+        "vescRampNumSteps: $vescRampNumSteps, "
+        "vescRampTime: $vescRampTime"
         ")";
   }
 
