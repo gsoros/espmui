@@ -547,7 +547,7 @@ class ApiLogCharacteristic extends BleCharacteristic<String> {
       // read full value as the notification is limited to the size of one packet
       String? fullValue = await read();
       debugLog("$tag mtu=${device.mtu} value(${value.length}) fullValue(${fullValue?.length})");
-      if (null != fullValue) value = fullValue;
+      if (null != fullValue && value.length < fullValue.length) value = fullValue;
     }
     DateTime date = DateTime.now();
     String fileName = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.log";
@@ -568,6 +568,7 @@ class ApiLogCharacteristic extends BleCharacteristic<String> {
         return value;
       }
     }
+    // debugLog("$tag writing ${value.length} characters to ${f.path}: $value");
     await f.writeAsString(
       "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')} $value\n",
       mode: FileMode.append,
