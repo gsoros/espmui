@@ -93,6 +93,22 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
     return [
       StaggeredGridItem(
         value: ValueListenableBuilder<bool>(
+          valueListenable: device.remember,
+          builder: (_, value, __) {
+            //debugLog("remember changed: $value");
+            return SettingSwitchWidget(
+              name: "Remember",
+              value: extendedBoolFromBool(value),
+              onChanged: (value) {
+                device.setRemember(value);
+              },
+            );
+          },
+        ),
+        colSpan: 3,
+      ),
+      StaggeredGridItem(
+        value: ValueListenableBuilder<bool>(
           valueListenable: device.autoConnect,
           builder: (_, value, __) {
             //debugLog("autoconnect changed: $value");
@@ -105,7 +121,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
             );
           },
         ),
-        colSpan: 6,
+        colSpan: 3,
       ),
       StaggeredGridItem(
         value: BatteryWidget(device),

@@ -30,6 +30,9 @@ Device: Battery
 class Device with Debug {
   Peripheral? peripheral;
 
+  /// whether the device should be remembered
+  final remember = ValueNotifier<bool>(false);
+
   /// whether the device should be kept connected
   final autoConnect = ValueNotifier<bool>(false);
 
@@ -112,28 +115,46 @@ class Device with Debug {
   }
 
   static Future<Device?> fromSaved(String savedDevice) async {
-    dev.log("Device.fromSaved($savedDevice)");
     var chunks = savedDevice.split(";");
-    if (chunks.length != 3) return null;
+    if (chunks.length < 3) return null;
+    String address = chunks.removeAt(0);
+    String type = "";
+    String name = "";
+    bool autoConnect = false;
+    chunks.forEach((chunk) {
+      String key = "type=";
+      if (chunk.startsWith(key)) type = chunk.substring(key.length);
+      key = "name=";
+      if (chunk.startsWith(key)) name = chunk.substring(key.length);
+      key = "autoConnect=";
+      if (chunk.startsWith(key)) autoConnect = chunk.substring(key.length) == "true";
+    });
+    dev.log("Device.fromSaved($savedDevice): address: $address, type: $type, name: $name, autoConnect: " + (autoConnect ? "true" : "false"));
     var manager = await BLE().manager;
-    Peripheral peripheral = manager.createUnsafePeripheral(chunks[2]);
+    Peripheral peripheral = manager.createUnsafePeripheral(address);
     Device device;
-    if ("ESPM" == chunks[0])
+    if ("ESPM" == type)
       device = ESPM(peripheral);
-    else if ("ESPCC" == chunks[0])
+    else if ("ESPCC" == type)
       device = ESPCC(peripheral);
-    else if ("PowerMeter" == chunks[0])
+    else if ("PowerMeter" == type)
       device = PowerMeter(peripheral);
-    else if ("HeartRateMonitor" == chunks[0])
+    else if ("HeartRateMonitor" == type)
       device = HeartRateMonitor(peripheral);
     else
       return null;
-    device.name = chunks[1];
+    device.name = name;
+    device.autoConnect.value = autoConnect;
+    device.remember.value = true;
     return device;
   }
 
   void init() async {
-    autoConnect.value = await isSaved();
+    String? saved = await getSaved();
+    if (null != saved) {
+      remember.value = true;
+      autoConnect.value = saved.contains("autoConnect=true");
+    }
     final connectedState = PeripheralConnectionState.connected;
     final disconnectedState = PeripheralConnectionState.disconnected;
     if (_stateSubscription == null && peripheral != null) {
@@ -363,28 +384,40 @@ class Device with Debug {
     autoConnect.value = value;
     await updatePreferences();
     // resend last connection state to trigger connect button update
-    streamSendIfNotClosed(_stateController, lastConnectionState);
+    // streamSendIfNotClosed(_stateController, lastConnectionState);
     if (value && !(await connected)) connect();
+  }
+
+  void setRemember(bool value) async {
+    remember.value = value;
+    await updatePreferences();
   }
 
   Future<void> updatePreferences() async {
     if (null == peripheral) return;
     List<String> devices = (await Preferences().getDevices()).value;
     debugLog('updatePreferences savedDevices before: $devices');
-    String item = runtimeType.toString() + ';' + (name?.replaceAll(RegExp(r';'), '') ?? '') + ';' + peripheral!.identifier;
-    debugLog('updatePreferences item: $item');
-    if (autoConnect.value)
+    devices.removeWhere((item) => item.startsWith(peripheral!.identifier));
+    if (remember.value) {
+      String item = peripheral!.identifier +
+          ";name=" +
+          (name?.replaceAll(RegExp(r';'), '') ?? '') +
+          ";type=" +
+          runtimeType.toString() +
+          ";autoConnect=" +
+          (autoConnect.value ? "true" : "false");
+      debugLog('updatePreferences item: $item');
       devices.add(item);
-    else
-      devices.removeWhere((item) => item.endsWith(peripheral!.identifier));
+    }
     Preferences().setDevices(devices);
     debugLog('updatePreferences savedDevices after: $devices');
   }
 
-  Future<bool> isSaved() async {
-    if (null == peripheral) return false;
+  Future<String?> getSaved() async {
+    if (null == peripheral) return null;
     var devices = (await Preferences().getDevices()).value;
-    return devices.any((item) => item.endsWith(peripheral!.identifier));
+    String item = devices.firstWhere((item) => item.startsWith(peripheral!.identifier), orElse: () => "");
+    return "" == item ? null : item;
   }
 
   Future<Type> correctType() async {
@@ -455,6 +488,7 @@ class PowerMeter extends Device {
       device = ESPM(peripheral!);
       device.name = name;
       device.autoConnect.value = autoConnect.value;
+      device.remember.value = remember.value;
     } else
       return this;
     return device;

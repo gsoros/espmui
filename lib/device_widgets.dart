@@ -34,7 +34,7 @@ class BatteryWidget extends StatelessWidget {
                 fit: FlexFit.loose,
                 child: Align(
                   child: Text(
-                    snapshot.hasData && snapshot.data! > 0 ? "${snapshot.data}" : "--",
+                    snapshot.hasData ? "${snapshot.data}" : "--",
                     style: const TextStyle(fontSize: 30),
                   ),
                 ),
