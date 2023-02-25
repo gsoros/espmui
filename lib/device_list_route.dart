@@ -127,8 +127,9 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
         else {
           List<Device> sorted = devices.values.toList(growable: false);
           sorted.sort((a, b) {
-            if (a.autoConnect.value == b.autoConnect.value) return a.name?.compareTo(b.name ?? "") ?? -1;
-            return a.autoConnect.value ? 1 : -1;
+            // if (a.autoConnect.value == b.autoConnect.value) return a.name?.compareTo(b.name ?? "") ?? -1;
+            // return a.autoConnect.value ? 1 : -1;
+            return a.name?.compareTo(b.name ?? "") ?? -1;
           });
           sorted.forEach(
             (device) {
@@ -153,6 +154,8 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
   }
 
   Widget _listItem(Device device) {
+    Color active = Color.fromARGB(255, 128, 255, 128);
+    Color inactive = Colors.grey;
     return InkWell(
       onTap: () {
         openDevice(device);
@@ -172,9 +175,54 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    device.name ?? "Unnamed device",
-                    style: TextStyle(fontSize: 18),
+                  Row(
+                    children: [
+                      Icon(device.iconData),
+                      Text(
+                        device.name ?? "Unnamed device",
+                        style: TextStyle(fontSize: 18),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 0, 10, 0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              ValueListenableBuilder(
+                                  valueListenable: device.remember,
+                                  builder: (context, bool value, _) {
+                                    if (value) return Icon(Icons.star, size: 28, color: active);
+                                    return Icon(Icons.star, size: 28, color: inactive);
+                                  }),
+                              ValueListenableBuilder(
+                                  valueListenable: device.autoConnect,
+                                  builder: (context, bool value, _) {
+                                    if (value) return Icon(Icons.autorenew, size: 28, color: active);
+                                    return Icon(Icons.autorenew, size: 28, color: inactive);
+                                  }),
+                              StreamBuilder(
+                                  stream: device.stateStream,
+                                  initialData: device.lastConnectionState,
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData) {
+                                      if (snapshot.data == PeripheralConnectionState.connected)
+                                        return Icon(Icons.link, size: 28, color: active);
+                                      else if (snapshot.data == PeripheralConnectionState.connecting)
+                                        return Icon(Icons.search, size: 28, color: Colors.yellow);
+                                      else if (snapshot.data == PeripheralConnectionState.disconnected)
+                                        return Icon(Icons.link_off, size: 28, color: inactive);
+                                      else if (snapshot.data == PeripheralConnectionState.disconnecting) return Icon(Icons.cut, size: 28, color: Colors.red);
+                                    }
+                                    return Text(
+                                      " ",
+                                      style: TextStyle(fontSize: 10),
+                                    );
+                                  }),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   Text(
                     0 < device.lastScanRssi ? "rssi: ${device.lastScanRssi}" : " ",

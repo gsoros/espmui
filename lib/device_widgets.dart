@@ -586,10 +586,12 @@ class SettingInputWidget extends StatelessWidget with Debug {
 class ApiSettingInputWidget extends SettingInputWidget {
   final Api api;
   final int? commandCode;
+  final String? commandArg;
 
   ApiSettingInputWidget({
     required this.api,
     required this.commandCode,
+    this.commandArg,
     String? value,
     bool enabled = true,
     String? name,
@@ -616,12 +618,15 @@ class ApiSettingInputWidget extends SettingInputWidget {
           return;
         }
         if (transformInput != null) edited = transformInput!(edited);
+        String command = "$commandCode=" + (null != commandArg ? "$commandArg:" : "") + "$edited";
+        String? expect = null != commandArg ? "$commandArg:" : null;
         final result = await api.requestResultCode(
-          "$commandCode=$edited",
+          command,
+          expectValue: expect,
           minDelayMs: 2000,
         );
         if (name != null) snackbar("$name update${result == ApiResult.success ? "d" : " failed"}", context);
-        debugLog("api.requestResultCode($commandCode): $result");
+        debugLog('api.requestResultCode("$command", expectValue="$expect"): $result');
       };
 }
 
@@ -1342,6 +1347,28 @@ class EspccSyncWidget extends StatelessWidget with Debug {
   }
 }
 
+class DeviceIcon extends StatelessWidget {
+  final String? type;
+  DeviceIcon(this.type);
+  Widget build(BuildContext context) {
+    return Icon(data());
+  }
+
+  IconData data() {
+    IconData id = Icons.question_mark;
+    if ("ESPM" == type)
+      id = Icons.offline_bolt;
+    else if ("PM" == type)
+      id = Icons.bolt;
+    else if ("ESPCC" == type)
+      id = Icons.smartphone;
+    else if ("HRM" == type)
+      id = Icons.favorite;
+    else if ("Vesc" == type) id = Icons.electric_bike;
+    return id;
+  }
+}
+
 class EspccPeersListWidget extends StatelessWidget with Debug {
   final List<String> peers;
   final String action;
@@ -1356,7 +1383,7 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
       // addr,addrType,deviceType,deviceName
       var parts = peer.split(",");
       if (parts.length < 4) return;
-      var icon = Icons.question_mark;
+      String? iconType;
       String? command;
       String? Function(String?, SettingInputWidget?)? commandProcessor;
       IconData? commandIcon;
@@ -1364,7 +1391,7 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
 
       if (parts[2] == "E") {
         /* ESPM */
-        icon = Icons.offline_bolt;
+        iconType = "ESPM";
         if ("add" == action) {
           passcodeEntry = SettingInputWidget(
             name: "Passcode",
@@ -1382,13 +1409,13 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
         }
       } else if (parts[2] == "P") {
         /* Powermeter */
-        icon = Icons.bolt;
+        iconType = "PM";
       } else if (parts[2] == "H") {
         /* Heartrate monitor */
-        icon = Icons.favorite;
+        iconType = "HRM";
       } else if (parts[2] == "V") {
         /* VESC */
-        icon = Icons.electric_bike;
+        iconType = "Vesc";
       }
       if (null != device?.api) {
         if ("add" == action) {
@@ -1419,7 +1446,7 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
               children: [
                 Row(
                   children: [
-                    Icon(icon),
+                    DeviceIcon(iconType),
                     Text(" "),
                     Text(parts[3]),
                   ],
@@ -1553,6 +1580,43 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
               child: Icon(Icons.edit),
             ),
           ]),
+          Divider(color: Colors.white38),
+          Flexible(
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
+                      child: Text("Vesc"),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Number of Battery Cells",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "battNumSeries",
+                      value: -1 == settings.vescBattNumSeries ? "" : settings.vescBattNumSeries.toString(),
+                      suffix: Text("in Series"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Battery Capacity",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "battCapacity",
+                      value: -1 == settings.vescBattCapacityWh ? "" : settings.vescBattCapacityWh.toString(),
+                      suffix: Text("Wh"),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           Divider(color: Colors.white38),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -208,7 +208,7 @@ class Api with Debug {
 
   int? commandCode(String s) {
     if (commands.containsValue(s)) return commands.keys.firstWhere((k) => commands[k] == s);
-    debugLog("code not found for command $s");
+    debugLog("${device.name} code not found for command $s");
     return null;
   }
 
@@ -238,7 +238,7 @@ class Api with Debug {
 
   /// format: resultCode:resultStr;commandCode:commandStr=[value]
   void _onNotify(String reply) {
-    //debugLog("_onNotify() $reply");
+    debugLog("${device.name} Api._onNotify() $reply");
     int resultEnd = reply.indexOf(";");
     if (resultEnd < 1) {
       debugLog("Error parsing notification: $reply");
@@ -282,9 +282,11 @@ class Api with Debug {
     int matches = 0;
     for (ApiMessage m in _queue) {
       if (m.commandCode == commandCode) {
-        //debugLog("expected: '${m.expectValue}' got '${value.substring(0, min(m.expectValue!.length, value.length))}'");
-        // no match if expected value is set and value does not begin with it
-        if (m.expectValue != null && m.expectValue != value.substring(0, min(m.expectValue!.length, value.length))) continue;
+        if (m.expectValue != null) {
+          //debugLog("expected: '${m.expectValue}' got '${value.substring(0, min(m.expectValue!.length, value.length))}'");
+          // no match if expected value is set and value does not begin with it
+          if (m.expectValue != value.substring(0, min(m.expectValue!.length, value.length))) continue;
+        }
         matches++;
         m.resultCode = resultCode;
         m.resultStr = resultStr;
@@ -545,6 +547,7 @@ class Api with Debug {
       _onDone(message);
       message.destruct();
     } else {
+      debugLog("Api sending $message");
       _send(message);
       _queue.addLast(message);
     }
@@ -555,7 +558,9 @@ class Api with Debug {
 
   void _send(ApiMessage message) async {
     int now = uts();
+    if (null != message.lastSentAt) debugLog("message last sent ${now - message.lastSentAt!} ms ago: $message");
     if (now < (message.lastSentAt ?? 0) + message.minDelayMs) return;
+    debugLog("sending...");
     if (!await device.ready()) {
       debugLog("_send() not ready");
       return;
@@ -574,7 +579,7 @@ class Api with Debug {
     _queue.clear();
     commands.clear();
     commands.addAll(_initialCommands);
-    debugLog("reset() commands: $commands");
+    debugLog("${device.name} reset() commands: $commands");
   }
 
   Future<void> destruct() async {

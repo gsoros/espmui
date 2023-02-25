@@ -395,7 +395,7 @@ class ConnectButton extends StatelessWidget with Debug {
         var action;
         var label = "Connect";
         if (snapshot.data == PeripheralConnectionState.connected) {
-          if (!device.autoConnect.value) action = device.disconnect;
+          action = device.disconnect;
           label = "Disconnect";
         } else if (snapshot.data == PeripheralConnectionState.connecting) {
           action = device.disconnect;

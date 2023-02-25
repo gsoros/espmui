@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 //import 'package:flutter/painting.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 //import 'package:intl/intl.dart';
+import 'package:flutter/material.dart';
 
 import 'espm.dart';
 import 'espcc.dart';
@@ -13,6 +14,7 @@ import 'ble.dart';
 import 'ble_characteristic.dart';
 import 'preferences.dart';
 import 'api.dart';
+import "device_widgets.dart";
 
 import 'util.dart';
 import 'debug.dart';
@@ -65,7 +67,7 @@ class Device with Debug {
   PeripheralConnectionState lastConnectionState = PeripheralConnectionState.disconnected;
   final _stateController = StreamController<PeripheralConnectionState>.broadcast();
   Stream<PeripheralConnectionState> get stateStream => _stateController.stream;
-  StreamSubscription<PeripheralConnectionState>? _stateSubscription;
+  StreamSubscription<PeripheralConnectionState>? stateSubscription;
   StreamSubscription<PeripheralConnectionState>? _stateChangeSubscription;
 
   /// Streams which can be selected on the tiles
@@ -157,8 +159,8 @@ class Device with Debug {
     }
     final connectedState = PeripheralConnectionState.connected;
     final disconnectedState = PeripheralConnectionState.disconnected;
-    if (_stateSubscription == null && peripheral != null) {
-      _stateSubscription = peripheral!
+    if (stateSubscription == null && peripheral != null) {
+      stateSubscription = peripheral!
           .observeConnectionState(
         emitCurrentValue: true,
         completeOnDisconnect: false,
@@ -196,8 +198,8 @@ class Device with Debug {
       await char?.unsubscribe();
       await char?.dispose();
     });
-    await _stateSubscription?.cancel();
-    _stateSubscription = null;
+    await stateSubscription?.cancel();
+    stateSubscription = null;
     await _stateChangeSubscription?.cancel();
     _stateChangeSubscription = null;
   }
@@ -234,14 +236,18 @@ class Device with Debug {
   }
 
   Future<void> onDisconnected() async {
-    //debugLog("_onDisconnected()");
+    debugLog("$name onDisconnected()");
+    if (await connected) {
+      debugLog("but $name is connected");
+      return;
+    }
     await _unsubscribeCharacteristics();
     _deinitCharacteristics();
     //streamSendIfNotClosed(stateController, newState);
     if (autoConnect.value && !await connected) {
       await Future.delayed(Duration(seconds: 15)).then((_) async {
         if (autoConnect.value && !await connected) {
-          //debugLog("Autoconnect calling connect()");
+          debugLog("$name onDisconnected() calling connect()");
           await connect();
         }
       });
@@ -279,7 +285,7 @@ class Device with Debug {
         .connect(
       isAutoConnect: true,
       refreshGatt: true,
-      timeout: Duration(seconds: 20),
+      timeout: Duration(seconds: 60),
     )
         .catchError(
       (e) async {
@@ -431,6 +437,8 @@ class Device with Debug {
   Future<Device> copyToCorrectType() async {
     return this;
   }
+
+  IconData get iconData => DeviceIcon(null).data();
 }
 
 class PowerMeter extends Device {
@@ -493,6 +501,9 @@ class PowerMeter extends Device {
       return this;
     return device;
   }
+
+  @override
+  IconData get iconData => DeviceIcon("PM").data();
 }
 
 class HeartRateMonitor extends Device {
@@ -512,6 +523,9 @@ class HeartRateMonitor extends Device {
       ),
     });
   }
+
+  @override
+  IconData get iconData => DeviceIcon("HRM").data();
 }
 
 class WifiSettings with Debug {

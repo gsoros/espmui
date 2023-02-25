@@ -16,6 +16,7 @@ import 'espcc_syncer.dart';
 import 'ble.dart';
 import 'ble_characteristic.dart';
 import 'ble_constants.dart';
+import 'device_widgets.dart';
 
 import 'util.dart';
 import 'debug.dart';
@@ -188,7 +189,11 @@ class ESPCC extends Device {
   }
 
   Future<void> onDisconnected() async {
-    debugLog("onDisconnected()");
+    debugLog("$name onDisconnected()");
+    if (await connected) {
+      debugLog("but $name is connected");
+      return;
+    }
     await super.onDisconnected();
     settings.value = ESPCCSettings();
     settings.notifyListeners();
@@ -226,6 +231,9 @@ class ESPCC extends Device {
     files.value.syncing = ExtendedBool.False;
     files.notifyListeners();
   }
+
+  @override
+  IconData get iconData => DeviceIcon("ESPCC").data();
 }
 
 class ESPCCFile with Debug {
