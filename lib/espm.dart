@@ -116,8 +116,8 @@ class ESPM extends PowerMeter {
 
   Future<void> onDisconnected() async {
     //debugLog("_onDisconnected()");
-    await super.onDisconnected();
     _resetInit();
+    await super.onDisconnected();
   }
 
   /// request initial values, returned values are discarded
@@ -129,7 +129,7 @@ class ESPM extends PowerMeter {
     weightServiceMode.value = ESPMWeightServiceMode.UNKNOWN;
     [
       "init",
-      "wse=${ESPMWeightServiceMode.WHEN_NO_CRANK}",
+      //"wse=${ESPMWeightServiceMode.WHEN_NO_CRANK}",
     ].forEach((key) async {
       await api.request<String>(
         key,
@@ -143,7 +143,9 @@ class ESPM extends PowerMeter {
   void _resetInit() {
     weightServiceMode.value = ESPMWeightServiceMode.UNKNOWN;
     wifiSettings.value = WifiSettings();
+    wifiSettings.notifyListeners();
     settings.value = ESPMSettings();
+    settings.notifyListeners();
     api.reset();
   }
 

@@ -176,17 +176,18 @@ class Device with Debug {
           */
           streamSendIfNotClosed(_stateController, state);
         },
-        onError: (e) => bleError(debugTag, "_stateSubscription", e),
+        onError: (e) => bleError(debugTag, "$name _stateSubscription", e),
       );
     }
     if (_stateChangeSubscription == null)
       _stateChangeSubscription = stateStream.listen(
         (state) async {
+          debugLog("$name _stateChangeSubscription state: $state");
           if (state == connectedState)
             await onConnected();
           else if (state == disconnectedState) await onDisconnected();
         },
-        onError: (e) => bleError(debugTag, "_stateChangeSubscription", e),
+        onError: (e) => bleError(debugTag, "$name _stateChangeSubscription", e),
       );
   }
 
@@ -237,10 +238,10 @@ class Device with Debug {
 
   Future<void> onDisconnected() async {
     debugLog("$name onDisconnected()");
-    if (await connected) {
-      debugLog("but $name is connected");
-      return;
-    }
+    // if (await connected) {
+    //   debugLog("but $name is connected");
+    //   return;
+    // }
     await _unsubscribeCharacteristics();
     _deinitCharacteristics();
     //streamSendIfNotClosed(stateController, newState);
@@ -267,16 +268,16 @@ class Device with Debug {
       return;
     }
     if (await BLE().currentState() != BluetoothState.POWERED_ON) {
-      debugLog("connect() Adapter is off, not connecting");
+      debugLog("$name connect() Adapter is off, not connecting");
       streamSendIfNotClosed(_stateController, disconnectedState);
       return;
     }
     if (null == peripheral) {
-      debugLog("connect() Peripheral is null)");
+      debugLog("$name connect() Peripheral is null)");
       return;
     }
     if (_connectionInitiated) {
-      debugLog("connect() Connection already initiated");
+      debugLog("$name connect() Connection already initiated");
       return;
     }
     //debugLog("connect() Connecting to $name(${peripheral!.identifier})");
@@ -285,11 +286,12 @@ class Device with Debug {
         .connect(
       isAutoConnect: true,
       refreshGatt: true,
-      timeout: Duration(seconds: 60),
+      timeout: Duration(seconds: 20),
+      //requestMtu: 512,
     )
         .catchError(
       (e) async {
-        bleError(debugTag, "peripheral.connect()", e);
+        bleError(debugTag, "$name peripheral.connect()", e);
         if (e is BleError) {
           BleError be = e;
           if (be.errorCode.value == BleErrorCode.deviceAlreadyConnected) {
@@ -331,14 +333,14 @@ class Device with Debug {
   }
 
   Future<void> _subscribeCharacteristics() async {
-    debugLog('_subscribeCharacteristics start');
+    debugLog('$name _subscribeCharacteristics start');
     if (!await discovered()) return;
-    await characteristics.forEachListItem((_, item) async {
+    await characteristics.forEachListItem((name, item) async {
       if (item.subscribeOnConnect) {
         if (null == item.characteristic) return;
-        debugLog('_subscribeCharacteristics ${item.characteristic?.charUUID} start');
+        debugLog('_subscribeCharacteristics $name ${item.characteristic?.charUUID} start');
         await item.characteristic?.subscribe();
-        debugLog('_subscribeCharacteristics ${item.characteristic?.charUUID} end');
+        debugLog('_subscribeCharacteristics $name ${item.characteristic?.charUUID} end');
       }
     });
     _subscribed = true;

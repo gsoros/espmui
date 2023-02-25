@@ -190,11 +190,11 @@ class ESPCC extends Device {
 
   Future<void> onDisconnected() async {
     debugLog("$name onDisconnected()");
-    if (await connected) {
-      debugLog("but $name is connected");
-      return;
-    }
-    await super.onDisconnected();
+    // if (await connected) {
+    //   debugLog("but $name is connected");
+    //   return;
+    // }
+
     settings.value = ESPCCSettings();
     settings.notifyListeners();
     wifiSettings.value = WifiSettings();
@@ -202,6 +202,7 @@ class ESPCC extends Device {
     files.value = ESPCCFileList();
     files.notifyListeners();
     api.reset();
+    await super.onDisconnected();
   }
 
   /// request initial values, returned value is discarded
@@ -423,8 +424,8 @@ class ESPCCFile with Debug {
       if (prevPoint.time != 0 && (point.time < prevPoint.time || prevPoint.time + 86400 < point.time)) {
         // 1 day
         debugLog("$tag invalid time ${point.time} ${point.timeAsIso8601}");
-        cursor += toRead;
-        continue;
+        // cursor += toRead;
+        // continue;
       }
       if (!point.hasLocation) {
         debugLog("$tag no location at point #$pointsWritten ${point.timeAsIso8601}");

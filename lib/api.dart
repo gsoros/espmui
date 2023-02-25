@@ -206,9 +206,9 @@ class Api with Debug {
   final Map<int, String> _initialCommands = {1: "init"};
   Map<int, String> commands = {};
 
-  int? commandCode(String s) {
+  int? commandCode(String s, {bool logOnError = true}) {
     if (commands.containsValue(s)) return commands.keys.firstWhere((k) => commands[k] == s);
-    debugLog("${device.name} code not found for command $s");
+    if (logOnError) debugLog("${device.name} code not found for command $s");
     return null;
   }
 
@@ -542,36 +542,30 @@ class Api with Debug {
     message.parseCommand();
     message.checkAge();
     message.checkAttempts();
+    int now = uts();
     if (message.isDone == true) {
       message.isDone = null;
       _onDone(message);
       message.destruct();
+    } else if (now < (message.lastSentAt ?? 0) + message.minDelayMs) {
+      debugLog("${device.name} Api delaying $message");
+      _queue.addLast(message);
     } else {
-      debugLog("Api sending $message");
-      _send(message);
+      debugLog("${device.name} Api sending $message");
+      if (!await device.ready()) {
+        debugLog("${device.name} Api _send() device not ready");
+      } else {
+        message.lastSentAt = now;
+        message.attempts = (message.attempts ?? 0) + 1;
+        String toWrite = "${message.commandCode}" + (null != message.arg ? "=" + message.arg! : "");
+        //debugLog("_send() calling char.write($toWrite)");
+        characteristic?.write(toWrite);
+      }
       _queue.addLast(message);
     }
     await Future.delayed(Duration(milliseconds: queueDelayMs));
     if (_queue.isNotEmpty) _startQueueSchedule();
     _running = false;
-  }
-
-  void _send(ApiMessage message) async {
-    int now = uts();
-    if (null != message.lastSentAt) debugLog("message last sent ${now - message.lastSentAt!} ms ago: $message");
-    if (now < (message.lastSentAt ?? 0) + message.minDelayMs) return;
-    debugLog("sending...");
-    if (!await device.ready()) {
-      debugLog("_send() not ready");
-      return;
-    }
-    message.lastSentAt = now;
-    message.attempts = (message.attempts ?? 0) + 1;
-    String toWrite = message.commandCode.toString();
-    var arg = message.arg;
-    if (arg != null) toWrite += "=$arg";
-    //debugLog("_send() calling char.write($toWrite)");
-    characteristic?.write(toWrite);
   }
 
   void reset() {

@@ -457,9 +457,9 @@ class EspccApiCharacteristic extends ApiCharacteristic {
     String tag = "EspccApiCharacteristic::onNotify:";
     //debugLog("$tag '$value'");
     final int success = ApiResult.success;
-    final int? rec = device.api.commandCode("rec");
+    final int? rec = device.api.commandCode("rec", logOnError: false);
     if (null == rec) {
-      debugLog("$tag could not find command code for 'rec'");
+      // debugLog("$tag could not find command code for 'rec'");
       return super.onNotify(value);
     }
     final reg = RegExp('(^$success;$rec=get:([0-9a-zA-Z]{8}):([0-9]+);*)(.+)');

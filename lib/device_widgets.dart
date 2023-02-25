@@ -667,6 +667,7 @@ class SettingSwitchWidget extends StatelessWidget with Debug {
 class ApiSettingSwitchWidget extends StatelessWidget with Debug {
   final Api api;
   final int? commandCode;
+  final String? commandArg;
   final ExtendedBool value;
   final String? name;
   final void Function()? onChanged;
@@ -675,6 +676,7 @@ class ApiSettingSwitchWidget extends StatelessWidget with Debug {
     required this.api,
     required this.commandCode,
     required this.value,
+    this.commandArg,
     this.name,
     this.onChanged,
   });
@@ -691,7 +693,8 @@ class ApiSettingSwitchWidget extends StatelessWidget with Debug {
               if (null == commandCode) return;
               if (onChanged != null) onChanged!();
               final result = await api.requestResultCode(
-                "$commandCode=${enabled ? "1" : "0"}",
+                "$commandCode=" + (null != commandArg ? "$commandArg:" : "") + "${enabled ? "1" : "0"}",
+                expectValue: null != commandArg ? "$commandArg:" : null,
                 minDelayMs: 2000,
               );
               if (name != null) snackbar("$name ${enabled ? "en" : "dis"}able${result == ApiResult.success ? "d" : " failed"}", context);
@@ -1613,6 +1616,95 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
                       keyboardType: TextInputType.number,
                     ),
                   ],
+                ),
+                Row(
+                  children: [
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Max Power",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "maxPower",
+                      value: -1 == settings.vescMaxPower ? "" : settings.vescMaxPower.toString(),
+                      suffix: Text("W"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Min Current",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "minCurrent",
+                      value: -1 == settings.vescMinCurrent ? "" : settings.vescMinCurrent.toString(),
+                      suffix: Text("A"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Max Current",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "maxCurrent",
+                      value: -1 == settings.vescMaxCurrent ? "" : settings.vescMaxCurrent.toString(),
+                      suffix: Text("A"),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Ramp Up:"),
+                    ApiSettingSwitchWidget(
+                      api: device.api,
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "rampUp",
+                      value: settings.vescRampUp,
+                    ),
+                    Text("Ramp Down:"),
+                    ApiSettingSwitchWidget(
+                      api: device.api,
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "rampDown",
+                      value: settings.vescRampDown,
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Ramp Diff",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "rampMinCurrentDiff",
+                      value: -1 == settings.vescRampMinCurrentDiff ? "" : settings.vescRampMinCurrentDiff.toString(),
+                      suffix: Text("A"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Steps",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "rampNumSteps",
+                      value: -1 == settings.vescRampNumSteps ? "" : settings.vescRampNumSteps.toString(),
+                      keyboardType: TextInputType.number,
+                    ),
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Time",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "rampTime",
+                      value: -1 == settings.vescRampTime ? "" : settings.vescRampTime.toString(),
+                      suffix: Text("ms"),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [],
+                ),
+                Row(
+                  children: [],
+                ),
+                Row(
+                  children: [],
                 ),
               ],
             ),

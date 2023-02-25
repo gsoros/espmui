@@ -40,16 +40,13 @@ class DeviceList with Debug {
     await _exclusiveAccess.protect(() async {
       if (_loaded && !reload) return;
       var saved = await Preferences().getDevices();
-      //debugLog("load() saved: ${saved.value}");
-      // don't forEach() on a Future
       for (String str in saved.value) {
         var device = await Device.fromSaved(str);
-        device?.autoConnect.value = true;
-        if (null != device) addOrUpdate(device);
-        device?.connect();
-        //debugLog("load() added ${device?.name}");
+        if (null != device) {
+          addOrUpdate(device);
+          if (device.autoConnect.value) device.connect();
+        }
       }
-      //debugLog('load() finished');
     });
     _loaded = true;
   }
