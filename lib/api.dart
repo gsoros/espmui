@@ -417,6 +417,17 @@ class Api with Debug {
 
     if ("bat" == message.commandStr) {
       debugLog("battery: ${message.valueAsString}");
+      List<String>? chunks = message.valueAsString?.split(";");
+      if (null == chunks || chunks.length < 2) return true;
+      if ("charging" == chunks[1]) {
+        device.isCharging = ExtendedBool.True;
+        debugLog("charging");
+      } else if ("discharging" == chunks[1]) {
+        if (ExtendedBool.True == device.isCharging) {
+          debugLog("charge end");
+        }
+        device.isCharging = ExtendedBool.False;
+      }
       return true;
     }
 

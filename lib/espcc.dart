@@ -638,7 +638,7 @@ class ESPCCSettings with Debug {
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
     String tag = "handleApiMessageSuccess";
-    //debugLog("$tag $message");
+    debugLog("$tag $message");
 
     if ("peers" == message.commandStr) {
       String? v = message.valueAsString;

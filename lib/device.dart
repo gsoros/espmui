@@ -76,6 +76,8 @@ class Device with Debug {
   /// Actions which can be initiated by tapping on the tiles
   Map<String, DeviceTileAction> tileActions = {};
 
+  ExtendedBool isCharging = ExtendedBool.Unknown;
+
   Device(this.peripheral) {
     debugLog("construct");
     if (null != peripheral)

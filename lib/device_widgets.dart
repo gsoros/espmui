@@ -25,29 +25,25 @@ class BatteryWidget extends StatelessWidget {
       initialData: device.battery?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
         return Container(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("Battery"),
-              Flexible(
-                fit: FlexFit.loose,
-                child: Align(
-                  child: Text(
-                    snapshot.hasData ? "${snapshot.data}" : "--",
-                    style: const TextStyle(fontSize: 30),
-                  ),
-                ),
-              ),
-              Align(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text("Battery"),
+            Flexible(
+              fit: FlexFit.loose,
+              child: Align(
                 child: Text(
-                  "%",
-                  style: TextStyle(color: Colors.white24),
+                  snapshot.hasData ? "${snapshot.data}" : "--",
+                  style: const TextStyle(fontSize: 30),
                 ),
-                alignment: Alignment.bottomRight,
               ),
-            ],
-          ),
+            ),
+            Align(
+              child: Text(
+                "%",
+                style: TextStyle(color: Colors.white24),
+              ),
+              alignment: Alignment.bottomRight,
+            ),
+          ]),
         );
       },
     );
@@ -119,28 +115,26 @@ class EspmWeightScaleWidget extends StatelessWidget with Debug {
             scrollable: true,
             title: Text("Calibrate device"),
             content: Container(
-              child: Column(
-                children: [
-                  autoTareWarning,
-                  EspmWeightScaleStreamListenerWidget(device, 1),
-                  TextField(
-                    maxLength: 10,
-                    maxLines: 1,
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.send,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: "Enter known mass",
-                      suffixText: "kg",
-                    ),
-                    controller: TextEditingController(),
-                    onSubmitted: (text) async {
-                      Navigator.of(context).pop();
-                      await apiCalibrate(text);
-                    },
+              child: Column(children: [
+                autoTareWarning,
+                EspmWeightScaleStreamListenerWidget(device, 1),
+                TextField(
+                  maxLength: 10,
+                  maxLines: 1,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.send,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: "Enter known mass",
+                    suffixText: "kg",
                   ),
-                ],
-              ),
+                  controller: TextEditingController(),
+                  onSubmitted: (text) async {
+                    Navigator.of(context).pop();
+                    await apiCalibrate(text);
+                  },
+                ),
+              ]),
             ),
           );
         },
@@ -197,30 +191,26 @@ class EspmWeightScaleWidget extends StatelessWidget with Debug {
             toggle(mode);
           },
           child: Container(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Scale"),
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: Align(
-                    child: device.lastConnectionState == PeripheralConnectionState.connected
-                        ? mode == ESPMWeightServiceMode.UNKNOWN
-                            ? CircularProgressIndicator()
-                            : strainOutput
-                        : strainOutput,
-                  ),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text("Scale"),
+              Flexible(
+                fit: FlexFit.loose,
+                child: Align(
+                  child: device.lastConnectionState == PeripheralConnectionState.connected
+                      ? mode == ESPMWeightServiceMode.UNKNOWN
+                          ? CircularProgressIndicator()
+                          : strainOutput
+                      : strainOutput,
                 ),
-                Align(
-                  child: Text(
-                    "kg",
-                    style: TextStyle(color: Colors.white24),
-                  ),
-                  alignment: Alignment.bottomRight,
+              ),
+              Align(
+                child: Text(
+                  "kg",
+                  style: TextStyle(color: Colors.white24),
                 ),
-              ],
-            ),
+                alignment: Alignment.bottomRight,
+              ),
+            ]),
           ),
         );
       },
@@ -267,44 +257,36 @@ class EspmHallSensorWidget extends StatelessWidget {
             scrollable: true,
             title: Text("Hall Sensor Settings"),
             content: Container(
-              child: Column(
-                children: [
-                  EspmHallStreamListenerWidget(device, ExtendedBool.True),
-                  Row(
-                    children: [
-                      ApiSettingInputWidget(
-                        name: "Offset",
-                        value: hallOffset.toString(),
-                        keyboardType: TextInputType.number,
-                        api: device.api,
-                        commandCode: device.api.commandCode("ho"),
-                      ),
-                    ],
+              child: Column(children: [
+                EspmHallStreamListenerWidget(device, ExtendedBool.True),
+                Row(children: [
+                  ApiSettingInputWidget(
+                    name: "Offset",
+                    value: hallOffset.toString(),
+                    keyboardType: TextInputType.number,
+                    api: device.api,
+                    commandCode: device.api.commandCode("ho"),
                   ),
-                  Row(
-                    children: [
-                      ApiSettingInputWidget(
-                        name: "High Threshold",
-                        value: hallThreshold.toString(),
-                        keyboardType: TextInputType.number,
-                        api: device.api,
-                        commandCode: device.api.commandCode("ht"),
-                      ),
-                    ],
+                ]),
+                Row(children: [
+                  ApiSettingInputWidget(
+                    name: "High Threshold",
+                    value: hallThreshold.toString(),
+                    keyboardType: TextInputType.number,
+                    api: device.api,
+                    commandCode: device.api.commandCode("ht"),
                   ),
-                  Row(
-                    children: [
-                      ApiSettingInputWidget(
-                        name: "Low Threshold",
-                        value: hallThresLow.toString(),
-                        keyboardType: TextInputType.number,
-                        api: device.api,
-                        commandCode: device.api.commandCode("htl"),
-                      ),
-                    ],
+                ]),
+                Row(children: [
+                  ApiSettingInputWidget(
+                    name: "Low Threshold",
+                    value: hallThresLow.toString(),
+                    keyboardType: TextInputType.number,
+                    api: device.api,
+                    commandCode: device.api.commandCode("htl"),
                   ),
-                ],
-              ),
+                ]),
+              ]),
             ),
           );
         },
@@ -340,20 +322,16 @@ class EspmHallSensorWidget extends StatelessWidget {
             if (enabled == ExtendedBool.True || enabled == ExtendedBool.False || enabled == ExtendedBool.Unknown) toggle(enabled);
           },
           child: Container(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Hall"),
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: Align(
-                    child: (enabled == ExtendedBool.Waiting) ? CircularProgressIndicator() : EspmHallStreamListenerWidget(device, enabled),
-                  ),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text("Hall"),
+              Flexible(
+                fit: FlexFit.loose,
+                child: Align(
+                  child: (enabled == ExtendedBool.Waiting) ? CircularProgressIndicator() : EspmHallStreamListenerWidget(device, enabled),
                 ),
-                Text(" "),
-              ],
-            ),
+              ),
+              Text(" "),
+            ]),
           ),
         );
       },
@@ -398,24 +376,20 @@ class PowerCadenceWidget extends StatelessWidget with Debug {
       },
     );
     return Container(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(mode == "power" ? "Power" : "Cadence"),
-          Flexible(
-            fit: FlexFit.loose,
-            child: Align(child: value),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(mode == "power" ? "Power" : "Cadence"),
+        Flexible(
+          fit: FlexFit.loose,
+          child: Align(child: value),
+        ),
+        Align(
+          child: Text(
+            mode == "power" ? "W" : "rpm",
+            style: TextStyle(color: Colors.white24),
           ),
-          Align(
-            child: Text(
-              mode == "power" ? "W" : "rpm",
-              style: TextStyle(color: Colors.white24),
-            ),
-            alignment: Alignment.bottomRight,
-          ),
-        ],
-      ),
+          alignment: Alignment.bottomRight,
+        ),
+      ]),
     );
   }
 }
@@ -442,24 +416,20 @@ class HeartRateWidget extends StatelessWidget {
       },
     );
     return Container(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("HR"),
-          Flexible(
-            fit: FlexFit.loose,
-            child: Align(child: value),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text("HR"),
+        Flexible(
+          fit: FlexFit.loose,
+          child: Align(child: value),
+        ),
+        Align(
+          child: Text(
+            "bpm",
+            style: TextStyle(color: Colors.white24),
           ),
-          Align(
-            child: Text(
-              "bpm",
-              style: TextStyle(color: Colors.white24),
-            ),
-            alignment: Alignment.bottomRight,
-          ),
-        ],
-      ),
+          alignment: Alignment.bottomRight,
+        ),
+      ]),
     );
   }
 }
@@ -512,19 +482,16 @@ class ApiInterfaceWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          fit: FlexFit.loose,
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: ApiStreamWidget(api),
-          ),
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      Flexible(
+        fit: FlexFit.loose,
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: ApiStreamWidget(api),
         ),
-        ApiCliWidget(api),
-      ],
-    );
+      ),
+      ApiCliWidget(api),
+    ]);
   }
 }
 
@@ -920,29 +887,27 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           //debugLog("MDM==SG strainThresLow: ${settings.strainThresLow}");
           widgets.add(Divider(color: Colors.white38));
           widgets.add(
-            Row(
-              children: [
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Low Threshold",
-                  commandCode: device.api.commandCode("stl"),
-                  value: settings.strainThresLow == null ? null : settings.strainThresLow.toString(),
-                  keyboardType: TextInputType.number,
-                  enabled: settings.strainThresLow != null,
-                  suffix: Text("kg"),
-                ),
-                Empty(),
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "High Threshold",
-                  commandCode: device.api.commandCode("st"),
-                  value: settings.strainThreshold == null ? null : settings.strainThreshold.toString(),
-                  keyboardType: TextInputType.number,
-                  enabled: settings.strainThreshold != null,
-                  suffix: Text("kg"),
-                ),
-              ],
-            ),
+            Row(children: [
+              ApiSettingInputWidget(
+                api: device.api,
+                name: "Low Threshold",
+                commandCode: device.api.commandCode("stl"),
+                value: settings.strainThresLow == null ? null : settings.strainThresLow.toString(),
+                keyboardType: TextInputType.number,
+                enabled: settings.strainThresLow != null,
+                suffix: Text("kg"),
+              ),
+              Empty(),
+              ApiSettingInputWidget(
+                api: device.api,
+                name: "High Threshold",
+                commandCode: device.api.commandCode("st"),
+                value: settings.strainThreshold == null ? null : settings.strainThreshold.toString(),
+                keyboardType: TextInputType.number,
+                enabled: settings.strainThreshold != null,
+                suffix: Text("kg"),
+              ),
+            ]),
           );
         }
 
@@ -960,75 +925,64 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
         );
         if (ExtendedBool.True == settings.autoTare) {
           widgets.add(
-            Row(
-              children: [
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Delay",
-                  commandCode: device.api.commandCode("atd"),
-                  value: settings.autoTareDelayMs == null ? null : settings.autoTareDelayMs.toString(),
-                  keyboardType: TextInputType.number,
-                  enabled: settings.autoTareDelayMs != null,
-                  suffix: Text("ms"),
-                ),
-                Empty(),
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Max. Range",
-                  commandCode: device.api.commandCode("atr"),
-                  value: settings.autoTareRangeG == null ? null : settings.autoTareRangeG.toString(),
-                  keyboardType: TextInputType.number,
-                  enabled: settings.autoTareRangeG != null,
-                  suffix: Text("g"),
-                ),
-              ],
-            ),
+            Row(children: [
+              ApiSettingInputWidget(
+                api: device.api,
+                name: "Delay",
+                commandCode: device.api.commandCode("atd"),
+                value: settings.autoTareDelayMs == null ? null : settings.autoTareDelayMs.toString(),
+                keyboardType: TextInputType.number,
+                enabled: settings.autoTareDelayMs != null,
+                suffix: Text("ms"),
+              ),
+              Empty(),
+              ApiSettingInputWidget(
+                api: device.api,
+                name: "Max. Range",
+                commandCode: device.api.commandCode("atr"),
+                value: settings.autoTareRangeG == null ? null : settings.autoTareRangeG.toString(),
+                keyboardType: TextInputType.number,
+                enabled: settings.autoTareRangeG != null,
+                suffix: Text("g"),
+              ),
+            ]),
           );
         }
 
         widgets.add(
-          Column(
-            children: [
-              Divider(color: Colors.white38),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  EspmuiElevatedButton(
-                    backgroundColorEnabled: Colors.blue.shade900,
-                    onPressed: settings.otaMode
-                        ? null
-                        : () async {
-                            int? code = await device.api.requestResultCode("system=ota");
-                            if (1 == code) {
-                              device.settings.value.otaMode = true;
-                              device.settings.notifyListeners();
-                              snackbar("Waiting for OTA update, reboot to cancel", context);
-                            } else
-                              snackbar("Failed to enter OTA mode", context);
-                          },
-                    child: Row(
-                      children: [
-                        Icon(Icons.system_update),
-                        Text("OTA"),
-                      ],
-                    ),
-                  ),
-                  EspmuiElevatedButton(
-                    backgroundColorEnabled: Colors.yellow.shade900,
-                    onPressed: () async {
-                      device.api.request<String>("system=reboot");
-                    },
-                    child: Row(
-                      children: [
-                        Icon(Icons.restart_alt),
-                        Text("Reboot"),
-                      ],
-                    ),
-                  ),
-                ],
+          Column(children: [
+            Divider(color: Colors.white38),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              EspmuiElevatedButton(
+                backgroundColorEnabled: Colors.blue.shade900,
+                onPressed: settings.otaMode
+                    ? null
+                    : () async {
+                        int? code = await device.api.requestResultCode("system=ota");
+                        if (1 == code) {
+                          device.settings.value.otaMode = true;
+                          device.settings.notifyListeners();
+                          snackbar("Waiting for OTA update, reboot to cancel", context);
+                        } else
+                          snackbar("Failed to enter OTA mode", context);
+                      },
+                child: Row(children: [
+                  Icon(Icons.system_update),
+                  Text("OTA"),
+                ]),
               ),
-            ],
-          ),
+              EspmuiElevatedButton(
+                backgroundColorEnabled: Colors.yellow.shade900,
+                onPressed: () async {
+                  device.api.request<String>("system=reboot");
+                },
+                child: Row(children: [
+                  Icon(Icons.restart_alt),
+                  Text("Reboot"),
+                ]),
+              ),
+            ]),
+          ]),
         );
 
         return Column(
@@ -1038,21 +992,13 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
       },
     );
 
-    return ExpansionTile(
-      title: Text("Settings"),
-      textColor: Colors.white,
-      iconColor: Colors.white,
-      children: [
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            frame(apiWifiSettings),
-            frame(deviceSettings),
-            frame(ApiInterfaceWidget(device.api)),
-          ],
-        )
-      ],
-    );
+    return ExpansionTile(title: Text("Settings"), textColor: Colors.white, iconColor: Colors.white, children: [
+      Column(mainAxisSize: MainAxisSize.min, children: [
+        frame(apiWifiSettings),
+        frame(deviceSettings),
+        frame(ApiInterfaceWidget(device.api)),
+      ])
+    ]);
   }
 }
 
@@ -1065,31 +1011,29 @@ class EspccPeersEditorWidget extends StatelessWidget with Debug {
     return ValueListenableBuilder<ESPCCSettings>(
         valueListenable: device.settings,
         builder: (_, settings, __) {
-          return Column(
-            children: [
-              EspccPeersListWidget(
-                peers: settings.peers,
-                action: "delete",
-                device: device,
-              ),
-              EspccPeersListWidget(
-                peers: settings.scanResults.where((element) => settings.peers.contains(element) ? false : true).toList(),
-                action: "add",
-                device: device,
-              ),
-              EspmuiElevatedButton(
-                child: Text(settings.scanning ? "Scanning..." : "Scan"),
-                onPressed: settings.scanning
-                    ? null
-                    : () {
-                        //device.settings.value.scanning = true;
-                        device.settings.value.scanResults = [];
-                        device.settings.notifyListeners();
-                        device.api.sendCommand("scan=10");
-                      },
-              ),
-            ],
-          );
+          return Column(children: [
+            EspccPeersListWidget(
+              peers: settings.peers,
+              action: "delete",
+              device: device,
+            ),
+            EspccPeersListWidget(
+              peers: settings.scanResults.where((element) => settings.peers.contains(element) ? false : true).toList(),
+              action: "add",
+              device: device,
+            ),
+            EspmuiElevatedButton(
+              child: Text(settings.scanning ? "Scanning..." : "Scan"),
+              onPressed: settings.scanning
+                  ? null
+                  : () {
+                      //device.settings.value.scanning = true;
+                      device.settings.value.scanResults = [];
+                      device.settings.notifyListeners();
+                      device.api.sendCommand("scan=10");
+                    },
+            ),
+          ]);
         });
   }
 }
@@ -1124,44 +1068,42 @@ class EspccTouchEditorWidget extends StatelessWidget with Debug {
             int cur = settings.touchRead.containsKey(k) ? settings.touchRead[k] ?? 0 : 0;
             if (cur < 0) cur = 0;
             if (100 < cur) cur = 100;
-            items.add(Stack(
-              children: [
-                FractionallySizedBox(
-                  widthFactor: map(cur.toDouble(), 0.0, 100.0, 0.0, 1.0),
-                  alignment: Alignment.topLeft,
-                  child: Container(
-                    color: Color.fromARGB(110, 36, 124, 28),
-                    child: Text(""),
-                  ),
+            items.add(Stack(children: [
+              FractionallySizedBox(
+                widthFactor: map(cur.toDouble(), 0.0, 100.0, 0.0, 1.0),
+                alignment: Alignment.topLeft,
+                child: Container(
+                  color: Color.fromARGB(110, 36, 124, 28),
+                  child: Text(""),
                 ),
-                SliderTheme(
-                  data: SliderThemeData(
-                    trackShape: FullWidthTrackShape(),
-                  ),
-                  child: Slider(
-                    label: v.toString(),
-                    value: v.toDouble(),
-                    min: 0.0,
-                    max: 100.0,
-                    onChanged: (newValue) {
-                      //debugLog("$k changed to $newValue");
-                      device.settings.value.touchThres[k] = newValue.toInt();
-                    },
-                    onChangeEnd: (newValue) {
-                      String thres = "";
-                      device.settings.value.touchThres.forEach((key, value) {
-                        if (0 < thres.length) thres += ",";
-                        if (key == k)
-                          thres += "$key:${newValue.toInt()}";
-                        else
-                          thres += "$key:$value";
-                      });
-                      device.api.sendCommand("touch=thresholds:$thres");
-                    },
-                  ),
+              ),
+              SliderTheme(
+                data: SliderThemeData(
+                  trackShape: FullWidthTrackShape(),
                 ),
-              ],
-            ));
+                child: Slider(
+                  label: v.toString(),
+                  value: v.toDouble(),
+                  min: 0.0,
+                  max: 100.0,
+                  onChanged: (newValue) {
+                    //debugLog("$k changed to $newValue");
+                    device.settings.value.touchThres[k] = newValue.toInt();
+                  },
+                  onChangeEnd: (newValue) {
+                    String thres = "";
+                    device.settings.value.touchThres.forEach((key, value) {
+                      if (0 < thres.length) thres += ",";
+                      if (key == k)
+                        thres += "$key:${newValue.toInt()}";
+                      else
+                        thres += "$key:$value";
+                    });
+                    device.api.sendCommand("touch=thresholds:$thres");
+                  },
+                ),
+              ),
+            ]));
           });
           return Column(children: items);
         });
@@ -1242,35 +1184,30 @@ class EspccSyncWidget extends StatelessWidget with Debug {
                 context: context,
                 builder: (BuildContext context) {
                   return AlertDialog(
-                    scrollable: false,
-                    title: Text("Delete ${f.name}?"),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                      scrollable: false,
+                      title: Text("Delete ${f.name}?"),
+                      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(
                           "Downloaded $downloadedPercent%",
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         Text("$details"),
-                      ],
-                    ),
-                    actions: [
-                      EspmuiElevatedButton(
-                        child: Text("Yes"),
-                        onPressed: () {
-                          sure = true;
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                      EspmuiElevatedButton(
-                        child: Text("No"),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                    ],
-                  );
+                      ]),
+                      actions: [
+                        EspmuiElevatedButton(
+                          child: Text("Yes"),
+                          onPressed: () {
+                            sure = true;
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                        EspmuiElevatedButton(
+                          child: Text("No"),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ]);
                 },
               );
               debugLog("delete: ${f.name} sure: $sure");
@@ -1290,29 +1227,26 @@ class EspccSyncWidget extends StatelessWidget with Debug {
             color: Colors.black12,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(5, 0, 5, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    f.name,
-                    style: const TextStyle(
-                      fontSize: 18.0,
-                      fontWeight: FontWeight.bold,
-                    ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  f.name,
+                  style: const TextStyle(
+                    fontSize: 18.0,
+                    fontWeight: FontWeight.bold,
                   ),
-                  Text(
-                    details,
-                    style: const TextStyle(
-                      fontSize: 14.0,
-                      color: Colors.white54,
-                    ),
+                ),
+                Text(
+                  details,
+                  style: const TextStyle(
+                    fontSize: 14.0,
+                    color: Colors.white54,
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: actions,
-                  ),
-                ],
-              ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: actions,
+                ),
+              ]),
             ),
             // ListTile(
             //   title: Text(f.name),
@@ -1327,24 +1261,21 @@ class EspccSyncWidget extends StatelessWidget with Debug {
         if (filelist.syncing == ExtendedBool.True) items.add(Text("Syncing..."));
         if (0 == items.length) items.add(Text("No files"));
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: items +
-              [
-                EspmuiElevatedButton(
-                  onPressed: filelist.syncing == ExtendedBool.True
-                      ? null
-                      : () {
-                          device.refreshFileList();
-                        },
-                  child: Row(
-                    children: [
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: items +
+                [
+                  EspmuiElevatedButton(
+                    onPressed: filelist.syncing == ExtendedBool.True
+                        ? null
+                        : () {
+                            device.refreshFileList();
+                          },
+                    child: Row(children: [
                       Icon(Icons.sync),
                       Text("Refresh"),
-                    ],
-                  ),
-                )
-              ],
-        );
+                    ]),
+                  )
+                ]);
       },
     );
   }
@@ -1444,25 +1375,18 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
           color: Colors.black12,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(5, 0, 5, 0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    DeviceIcon(iconType),
-                    Text(" "),
-                    Text(parts[3]),
-                  ],
-                ),
-                Row(
-                  children: [
-                    passcodeEntry ?? Text(" "),
-                    Text(" "),
-                    button,
-                  ],
-                )
-              ],
-            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Row(children: [
+                DeviceIcon(iconType),
+                Text(" "),
+                Text(parts[3]),
+              ]),
+              Row(children: [
+                passcodeEntry ?? Text(" "),
+                Text(" "),
+                button,
+              ])
+            ]),
           ),
         ),
       );
@@ -1500,11 +1424,9 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
             scrollable: scrollable,
             title: title,
             content: Container(
-              child: Column(
-                children: [
-                  body,
-                ],
-              ),
+              child: Column(children: [
+                body,
+              ]),
             ),
           );
         },
@@ -1525,22 +1447,18 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
                 //scrollable: false,
               );
             },
-            child: Row(
-              children: [
-                Icon(Icons.sync),
-                Text("Sync recordings"),
-              ],
-            ),
+            child: Row(children: [
+              Icon(Icons.sync),
+              Text("Sync recordings"),
+            ]),
           ),
           Divider(color: Colors.white38),
           Row(children: [
             Flexible(
-              child: Column(
-                children: [
-                  Row(children: [Text("Peers")]),
-                  EspccPeersListWidget(peers: settings.peers),
-                ],
-              ),
+              child: Column(children: [
+                Row(children: [Text("Peers")]),
+                EspccPeersListWidget(peers: settings.peers),
+              ]),
             ),
             EspmuiElevatedButton(
               onPressed: () {
@@ -1555,11 +1473,9 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
           Divider(color: Colors.white38),
           Row(children: [
             Flexible(
-              child: Column(
-                children: [
-                  Row(children: [Text("Touch")]),
-                ],
-              ),
+              child: Column(children: [
+                Row(children: [Text("Touch")]),
+              ]),
             ),
             EspmuiElevatedButton(
               backgroundColorEnabled: settings.touchEnabled ? Color.fromARGB(255, 2, 150, 2) : Color.fromARGB(255, 141, 2, 2),
@@ -1585,175 +1501,151 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
           ]),
           Divider(color: Colors.white38),
           Flexible(
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
-                      child: Text("Vesc"),
-                    ),
-                  ],
+            child: Column(children: [
+              Row(children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
+                  child: Text("Vesc"),
                 ),
-                Row(
-                  children: [
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Number of Battery Cells",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "battNumSeries",
-                      value: -1 == settings.vescBattNumSeries ? "" : settings.vescBattNumSeries.toString(),
-                      suffix: Text("in Series"),
-                      keyboardType: TextInputType.number,
-                    ),
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Battery Capacity",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "battCapacity",
-                      value: -1 == settings.vescBattCapacityWh ? "" : settings.vescBattCapacityWh.toString(),
-                      suffix: Text("Wh"),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ],
+              ]),
+              Row(children: [
+                ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Number of Battery Cells",
+                  commandCode: device.api.commandCode("vesc"),
+                  commandArg: "battNumSeries",
+                  value: -1 == settings.vescBattNumSeries ? "" : settings.vescBattNumSeries.toString(),
+                  suffix: Text("in Series"),
+                  keyboardType: TextInputType.number,
                 ),
-                Row(
-                  children: [
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Max Power",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "maxPower",
-                      value: -1 == settings.vescMaxPower ? "" : settings.vescMaxPower.toString(),
-                      suffix: Text("W"),
-                      keyboardType: TextInputType.number,
-                    ),
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Min Current",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "minCurrent",
-                      value: -1 == settings.vescMinCurrent ? "" : settings.vescMinCurrent.toString(),
-                      suffix: Text("A"),
-                      keyboardType: TextInputType.number,
-                    ),
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Max Current",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "maxCurrent",
-                      value: -1 == settings.vescMaxCurrent ? "" : settings.vescMaxCurrent.toString(),
-                      suffix: Text("A"),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ],
+                ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Battery Capacity",
+                  commandCode: device.api.commandCode("vesc"),
+                  commandArg: "battCapacity",
+                  value: -1 == settings.vescBattCapacityWh ? "" : settings.vescBattCapacityWh.toString(),
+                  suffix: Text("Wh"),
+                  keyboardType: TextInputType.number,
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text("Ramp Up:"),
-                    ApiSettingSwitchWidget(
-                      api: device.api,
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "rampUp",
-                      value: settings.vescRampUp,
-                    ),
-                    Text("Ramp Down:"),
-                    ApiSettingSwitchWidget(
-                      api: device.api,
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "rampDown",
-                      value: settings.vescRampDown,
-                    ),
-                  ],
+              ]),
+              Row(children: [
+                ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Max Power",
+                  commandCode: device.api.commandCode("vesc"),
+                  commandArg: "maxPower",
+                  value: -1 == settings.vescMaxPower ? "" : settings.vescMaxPower.toString(),
+                  suffix: Text("W"),
+                  keyboardType: TextInputType.number,
                 ),
-                Row(
-                  children: [
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Ramp Diff",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "rampMinCurrentDiff",
-                      value: -1 == settings.vescRampMinCurrentDiff ? "" : settings.vescRampMinCurrentDiff.toString(),
-                      suffix: Text("A"),
-                      keyboardType: TextInputType.number,
-                    ),
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Steps",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "rampNumSteps",
-                      value: -1 == settings.vescRampNumSteps ? "" : settings.vescRampNumSteps.toString(),
-                      keyboardType: TextInputType.number,
-                    ),
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Time",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "rampTime",
-                      value: -1 == settings.vescRampTime ? "" : settings.vescRampTime.toString(),
-                      suffix: Text("ms"),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ],
+                ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Min Current",
+                  commandCode: device.api.commandCode("vesc"),
+                  commandArg: "minCurrent",
+                  value: -1 == settings.vescMinCurrent ? "" : settings.vescMinCurrent.toString(),
+                  suffix: Text("A"),
+                  keyboardType: TextInputType.number,
                 ),
-                Row(
-                  children: [],
+                ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Max Current",
+                  commandCode: device.api.commandCode("vesc"),
+                  commandArg: "maxCurrent",
+                  value: -1 == settings.vescMaxCurrent ? "" : settings.vescMaxCurrent.toString(),
+                  suffix: Text("A"),
+                  keyboardType: TextInputType.number,
                 ),
-                Row(
-                  children: [],
+              ]),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text("Ramp"),
+                Row(children: [
+                  ApiSettingSwitchWidget(
+                    api: device.api,
+                    commandCode: device.api.commandCode("vesc"),
+                    commandArg: "rampUp",
+                    value: settings.vescRampUp,
+                  ),
+                  Text("Up"),
+                ]),
+                Row(children: [
+                  ApiSettingSwitchWidget(
+                    api: device.api,
+                    commandCode: device.api.commandCode("vesc"),
+                    commandArg: "rampDown",
+                    value: settings.vescRampDown,
+                  ),
+                  Text("Down"),
+                ]),
+              ]),
+              Row(children: [
+                ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Diff",
+                  commandCode: device.api.commandCode("vesc"),
+                  commandArg: "rampMinCurrentDiff",
+                  value: -1 == settings.vescRampMinCurrentDiff ? "" : settings.vescRampMinCurrentDiff.toString(),
+                  suffix: Text("A"),
+                  keyboardType: TextInputType.number,
                 ),
-                Row(
-                  children: [],
+                ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Steps",
+                  commandCode: device.api.commandCode("vesc"),
+                  commandArg: "rampNumSteps",
+                  value: -1 == settings.vescRampNumSteps ? "" : settings.vescRampNumSteps.toString(),
+                  keyboardType: TextInputType.number,
                 ),
-              ],
-            ),
+                ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Time",
+                  commandCode: device.api.commandCode("vesc"),
+                  commandArg: "rampTime",
+                  value: -1 == settings.vescRampTime ? "" : settings.vescRampTime.toString(),
+                  suffix: Text("ms"),
+                  keyboardType: TextInputType.number,
+                ),
+              ]),
+            ]),
           ),
           Divider(color: Colors.white38),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              EspmuiElevatedButton(
-                backgroundColorEnabled: Colors.blue.shade900,
-                onPressed: settings.otaMode
-                    ? null
-                    : () async {
-                        int? code = await device.api.requestResultCode("system=ota");
-                        if (1 == code) {
-                          device.settings.value.otaMode = true;
-                          device.settings.notifyListeners();
-                          snackbar("Waiting for OTA update, reboot to cancel", context);
-                        } else
-                          snackbar("Failed to enter OTA mode", context);
-                      },
-                child: Row(
-                  children: [
-                    Icon(Icons.system_update),
-                    Text("OTA"),
-                  ],
-                ),
-              ),
-              EspmuiElevatedButton(
-                backgroundColorEnabled: Colors.yellow.shade900,
-                onPressed: () async {
-                  int? code = await device.api.requestResultCode("system=reboot");
-                  if (code == ApiResult.success) {
-                    // snackbar("Rebooting", context);
-                    // device.disconnect();
-                    // await Future.delayed(Duration(seconds: 2));
-                    // device.connect();
-                  } else
-                    snackbar("Failed to reboot", context);
-                },
-                child: Row(
-                  children: [
-                    Icon(Icons.restart_alt),
-                    Text("Reboot"),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            EspmuiElevatedButton(
+              backgroundColorEnabled: Colors.blue.shade900,
+              onPressed: settings.otaMode
+                  ? null
+                  : () async {
+                      int? code = await device.api.requestResultCode("system=ota");
+                      if (1 == code) {
+                        device.settings.value.otaMode = true;
+                        device.settings.notifyListeners();
+                        snackbar("Waiting for OTA update, reboot to cancel", context);
+                      } else
+                        snackbar("Failed to enter OTA mode", context);
+                    },
+              child: Row(children: [
+                Icon(Icons.system_update),
+                Text("OTA"),
+              ]),
+            ),
+            EspmuiElevatedButton(
+              backgroundColorEnabled: Colors.yellow.shade900,
+              onPressed: () async {
+                int? code = await device.api.requestResultCode("system=reboot");
+                if (code == ApiResult.success) {
+                  // snackbar("Rebooting", context);
+                  // device.disconnect();
+                  // await Future.delayed(Duration(seconds: 2));
+                  // device.connect();
+                } else
+                  snackbar("Failed to reboot", context);
+              },
+              child: Row(children: [
+                Icon(Icons.restart_alt),
+                Text("Reboot"),
+              ]),
+            ),
+          ]),
         ];
 
         return Column(
@@ -1763,21 +1655,13 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
       },
     );
 
-    return ExpansionTile(
-      title: Text("Settings"),
-      textColor: Colors.white,
-      iconColor: Colors.white,
-      children: [
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            frame(apiWifiSettings),
-            frame(deviceSettings),
-            frame(ApiInterfaceWidget(device.api)),
-          ],
-        )
-      ],
-    );
+    return ExpansionTile(title: Text("Settings"), textColor: Colors.white, iconColor: Colors.white, children: [
+      Column(mainAxisSize: MainAxisSize.min, children: [
+        frame(apiWifiSettings),
+        frame(deviceSettings),
+        frame(ApiInterfaceWidget(device.api)),
+      ])
+    ]);
   }
 }
 
@@ -1820,26 +1704,24 @@ class ApiWifiSettingsWidget extends StatelessWidget {
           );
           if (settings.apEnabled == ExtendedBool.True)
             widgets.add(
-              Row(
-                children: [
-                  ApiSettingInputWidget(
-                    api: api,
-                    name: "SSID",
-                    commandCode: api.commandCode("was"),
-                    value: settings.apSSID,
-                    enabled: settings.apEnabled == ExtendedBool.True ? true : false,
-                  ),
-                  Empty(),
-                  ApiSettingInputWidget(
-                    api: api,
-                    name: "Password",
-                    commandCode: api.commandCode("wap"),
-                    value: "",
-                    isPassword: true,
-                    enabled: settings.apEnabled == ExtendedBool.True ? true : false,
-                  ),
-                ],
-              ),
+              Row(children: [
+                ApiSettingInputWidget(
+                  api: api,
+                  name: "SSID",
+                  commandCode: api.commandCode("was"),
+                  value: settings.apSSID,
+                  enabled: settings.apEnabled == ExtendedBool.True ? true : false,
+                ),
+                Empty(),
+                ApiSettingInputWidget(
+                  api: api,
+                  name: "Password",
+                  commandCode: api.commandCode("wap"),
+                  value: "",
+                  isPassword: true,
+                  enabled: settings.apEnabled == ExtendedBool.True ? true : false,
+                ),
+              ]),
             );
         }
         if (settings.enabled == ExtendedBool.True) {
@@ -1857,26 +1739,24 @@ class ApiWifiSettingsWidget extends StatelessWidget {
           );
           if (settings.staEnabled == ExtendedBool.True) {
             widgets.add(
-              Row(
-                children: [
-                  ApiSettingInputWidget(
-                    api: api,
-                    name: "SSID",
-                    commandCode: api.commandCode("wss"),
-                    value: settings.staSSID,
-                    enabled: settings.staEnabled == ExtendedBool.True ? true : false,
-                  ),
-                  Empty(),
-                  ApiSettingInputWidget(
-                    api: api,
-                    name: "Password",
-                    commandCode: api.commandCode("wsp"),
-                    value: "",
-                    isPassword: true,
-                    enabled: settings.staEnabled == ExtendedBool.True ? true : false,
-                  ),
-                ],
-              ),
+              Row(children: [
+                ApiSettingInputWidget(
+                  api: api,
+                  name: "SSID",
+                  commandCode: api.commandCode("wss"),
+                  value: settings.staSSID,
+                  enabled: settings.staEnabled == ExtendedBool.True ? true : false,
+                ),
+                Empty(),
+                ApiSettingInputWidget(
+                  api: api,
+                  name: "Password",
+                  commandCode: api.commandCode("wsp"),
+                  value: "",
+                  isPassword: true,
+                  enabled: settings.staEnabled == ExtendedBool.True ? true : false,
+                ),
+              ]),
             );
           }
         }
