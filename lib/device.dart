@@ -239,7 +239,7 @@ class Device with Debug {
   }
 
   Future<void> onDisconnected() async {
-    debugLog("$name onDisconnected()");
+    String tag = "Device::onDisconnected() $name";
     // if (await connected) {
     //   debugLog("but $name is connected");
     //   return;
@@ -247,10 +247,11 @@ class Device with Debug {
     await _unsubscribeCharacteristics();
     _deinitCharacteristics();
     //streamSendIfNotClosed(stateController, newState);
+    debugLog("$tag autoConnect.value: ${autoConnect.value}");
     if (autoConnect.value && !await connected) {
       await Future.delayed(Duration(seconds: 15)).then((_) async {
         if (autoConnect.value && !await connected) {
-          debugLog("$name onDisconnected() calling connect()");
+          debugLog("$tag calling connect()");
           await connect();
         }
       });
