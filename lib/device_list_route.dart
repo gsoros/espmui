@@ -1,6 +1,7 @@
 import 'dart:async';
 //import 'dart:developer' as dev;
 
+import 'package:espmui/device_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:page_transition/page_transition.dart';
@@ -154,8 +155,6 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
   }
 
   Widget _listItem(Device device) {
-    Color active = Color.fromARGB(255, 128, 255, 128);
-    Color inactive = Colors.grey;
     return InkWell(
       onTap: () {
         openDevice(device);
@@ -191,32 +190,27 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
                               ValueListenableBuilder(
                                   valueListenable: device.remember,
                                   builder: (context, bool value, _) {
-                                    if (value) return Icon(Icons.star, size: 28, color: active);
-                                    return Icon(Icons.star, size: 28, color: inactive);
+                                    return FavoriteIcon(active: value);
                                   }),
                               ValueListenableBuilder(
                                   valueListenable: device.autoConnect,
                                   builder: (context, bool value, _) {
-                                    if (value) return Icon(Icons.autorenew, size: 28, color: active);
-                                    return Icon(Icons.autorenew, size: 28, color: inactive);
+                                    return AutoConnectIcon(active: value);
                                   }),
                               StreamBuilder(
                                   stream: device.stateStream,
                                   initialData: device.lastConnectionState,
                                   builder: (context, snapshot) {
+                                    return ConnectionStateIcon(state: snapshot.data);
+                                    /*
                                     if (snapshot.hasData) {
-                                      if (snapshot.data == PeripheralConnectionState.connected)
-                                        return Icon(Icons.link, size: 28, color: active);
-                                      else if (snapshot.data == PeripheralConnectionState.connecting)
-                                        return Icon(Icons.search, size: 28, color: Colors.yellow);
-                                      else if (snapshot.data == PeripheralConnectionState.disconnected)
-                                        return Icon(Icons.link_off, size: 28, color: inactive);
-                                      else if (snapshot.data == PeripheralConnectionState.disconnecting) return Icon(Icons.cut, size: 28, color: Colors.red);
+                                      return ConnectionStateIcon(state: snapshot.data);
                                     }
                                     return Text(
                                       " ",
                                       style: TextStyle(fontSize: 10),
                                     );
+                                    */
                                   }),
                             ],
                           ),

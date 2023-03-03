@@ -97,7 +97,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
           builder: (_, value, __) {
             //debugLog("remember changed: $value");
             return SettingSwitchWidget(
-              name: "Remember",
+              label: FavoriteIcon(active: value),
               value: extendedBoolFromBool(value),
               onChanged: (value) {
                 device.setRemember(value);
@@ -105,7 +105,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
             );
           },
         ),
-        colSpan: 3,
+        colSpan: 2,
       ),
       StaggeredGridItem(
         value: ValueListenableBuilder<bool>(
@@ -113,7 +113,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
           builder: (_, value, __) {
             //debugLog("autoconnect changed: $value");
             return SettingSwitchWidget(
-              name: "Auto Connect",
+              label: AutoConnectIcon(active: value),
               value: extendedBoolFromBool(value),
               onChanged: (value) {
                 device.setAutoConnect(value);
@@ -121,7 +121,20 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
             );
           },
         ),
-        colSpan: 3,
+        colSpan: 2,
+      ),
+      StaggeredGridItem(
+        value: ValueListenableBuilder<bool>(
+            valueListenable: device.saveLog,
+            builder: (_, value, __) {
+              //debugLog("saveLog changed: $value");
+              return SettingSwitchWidget(
+                label: Text("Log"),
+                value: extendedBoolFromBool(device.saveLog.value),
+                onChanged: device.setSaveLog,
+              );
+            }),
+        colSpan: 2,
       ),
       StaggeredGridItem(
         value: BatteryWidget(device),

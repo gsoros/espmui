@@ -1,4 +1,4 @@
-package com.example.espmui
+package org.gsoros.espmui
 
 import io.flutter.embedding.android.FlutterActivity
 

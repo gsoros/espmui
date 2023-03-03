@@ -45,11 +45,11 @@ class Preferences with Debug {
   }
 
   Future<void> _init() async {
-    debugLog('init step 1');
+    // debugLog('init step 1');
     if (_initDone) return;
     await _exclusiveAccess.protect(() async {
       if (_initDone) return;
-      debugLog('init step 2');
+      // debugLog('init step 2');
       _sharedPreferences = await SharedPreferences.getInstance();
       _devices.value = _sharedPreferences.getStringList('devices') ?? [];
       _devices.addListener(() {

@@ -599,12 +599,12 @@ class ApiSettingInputWidget extends SettingInputWidget {
 
 class SettingSwitchWidget extends StatelessWidget with Debug {
   final ExtendedBool value;
-  final String? name;
+  final Widget? label;
   final void Function(bool)? onChanged;
 
   SettingSwitchWidget({
     required this.value,
-    this.name,
+    this.label,
     this.onChanged,
   });
 
@@ -617,14 +617,14 @@ class SettingSwitchWidget extends StatelessWidget with Debug {
             activeColor: Colors.red,
             onChanged: (bool enabled) async {
               if (onChanged != null) onChanged!(enabled);
-              debugLog("[SettingSwitch] $name changed to $enabled");
+              debugLog("[SettingSwitch] changed to $enabled");
             });
-    return (name == null)
+    return (label == null)
         ? toggler
         : Row(children: [
             Flexible(
               fit: FlexFit.tight,
-              child: Text(name!),
+              child: label!,
             ),
             toggler,
           ]);
@@ -1766,5 +1766,53 @@ class ApiWifiSettingsWidget extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class FavoriteIcon extends StatelessWidget {
+  final Color activeColor = Color.fromARGB(255, 128, 255, 128);
+  final Color inactiveColor = Colors.grey;
+  final bool active;
+  final double size;
+
+  FavoriteIcon({this.active = true, this.size = 28});
+
+  @override
+  Widget build(BuildContext context) {
+    return Icon(Icons.star, size: size, color: active ? activeColor : inactiveColor);
+  }
+}
+
+class AutoConnectIcon extends StatelessWidget {
+  final Color activeColor = Color.fromARGB(255, 128, 255, 128);
+  final Color inactiveColor = Colors.grey;
+  final bool active;
+  final double size;
+
+  AutoConnectIcon({this.active = true, this.size = 28});
+
+  @override
+  Widget build(BuildContext context) {
+    return Icon(Icons.autorenew, size: size, color: active ? activeColor : inactiveColor);
+  }
+}
+
+class ConnectionStateIcon extends StatelessWidget {
+  final Color connectedColor = Color.fromARGB(255, 128, 255, 128);
+  final Color connectingColor = Colors.yellow;
+  final Color disconnectedColor = Colors.grey;
+  final Color disconnecingColor = Colors.red;
+  final Object? state;
+  final double size;
+
+  ConnectionStateIcon({this.state, this.size = 28});
+
+  @override
+  Widget build(BuildContext context) {
+    if (state == PeripheralConnectionState.connected) return Icon(Icons.link, size: size, color: connectedColor);
+    if (state == PeripheralConnectionState.connecting) return Icon(Icons.search, size: size, color: connectingColor);
+    if (state == PeripheralConnectionState.disconnected) return Icon(Icons.link_off, size: size, color: disconnectedColor);
+    if (state == PeripheralConnectionState.disconnecting) return Icon(Icons.cut, size: size, color: disconnecingColor);
+    return Empty();
   }
 }

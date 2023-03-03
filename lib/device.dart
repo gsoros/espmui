@@ -15,6 +15,7 @@ import 'ble_characteristic.dart';
 import 'preferences.dart';
 import 'api.dart';
 import "device_widgets.dart";
+import "notifications.dart";
 
 import 'util.dart';
 import 'debug.dart';
@@ -37,6 +38,9 @@ class Device with Debug {
 
   /// whether the device should be kept connected
   final autoConnect = ValueNotifier<bool>(false);
+
+  /// whether the log should be saved
+  final saveLog = ValueNotifier<bool>(false);
 
   /// list of characteristics
   CharacteristicList characteristics = CharacteristicList();
@@ -76,6 +80,7 @@ class Device with Debug {
   /// Actions which can be initiated by tapping on the tiles
   Map<String, DeviceTileAction> tileActions = {};
 
+  StreamSubscription<int>? _batteryLevelSubscription;
   ExtendedBool isCharging = ExtendedBool.Unknown;
 
   Device(this.peripheral) {
@@ -125,6 +130,7 @@ class Device with Debug {
     String type = "";
     String name = "";
     bool autoConnect = false;
+    bool saveLog = false;
     chunks.forEach((chunk) {
       String key = "type=";
       if (chunk.startsWith(key)) type = chunk.substring(key.length);
@@ -132,8 +138,13 @@ class Device with Debug {
       if (chunk.startsWith(key)) name = chunk.substring(key.length);
       key = "autoConnect=";
       if (chunk.startsWith(key)) autoConnect = chunk.substring(key.length) == "true";
+      key = "saveLog=";
+      if (chunk.startsWith(key)) saveLog = chunk.substring(key.length) == "true";
     });
-    dev.log("Device.fromSaved($savedDevice): address: $address, type: $type, name: $name, autoConnect: " + (autoConnect ? "true" : "false"));
+    dev.log("Device.fromSaved($savedDevice): address: $address, type: $type, name: $name, autoConnect: " +
+        (autoConnect ? "true" : "false") +
+        ", saveLog: " +
+        (saveLog ? "true" : "false"));
     var manager = await BLE().manager;
     Peripheral peripheral = manager.createUnsafePeripheral(address);
     Device device;
@@ -150,6 +161,7 @@ class Device with Debug {
     device.name = name;
     device.autoConnect.value = autoConnect;
     device.remember.value = true;
+    device.saveLog.value = saveLog;
     return device;
   }
 
@@ -158,6 +170,7 @@ class Device with Debug {
     if (null != saved) {
       remember.value = true;
       autoConnect.value = saved.contains("autoConnect=true");
+      saveLog.value = saved.contains("saveLog=true");
     }
     final connectedState = PeripheralConnectionState.connected;
     final disconnectedState = PeripheralConnectionState.disconnected;
@@ -181,7 +194,7 @@ class Device with Debug {
         onError: (e) => bleError(debugTag, "$name _stateSubscription", e),
       );
     }
-    if (_stateChangeSubscription == null)
+    if (_stateChangeSubscription == null) {
       _stateChangeSubscription = stateStream.listen(
         (state) async {
           debugLog("$name _stateChangeSubscription state: $state");
@@ -191,6 +204,16 @@ class Device with Debug {
         },
         onError: (e) => bleError(debugTag, "$name _stateChangeSubscription", e),
       );
+    }
+    if (_batteryLevelSubscription == null && peripheral != null) {
+      _batteryLevelSubscription = battery?.defaultStream.listen(
+        (level) {
+          debugLog("$name _batteryLevelSubscription level: $level%, charging: $isCharging");
+          if (extendedBoolToBool(isCharging)) notifyCharging();
+        },
+        onError: (e) => debugLog("$debugTag _batteryLevelSubscription $e"),
+      );
+    }
   }
 
   Future<void> dispose() async {
@@ -205,6 +228,8 @@ class Device with Debug {
     stateSubscription = null;
     await _stateChangeSubscription?.cancel();
     _stateChangeSubscription = null;
+    await _batteryLevelSubscription?.cancel();
+    _batteryLevelSubscription = null;
   }
 
   Future<bool> ready() async {
@@ -404,6 +429,14 @@ class Device with Debug {
     await updatePreferences();
   }
 
+  void setSaveLog(bool value) async {
+    if (!saveLog.value && value)
+      characteristics.get("apiLog")?.subscribe();
+    else if (saveLog.value && !value) characteristics.get("apiLog")?.unsubscribe();
+    saveLog.value = value;
+    await updatePreferences();
+  }
+
   Future<void> updatePreferences() async {
     if (null == peripheral) return;
     List<String> devices = (await Preferences().getDevices()).value;
@@ -416,7 +449,9 @@ class Device with Debug {
           ";type=" +
           runtimeType.toString() +
           ";autoConnect=" +
-          (autoConnect.value ? "true" : "false");
+          (autoConnect.value ? "true" : "false") +
+          ";saveLog=" +
+          (saveLog.value ? "true" : "false");
       debugLog('updatePreferences item: $item');
       devices.add(item);
     }
@@ -444,6 +479,31 @@ class Device with Debug {
   }
 
   IconData get iconData => DeviceIcon(null).data();
+
+  void notifyCharging() {
+    bool charging = extendedBoolToBool(isCharging);
+    String status = charging ? "charging" : "charge end";
+    int progress = this.battery?.lastValue ?? -1;
+    bool showProgress = progress != -1;
+
+    Notifications().cancel(peripheral.hashCode);
+
+    debugLog("$name notifyCharging() battery charging: $charging");
+
+    Notifications().notify(
+      name ?? "unknown device",
+      status,
+      id: peripheral.hashCode,
+      channelId: status,
+      playSound: !charging,
+      enableVibration: !charging,
+      showProgress: showProgress,
+      progress: progress,
+      maxProgress: 100,
+      ongoing: charging,
+      onlyAlertOnce: true,
+    );
+  }
 }
 
 class PowerMeter extends Device {

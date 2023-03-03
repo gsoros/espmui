@@ -40,6 +40,7 @@ class ESPCC extends Device {
     characteristics.addAll({
       'apiLog': CharacteristicListItem(
         ApiLogCharacteristic(this, BleConstants.ESPCC_API_SERVICE_UUID),
+        subscribeOnConnect: saveLog.value,
       ),
     });
     api = Api(this, queueDelayMs: 50);
