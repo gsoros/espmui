@@ -13,6 +13,7 @@ import 'device_list.dart';
 import 'device_widgets.dart';
 import 'espm.dart';
 import 'espcc.dart';
+import 'tile.dart';
 
 class DeviceRoute extends StatefulWidget with Debug {
   final Device device;
@@ -89,8 +90,29 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
     );
   }
 
+  List<StaggeredGridItem> _deviceStreamTiles() {
+    List<StaggeredGridItem> items = [];
+    device.tileStreams.forEach((name, stream) {
+      //debugLog("_deviceStreamTiles: name: $name, label: ${stream.label}");
+      if (ESPM == device.runtimeType && "scale" == name) return; // TODO
+      Tile tile = Tile(
+        device: device.identifier,
+        stream: name,
+        color: Colors.black,
+        showDeviceName: false,
+      );
+      StaggeredGridItem item = StaggeredGridItem(
+        colSpan: 2,
+        value: tile,
+      );
+      items.add(item);
+    });
+    return items;
+  }
+
   List<StaggeredGridItem> _devicePropertyItems() {
-    return [
+    List<StaggeredGridItem> items = [];
+    items.addAll([
       StaggeredGridItem(
         value: ValueListenableBuilder<bool>(
           valueListenable: device.remember,
@@ -136,11 +158,13 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
             }),
         colSpan: 2,
       ),
-      StaggeredGridItem(
-        value: BatteryWidget(device),
-        colSpan: 2,
-      ),
-    ];
+      // StaggeredGridItem(
+      //   value: BatteryWidget(device),
+      //   colSpan: 2,
+      // ),
+    ]);
+    items.addAll(_deviceStreamTiles());
+    return items;
   }
 
   Widget _deviceProperties() {
@@ -191,14 +215,14 @@ class PowerMeterRouteState extends DeviceRouteState {
   @override
   _devicePropertyItems() {
     return [
-      StaggeredGridItem(
-        value: PowerCadenceWidget(powerMeter, mode: "power"),
-        colSpan: 3,
-      ),
-      StaggeredGridItem(
-        value: PowerCadenceWidget(powerMeter, mode: "cadence"),
-        colSpan: 3,
-      ),
+      // StaggeredGridItem(
+      //   value: PowerCadenceWidget(powerMeter, mode: "power"),
+      //   colSpan: 3,
+      // ),
+      // StaggeredGridItem(
+      //   value: PowerCadenceWidget(powerMeter, mode: "cadence"),
+      //   colSpan: 3,
+      // ),
     ]..addAll(super._devicePropertyItems());
   }
 }
@@ -253,10 +277,10 @@ class HeartRateMonitorRouteState extends DeviceRouteState {
   @override
   _devicePropertyItems() {
     return [
-      StaggeredGridItem(
-        value: HeartRateWidget(hrm),
-        colSpan: 3,
-      ),
+      // StaggeredGridItem(
+      //   value: HeartRateWidget(hrm),
+      //   colSpan: 3,
+      // ),
     ]..addAll(super._devicePropertyItems());
   }
 }

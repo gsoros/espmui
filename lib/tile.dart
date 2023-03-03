@@ -20,6 +20,7 @@ class Tile extends StatelessWidget with Debug {
   final int height;
   final String device;
   final String stream;
+  final bool showDeviceName;
 
   /// tap action
   final String tap;
@@ -37,6 +38,7 @@ class Tile extends StatelessWidget with Debug {
     this.stream = "",
     this.tap = "",
     this.history = 0,
+    this.showDeviceName = true,
   }) : super(key: key);
 
   Tile.from(
@@ -50,6 +52,7 @@ class Tile extends StatelessWidget with Debug {
     String? stream,
     String? tap,
     int? history,
+    bool? showDeviceName,
   }) : this(
           key: key ?? other.key,
           color: color ?? other.color,
@@ -60,6 +63,7 @@ class Tile extends StatelessWidget with Debug {
           stream: stream ?? other.stream,
           tap: tap ?? other.tap,
           history: history ?? other.history,
+          showDeviceName: showDeviceName ?? other.showDeviceName,
         );
 
   Tile copyWith(
@@ -71,6 +75,8 @@ class Tile extends StatelessWidget with Debug {
     String? device,
     String? stream,
     String? tap,
+    int? history,
+    bool? showDeviceName,
   ) {
     return Tile.from(
       this,
@@ -82,6 +88,8 @@ class Tile extends StatelessWidget with Debug {
       device: device ?? this.device,
       stream: stream ?? this.stream,
       tap: tap ?? this.tap,
+      history: history ?? this.history,
+      showDeviceName: showDeviceName ?? this.showDeviceName,
     );
   }
 
@@ -93,7 +101,8 @@ class Tile extends StatelessWidget with Debug {
         device = json['device'] ?? "",
         stream = json['stream'] ?? "",
         tap = json['tap'] ?? "",
-        history = json['history'] ?? 0;
+        history = json['history'] ?? 0,
+        showDeviceName = json["showDeviceName"] ?? true;
 
   Map<String, dynamic> toJson() => {
         'color': color.value,
@@ -104,6 +113,7 @@ class Tile extends StatelessWidget with Debug {
         'stream': stream,
         'tap': tap,
         'history': history,
+        'showDeviceName': showDeviceName,
       };
 
   @override
@@ -121,18 +131,18 @@ class Tile extends StatelessWidget with Debug {
         stream: stream?.stream,
         initialData: stream?.initialData != null ? stream?.initialData!() : null,
         builder: (_, snapshot) {
-          //debugLog("Tile build getValue ${device.name} ${source.label} ${snapshot.data}");
+          //debugLog("Tile build getValue ${device?.name} ${stream?.label} ${snapshot.data}");
           return Text(snapshot.hasData ? snapshot.data.toString() : " ");
         },
       );
     }
 
-    Widget getValueWhenConnected() {
+    Widget getValueIfConnected() {
       return StreamBuilder<PeripheralConnectionState>(
         stream: device?.stateStream,
         initialData: device?.lastConnectionState,
         builder: (_, snapshot) {
-          //debugLog("Tile build getValueWhenConnected ${device.name} ${source.label} ${snapshot.data}");
+          //debugLog("Tile build getValueIfConnected ${device?.name} ${stream?.label} ${snapshot.data}");
           if (!snapshot.hasData || snapshot.data == null || snapshot.data == PeripheralConnectionState.connected) return getValue();
           if (snapshot.data == PeripheralConnectionState.disconnected) return Empty();
           return CircularProgressIndicator();
@@ -161,6 +171,9 @@ class Tile extends StatelessWidget with Debug {
       );
     }
 
+    String label = stream?.label ?? '';
+    if (showDeviceName) label += "(" + (device?.name ?? "No source") + ")";
+
     return Material(
       child: Container(
         padding: const EdgeInsets.all(2.0),
@@ -179,7 +192,7 @@ class Tile extends StatelessWidget with Debug {
                 children: [
                   Expanded(
                     child: Text(
-                      "${stream?.label ?? ''} (${device?.name ?? 'No source'})",
+                      label,
                       softWrap: false,
                       overflow: TextOverflow.fade,
                       style: TextStyle(fontSize: 10, color: textColor),
@@ -216,7 +229,7 @@ class Tile extends StatelessWidget with Debug {
                             color: textColor,
                             fontSize: 120,
                           ),
-                          child: getValueWhenConnected(),
+                          child: getValueIfConnected(),
                         ),
                       ),
                     ),

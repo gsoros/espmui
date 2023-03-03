@@ -72,37 +72,27 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
                             content: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  width: 150.0,
-                                  height: 50.0,
-                                  margin: EdgeInsets.only(top: 30),
-                                  child: ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          TileList().add(Tile());
-                                          TileList().save();
-                                        });
-                                        Navigator.of(context).pop(); // close dialog
-                                      },
-                                      child: Text("Add tile")),
-                                ),
-                                Container(
-                                  width: 150.0,
-                                  height: 50.0,
-                                  margin: EdgeInsets.only(top: 30),
-                                  child: ElevatedButton(
+                                ElevatedButton(
                                     onPressed: () {
+                                      setState(() {
+                                        TileList().add(Tile());
+                                        TileList().save();
+                                      });
                                       Navigator.of(context).pop(); // close dialog
-                                      Navigator.push(
-                                        context,
-                                        PageTransition(
-                                          type: PageTransitionType.rightToLeft,
-                                          child: DeviceListRoute(),
-                                        ),
-                                      );
                                     },
-                                    child: Text("Devices"),
-                                  ),
+                                    child: Text("Add tile")),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(); // close dialog
+                                    Navigator.push(
+                                      context,
+                                      PageTransition(
+                                        type: PageTransitionType.rightToLeft,
+                                        child: DeviceListRoute(),
+                                      ),
+                                    );
+                                  },
+                                  child: Text("Devices"),
                                 ),
                               ],
                             ),

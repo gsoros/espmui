@@ -717,7 +717,7 @@ class ESPCCSettings with Debug {
       String? s = message.valueAsString;
       if (null != i && null != s && 1 == s.length && int.tryParse(s) == i) {
         recording = (ESPCCRecordingState.MIN < i && i < ESPCCRecordingState.MAX) ? i : ESPCCRecordingState.UNKNOWN;
-        debugLog("$tag rec: received $recording");
+        //debugLog("$tag received rec=${message.value}, parsed recording=${ESPCCRecordingState.getString(recording)}");
         return true;
       }
       return false;
