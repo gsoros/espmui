@@ -122,7 +122,7 @@ abstract class BleCharacteristic<T> with Debug {
 
   Future<void> subscribe() async {
     debugLog("subscribe()");
-    if (_subscription != null) {
+    if (isSubscribed) {
       bleError(debugTag, "already subscribed");
       return;
     }
@@ -159,6 +159,8 @@ abstract class BleCharacteristic<T> with Debug {
     debugLog("subscribe() initial value: $lastValue");
     util.streamSendIfNotClosed(_controller, lastValue);
   }
+
+  bool get isSubscribed => _subscription != null;
 
   void _appendToHistory() {
     // var history = histories['raw'];
@@ -235,6 +237,15 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
       bleError(debugTag, "toUint8List() negative value");
     else if (255 < value) bleError(debugTag, "toUint8List() $value clipped");
     return Uint8List.fromList([value]);
+  }
+
+  @override
+  Future<void> unsubscribe() async {
+    bool wasSubscribed = isSubscribed;
+    await super.unsubscribe();
+    if (!wasSubscribed) return;
+    device.isCharging = util.ExtendedBool.Unknown;
+    device.notifyCharging();
   }
 }
 

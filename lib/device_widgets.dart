@@ -602,10 +602,14 @@ class SettingSwitchWidget extends StatelessWidget with Debug {
   final Widget? label;
   final void Function(bool)? onChanged;
 
+  /// whether the switch can be toggled
+  final bool enabled;
+
   SettingSwitchWidget({
     required this.value,
     this.label,
     this.onChanged,
+    this.enabled = true,
   });
 
   @override
@@ -615,10 +619,12 @@ class SettingSwitchWidget extends StatelessWidget with Debug {
         : Switch(
             value: value == ExtendedBool.True ? true : false,
             activeColor: Colors.red,
-            onChanged: (bool enabled) async {
-              if (onChanged != null) onChanged!(enabled);
-              debugLog("[SettingSwitch] changed to $enabled");
-            });
+            onChanged: enabled
+                ? (bool state) async {
+                    if (onChanged != null) onChanged!(state);
+                    debugLog("[SettingSwitch] $label changed to $state");
+                  }
+                : null);
     return (label == null)
         ? toggler
         : Row(children: [

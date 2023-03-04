@@ -154,6 +154,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
                 label: Text("Log"),
                 value: extendedBoolFromBool(device.saveLog.value),
                 onChanged: device.setSaveLog,
+                enabled: null != device.characteristic("apiLog"),
               );
             }),
         colSpan: 2,
