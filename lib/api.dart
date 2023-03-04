@@ -236,7 +236,7 @@ class Api with Debug {
     _timer = null;
   }
 
-  /// format: resultCode:resultStr;commandCode:commandStr=[value]
+  /// format: resultCode[:resultStr];commandCode[]:commandStr][=[value]]
   void _onNotify(String reply) {
     String tag = "${device.name} Api._onNotify()";
     debugLog("$tag $reply");
@@ -422,11 +422,11 @@ class Api with Debug {
       List<String>? chunks = message.valueAsString?.split("|");
       if (null == chunks || chunks.length < 2) return true;
       if ("charging" == chunks[1]) {
-        bool wasntCharging = ExtendedBool.True != device.isCharging;
+        bool wasntCharging = !device.isCharging.asBool;
         device.isCharging = ExtendedBool.True;
         if (wasntCharging) device.notifyCharging();
       } else if ("discharging" == chunks[1]) {
-        bool wasCharging = ExtendedBool.True == device.isCharging;
+        bool wasCharging = device.isCharging.asBool;
         device.isCharging = ExtendedBool.False;
         if (wasCharging) device.notifyCharging();
       }

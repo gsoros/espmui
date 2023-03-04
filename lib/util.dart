@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:espmui/main.dart';
+// import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -11,24 +12,25 @@ import 'debug.dart';
 
 /// bool plus Unknown and Waiting
 enum ExtendedBool {
-  False,
-  True,
-  Unknown,
-  Waiting,
+  Unknown(0),
+  Waiting(1),
+  False(2),
+  True(3);
+
+  final int value;
+
+  const ExtendedBool(this.value);
+
+  factory ExtendedBool.fromBool(bool b) => b ? True : False;
+
+  factory ExtendedBool.fromString(String s) {
+    if (s.toLowerCase() == "true" || s == "1") return True;
+    if (s.toLowerCase() == "false" || s == "0") return False;
+    return Unknown;
+  }
+
+  bool get asBool => value == True.value;
 }
-
-/// converts bool to extended
-ExtendedBool extendedBoolFromBool(bool value) => value ? ExtendedBool.True : ExtendedBool.False;
-
-/// converts string to extended
-ExtendedBool extendedBoolFromString(String value) {
-  if (value.toLowerCase() == "true" || value == "1") return ExtendedBool.True;
-  if (value.toLowerCase() == "false" || value == "0") return ExtendedBool.False;
-  return ExtendedBool.Unknown;
-}
-
-/// converts extended to bool
-bool extendedBoolToBool(ExtendedBool value) => ExtendedBool.True == value;
 
 /// A [ValueNotifier] that notifies listeners in the setter even when [value] is replaced
 /// with something that is equal to the old value as evaluated by the equality operator ==.

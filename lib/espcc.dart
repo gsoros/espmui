@@ -749,10 +749,10 @@ class ESPCCSettings with Debug {
             vescMaxCurrent = double.tryParse(pair[1]) ?? vescMaxCurrent;
             break;
           case "rampUp":
-            vescRampUp = extendedBoolFromString(pair[1]);
+            vescRampUp = ExtendedBool.fromString(pair[1]);
             break;
           case "rampDown":
-            vescRampDown = extendedBoolFromString(pair[1]);
+            vescRampDown = ExtendedBool.fromString(pair[1]);
             break;
           case "rampMinCurrentDiff":
             vescRampMinCurrentDiff = double.tryParse(pair[1]) ?? vescRampMinCurrentDiff;

@@ -120,7 +120,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
             //debugLog("remember changed: $value");
             return SettingSwitchWidget(
               label: FavoriteIcon(active: value),
-              value: extendedBoolFromBool(value),
+              value: ExtendedBool.fromBool(value),
               onChanged: (value) {
                 device.setRemember(value);
               },
@@ -136,7 +136,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
             //debugLog("autoconnect changed: $value");
             return SettingSwitchWidget(
               label: AutoConnectIcon(active: value),
-              value: extendedBoolFromBool(value),
+              value: ExtendedBool.fromBool(value),
               onChanged: (value) {
                 device.setAutoConnect(value);
               },
@@ -152,7 +152,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
               //debugLog("saveLog changed: $value");
               return SettingSwitchWidget(
                 label: Text("Log"),
-                value: extendedBoolFromBool(device.saveLog.value),
+                value: ExtendedBool.fromBool(device.saveLog.value),
                 onChanged: device.setSaveLog,
                 enabled: null != device.characteristic("apiLog"),
               );
@@ -198,7 +198,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
             elevation: 3,
             color: Colors.black,
             child: Container(
-              padding: const EdgeInsets.all(5),
+              padding: const EdgeInsets.all(2),
               child: items[index].value,
             ),
           ),

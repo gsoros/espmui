@@ -69,6 +69,7 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
                         return Center(
                           child: AlertDialog(
                             title: Hero(tag: 'fab', child: Icon(Icons.settings)),
+                            contentPadding: EdgeInsets.fromLTRB(0, 20, 0, 0),
                             content: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -81,6 +82,7 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
                                       Navigator.of(context).pop(); // close dialog
                                     },
                                     child: Text("Add tile")),
+                                SizedBox(width: 10, height: 20, child: Empty()),
                                 ElevatedButton(
                                   onPressed: () {
                                     Navigator.of(context).pop(); // close dialog
@@ -569,70 +571,84 @@ class _TileGridState extends State<TileGrid> with Debug {
                   return LongPressDraggable<Tile>(
                     data: tiles[index],
                     feedback: Opacity(
-                      child: Material(color: Colors.transparent, child: _tiles[index]),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: _tiles[index],
+                      ),
                       opacity: .5,
                     ),
                     child: Hero(
                       placeholderBuilder: (_, __, child) => child,
                       tag: tiles[index].hashCode,
-                      child: Material(
-                        child: InkWell(
-                          child: tiles[index],
-                          onTap: () {
-                            debugLog("tile $index tap");
-                            onTap(tiles[index]);
-                          },
-                          onDoubleTap: () {
-                            debugLog("tile $index doubleTap");
-                            Navigator.push(
-                              context,
-                              HeroDialogRoute(
-                                builder: (context) {
-                                  return WillPopScope(
-                                    onWillPop: () async {
-                                      setState(() {
-                                        showColorPicker = false;
-                                      });
-                                      return true;
-                                    },
-                                    child: Center(
-                                      child: AlertDialog(
-                                        scrollable: true,
-                                        backgroundColor: Colors.black87,
-                                        content: Column(
-                                          children: [
-                                            sizeAndColor(index),
-                                            source(index),
-                                            tapAction(index),
-                                          ],
+                      child: Card(
+                        shadowColor: Colors.black26,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5.0),
+                        ),
+                        elevation: 3,
+                        color: Colors.transparent, // debug
+                        child: Container(
+                          //padding: const EdgeInsets.all(2),
+                          child: Material(
+                            child: InkWell(
+                              child: tiles[index],
+                              onTap: () {
+                                debugLog("tile $index tap");
+                                onTap(tiles[index]);
+                              },
+                              onDoubleTap: () {
+                                debugLog("tile $index doubleTap");
+                                Navigator.push(
+                                  context,
+                                  HeroDialogRoute(
+                                    builder: (context) {
+                                      return WillPopScope(
+                                        onWillPop: () async {
+                                          setState(() {
+                                            showColorPicker = false;
+                                          });
+                                          return true;
+                                        },
+                                        child: Center(
+                                          child: AlertDialog(
+                                            scrollable: true,
+                                            backgroundColor: Colors.black87,
+                                            content: Column(
+                                              children: [
+                                                sizeAndColor(index),
+                                                source(index),
+                                                tapAction(index),
+                                              ],
+                                            ),
+                                            actions: [
+                                              EspmuiElevatedButton(
+                                                child: Text("Delete Tile"),
+                                                onPressed: () {
+                                                  debugLog("delete tile $index");
+                                                  setState(() {
+                                                    tiles.removeAt(index);
+                                                    _tiles.tiles = tiles;
+                                                    _tiles.save();
+                                                  });
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                              EspmuiElevatedButton(
+                                                child: Text("Close"),
+                                                onPressed: Navigator.of(context).pop,
+                                              ),
+                                            ],
+                                            actionsAlignment: MainAxisAlignment.spaceBetween,
+                                            buttonPadding: EdgeInsets.zero,
+                                          ),
                                         ),
-                                        actions: [
-                                          EspmuiElevatedButton(
-                                            child: Text("Delete Tile"),
-                                            onPressed: () {
-                                              debugLog("delete tile $index");
-                                              setState(() {
-                                                tiles.removeAt(index);
-                                                _tiles.tiles = tiles;
-                                                _tiles.save();
-                                              });
-                                              Navigator.of(context).pop();
-                                            },
-                                          ),
-                                          EspmuiElevatedButton(
-                                            child: Text("Close"),
-                                            onPressed: Navigator.of(context).pop,
-                                          ),
-                                        ],
-                                        actionsAlignment: MainAxisAlignment.spaceBetween,
-                                        buttonPadding: EdgeInsets.zero,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
-                          },
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ),
                       ),
                     ),

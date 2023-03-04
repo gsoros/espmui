@@ -30,7 +30,7 @@ class Tile extends StatelessWidget with Debug {
 
   Tile({
     Key? key,
-    this.color = Colors.red,
+    this.color = Colors.black54,
     this.textColor = Colors.white,
     this.width = 5,
     this.height = 2,
@@ -176,29 +176,28 @@ class Tile extends StatelessWidget with Debug {
 
     return Material(
       child: Container(
-        padding: const EdgeInsets.all(2.0),
+        //padding: const EdgeInsets.all(2.0),
         height: height * sizeUnit,
         width: width * sizeUnit,
-        child: Container(
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(5.0),
-          ),
-          padding: const EdgeInsets.all(4.0),
-          child: Column(
-            //crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      label,
-                      softWrap: false,
-                      overflow: TextOverflow.fade,
-                      style: TextStyle(fontSize: 10, color: textColor),
-                    ),
+        decoration: BoxDecoration(
+          color: color,
+          //borderRadius: BorderRadius.circular(5.0),
+        ),
+        //padding: const EdgeInsets.all(4.0),
+        child: Column(
+          //crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: TextStyle(fontSize: 10, color: textColor),
                   ),
-                  /*
+                ),
+                /*
                   Expanded(
                     child: Align(
                       alignment: Alignment.topRight,
@@ -211,34 +210,34 @@ class Tile extends StatelessWidget with Debug {
                     ),
                   ),
                   */
-                ],
-              ),
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  alignment: AlignmentDirectional.bottomEnd,
-                  children: [
-                    FittedBox(
-                      child: background(),
-                      fit: BoxFit.fill,
-                    ),
-                    Align(
-                      child: FittedBox(
-                        child: DefaultTextStyle.merge(
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 120,
-                          ),
-                          child: getValueIfConnected(),
+              ],
+            ),
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                alignment: AlignmentDirectional.bottomEnd,
+                children: [
+                  FittedBox(
+                    child: background(),
+                    fit: BoxFit.fill,
+                  ),
+                  Align(
+                    child: FittedBox(
+                      child: DefaultTextStyle.merge(
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 120,
                         ),
+                        child: getValueIfConnected(),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Row(
-                children: [
-                  /*
+            ),
+            Row(
+              children: [
+                /*
                   Expanded(
                     child: Text(
                       " ",
@@ -248,21 +247,20 @@ class Tile extends StatelessWidget with Debug {
                     ),
                   ),
                   */
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.bottomRight,
-                      child: Text(
-                        stream?.units ?? " ",
-                        softWrap: false,
-                        overflow: TextOverflow.fade,
-                        style: TextStyle(fontSize: 10, color: textColor),
-                      ),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomRight,
+                    child: Text(
+                      stream?.units ?? " ",
+                      softWrap: false,
+                      overflow: TextOverflow.fade,
+                      style: TextStyle(fontSize: 10, color: textColor),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -291,9 +289,10 @@ class TileList with Debug {
     notifier.notifyListeners();
   }
 
-  void add(Tile tile) {
+  int add(Tile tile) {
     tiles.add(tile);
     notifier.notifyListeners();
+    return tiles.length;
   }
 
   void removeWhere(bool Function(Tile) test) {

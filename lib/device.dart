@@ -209,7 +209,7 @@ class Device with Debug {
       _batteryLevelSubscription = battery?.defaultStream.listen(
         (level) {
           debugLog("$name _batteryLevelSubscription level: $level%, charging: $isCharging");
-          if (extendedBoolToBool(isCharging)) notifyCharging();
+          if (isCharging.asBool) notifyCharging();
         },
         onError: (e) => debugLog("$debugTag _batteryLevelSubscription $e"),
       );
@@ -481,7 +481,7 @@ class Device with Debug {
   IconData get iconData => DeviceIcon(null).data();
 
   void notifyCharging() {
-    bool charging = extendedBoolToBool(isCharging);
+    bool charging = isCharging.asBool;
     String status = charging ? "charging" : "charge end";
     int progress = this.battery?.lastValue ?? -1;
     bool showProgress = progress != -1;
