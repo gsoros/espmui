@@ -686,6 +686,37 @@ class HeartRateCharacteristic extends BleCharacteristic<int> {
   Uint8List toUint8List(int value) => Uint8List(2); // we are not writing
 }
 
+class TemperatureCharacteristic extends BleCharacteristic<double> {
+  final serviceUUID = BleConstants.ENVIRONMENTAL_SENSING_SERVICE_UUID;
+  final charUUID = BleConstants.TEMPERATURE_CHAR_UUID;
+
+  TemperatureCharacteristic(Device device) : super(device) {
+    histories['measurement'] = CharacteristicHistory<double>(maxEntries: 360, maxAge: 60);
+  }
+
+  @override
+  void _appendToHistory() {
+    super._appendToHistory();
+    var history = histories['measurement'];
+    if (null != lastValue || null != history) history!.append(lastValue!);
+  }
+
+  @override
+  double fromUint8List(Uint8List list) {
+    /// https://github.com/oesmith/gatt-xml/blob/master/org.bluetooth.characteristic.temperature.xml
+    ///
+    /// Format: little-endian
+    /// Bytes:
+    /// [Temperature: 2] ˚C*100
+    ///
+    if (list.isEmpty) return 0;
+    return list.buffer.asByteData().getUint16(0, Endian.little).toDouble() / 100;
+  }
+
+  @override
+  Uint8List toUint8List(double value) => Uint8List(2); // we are not writing
+}
+
 class CharacteristicList with Debug {
   Map<String, CharacteristicListItem> _items = {};
 

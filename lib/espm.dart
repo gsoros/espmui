@@ -1,4 +1,5 @@
 import 'dart:async';
+// import 'dart:html';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
@@ -22,6 +23,7 @@ class ESPM extends PowerMeter {
 
   WeightScaleCharacteristic? get weightScaleChar => characteristic("weightScale") as WeightScaleCharacteristic?;
   HallCharacteristic? get hallChar => characteristic("hall") as HallCharacteristic?;
+  TemperatureCharacteristic? get tempChar => characteristic("temp") as TemperatureCharacteristic?;
 
   ESPM(Peripheral peripheral) : super(peripheral) {
     characteristics.addAll({
@@ -35,6 +37,10 @@ class ESPM extends PowerMeter {
       'hall': CharacteristicListItem(
         HallCharacteristic(this),
         subscribeOnConnect: false,
+      ),
+      'temp': CharacteristicListItem(
+        TemperatureCharacteristic(this),
+        subscribeOnConnect: true,
       ),
     });
     api = Api(this);
@@ -53,6 +59,19 @@ class ESPM extends PowerMeter {
         initialData: weightScaleChar?.lastValue.toString,
         units: "kg",
         history: weightScaleChar?.histories['measurement'],
+      ),
+    });
+    tileStreams.addAll({
+      "temp": DeviceTileStream(
+        label: "Temperature",
+        stream: tempChar?.defaultStream.map<String>((value) {
+          String s = value.toStringAsFixed(1);
+          if (s.length > 6) s = s.substring(0, 6);
+          return s;
+        }),
+        initialData: tempChar?.lastValue.toString,
+        units: "˚C",
+        history: tempChar?.histories['measurement'],
       ),
     });
     tileActions.addAll({
@@ -157,6 +176,16 @@ class ESPM extends PowerMeter {
   @override
   Future<Device> copyToCorrectType() async {
     return this;
+  }
+
+  @override
+  Future<void> subscribeCharacteristics() async {
+    await super.subscribeCharacteristics();
+    if (null == tempChar || !tempChar!.isSubscribed) {
+      int len = tileStreams.length;
+      tileStreams.removeWhere((key, _) => key == "temp");
+      if (len <= tileStreams.length) debugLog("ESPM subscribeCharacteristics failed to remove temperature tilestream, tileStreams: $tileStreams");
+    }
   }
 }
 

@@ -23,8 +23,8 @@ import 'debug.dart';
 /*
 Device: Battery
   ├─ PowerMeter: Power(, Cadence)
-  │    └─ ESPM: Api, WeightScale, Hall
-  ├─ ESPCC: Api
+  │    └─ ESPM: Api, WeightScale, Hall, Temp
+  ├─ ESPCC: Api, Rec
   ├─ HeartrateMonitor: Heartrate
   ├─ TODO CadenceSensor: Cadence
   └─ TODO SpeedSensor: Speed
@@ -260,7 +260,7 @@ class Device with Debug {
 
   Future<void> onConnected() async {
     await discoverCharacteristics();
-    await _subscribeCharacteristics();
+    await subscribeCharacteristics();
   }
 
   Future<void> onDisconnected() async {
@@ -360,8 +360,8 @@ class Device with Debug {
     _discovered = true;
   }
 
-  Future<void> _subscribeCharacteristics() async {
-    debugLog('$name _subscribeCharacteristics start');
+  Future<void> subscribeCharacteristics() async {
+    debugLog('$name subscribeCharacteristics start');
     if (!await discovered()) return;
     await characteristics.forEachListItem((name, item) async {
       if (item.subscribeOnConnect) {
@@ -372,7 +372,7 @@ class Device with Debug {
       }
     });
     _subscribed = true;
-    debugLog('_subscribeCharacteristics end');
+    debugLog('subscribeCharacteristics end');
   }
 
   Future<void> _unsubscribeCharacteristics() async {
