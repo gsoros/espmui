@@ -5,11 +5,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 
+import 'package:page_transition/page_transition.dart';
+
 import 'ble_characteristic.dart';
 import 'api.dart';
 import 'device.dart';
 import 'espm.dart';
 import 'espcc.dart';
+import 'temperature_compensation_route.dart';
 
 import 'util.dart';
 import 'debug.dart';
@@ -675,13 +678,16 @@ class ApiSettingSwitchWidget extends StatelessWidget with Debug {
             });
     return (name == null)
         ? onOff
-        : Row(children: [
-            Flexible(
-              fit: FlexFit.tight,
-              child: Text(name!),
-            ),
-            onOff,
-          ]);
+        : Row(
+            //mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                fit: FlexFit.tight,
+                child: Text(name!),
+              ),
+              onOff,
+            ],
+          );
   }
 }
 
@@ -914,6 +920,42 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                 suffix: Text("kg"),
               ),
             ]),
+          );
+        }
+
+        int? tcCode = device.api.commandCode("tc");
+        if (null != tcCode && null != settings.tc) {
+          widgets.add(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                EspmuiElevatedButton(
+                  child: Icon(Icons.edit),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      PageTransition(
+                        type: PageTransitionType.rightToLeft,
+                        child: TemperatureCompensationRoute(device),
+                      ),
+                    );
+                  },
+                ),
+                Text("  "),
+                Flexible(
+                  child: ApiSettingSwitchWidget(
+                    api: device.api,
+                    name: "Temperature Compensation",
+                    commandCode: device.api.commandCode("tc"),
+                    value: settings.tc!.enabled,
+                    onChanged: () {
+                      device.settings.value.tc!.enabled = ExtendedBool.Waiting;
+                      device.settings.notifyListeners();
+                    },
+                  ),
+                ),
+              ],
+            ),
           );
         }
 

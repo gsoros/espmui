@@ -202,6 +202,7 @@ class ESPMSettings with Debug {
   int? autoTareDelayMs;
   int? autoTareRangeG;
   bool otaMode = false;
+  TemperatureControlSettings? tc;
 
   final motionDetectionMethods = {
     0: "Hall effect sensor",
@@ -224,7 +225,8 @@ class ESPMSettings with Debug {
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    //debugLog("handleApiMessageSuccess $message");
+    String tag = "handleApiMessageSuccess";
+    //debugLog("$tag $message");
 
     if ("cl" == message.commandStr) {
       cranklength = message.valueAsDouble;
@@ -277,6 +279,20 @@ class ESPMSettings with Debug {
       }
       return false;
     }
+    if ("tc" == message.commandStr) {
+      debugLog("$tag tc message: $message");
+      if (null == tc) tc = TemperatureControlSettings(); // TC is supported
+      if (null == message.value) return true;
+      if (message.value == "0")
+        tc!.enabled = ExtendedBool.False;
+      else if (message.value == "1")
+        tc!.enabled = ExtendedBool.True;
+      else if (message.value!.contains("table;")) //
+        debugLog("TODO set table params: " + message.value!.substring(message.value!.indexOf("table;")));
+      else if (message.value!.contains("valuesFrom;")) //
+        debugLog("TODO set table values: " + message.value!.substring(message.value!.indexOf("valuesFrom;")));
+      return true;
+    }
 
     return false;
   }
@@ -294,7 +310,8 @@ class ESPMSettings with Debug {
         other.negativeTorqueMethod == negativeTorqueMethod &&
         other.autoTare == autoTare &&
         other.autoTareDelayMs == autoTareDelayMs &&
-        other.autoTareRangeG == autoTareRangeG;
+        other.autoTareRangeG == autoTareRangeG &&
+        other.tc == tc;
   }
 
   @override
@@ -309,7 +326,8 @@ class ESPMSettings with Debug {
       negativeTorqueMethod.hashCode ^
       autoTare.hashCode ^
       autoTareDelayMs.hashCode ^
-      autoTareDelayMs.hashCode;
+      autoTareDelayMs.hashCode ^
+      tc.hashCode;
 
   String toString() {
     return "${describeIdentity(this)} ("
@@ -323,7 +341,8 @@ class ESPMSettings with Debug {
         "negativeTorqueMethod: $negativeTorqueMethod, "
         "autoTare: $autoTare, "
         "autoTareDelayMs: $autoTareDelayMs, "
-        "autoTareRangeG: $autoTareRangeG)";
+        "autoTareRangeG: $autoTareRangeG, "
+        "tc: $tc)";
   }
 }
 
@@ -338,4 +357,14 @@ class ESPMWeightServiceMode {
 
   /// weight scale measurement characteristic updates enabled while there are no crank events
   static const int WHEN_NO_CRANK = 2;
+}
+
+class TemperatureControlSettings {
+  ExtendedBool enabled = ExtendedBool.Unknown;
+  int? size;
+  int? keyOffset;
+  double? keyResolution;
+  double? valueResolution;
+  List<int>? values;
+  static const int valueUnset = -128; // INT8_MIN
 }
