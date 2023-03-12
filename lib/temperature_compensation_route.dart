@@ -33,7 +33,6 @@ class TemperatureCompensationRouteState extends State<TemperatureCompensationRou
   @override
   void dispose() {
     debugLog("dispose()");
-    //scanner.dispose();
     super.dispose();
   }
 
@@ -42,13 +41,31 @@ class TemperatureCompensationRouteState extends State<TemperatureCompensationRou
     return Scaffold(
       appBar: AppBar(
         title: BleAdapterCheck(
-          Text("Titlebar"),
+          Text("${device.name} TC"),
           ifDisabled: (state) => BleDisabled(state),
         ),
       ),
       body: Container(
         margin: EdgeInsets.all(6),
-        child: Text("content"),
+        child: Column(
+          children: [
+            Flexible(
+              fit: FlexFit.tight,
+              child: Text("Chart"),
+            ),
+            Flexible(
+              child: Row(
+                children: [
+                  Text("Button"),
+                  Text("Button"),
+                  Text("Button"),
+                  Text("Button"),
+                  Text("Button"),
+                ],
+              ),
+            )
+          ],
+        ),
       ),
     );
   }

@@ -295,7 +295,7 @@ class ESPCCFile with Debug {
     String? data,
     Uint8List? byteData,
   }) async {
-    String tag = "appendLocal ($name)";
+    String tag = "appendLocal ($name ef.hash $hashCode)";
     if (null != data && null != byteData) {
       debugLog("$tag both data and byteData present");
       return 0;
@@ -425,8 +425,8 @@ class ESPCCFile with Debug {
       if (prevPoint.time != 0 && (point.time < prevPoint.time || prevPoint.time + 86400 < point.time)) {
         // 1 day
         debugLog("$tag invalid time ${point.time} ${point.timeAsIso8601}");
-        // cursor += toRead;
-        // continue;
+        cursor += toRead;
+        continue;
       }
       if (!point.hasLocation) {
         debugLog("$tag no location at point #$pointsWritten ${point.timeAsIso8601}");
@@ -434,6 +434,10 @@ class ESPCCFile with Debug {
           debugLog("$tag copying location from prev point");
           point.lat = prevPoint.lat;
           point.lon = prevPoint.lon;
+        } else {
+          debugLog("$tag invalid point");
+          cursor += toRead;
+          continue;
         }
       }
       if (!point.hasAltitude && prevPoint.hasAltitude) {
@@ -639,7 +643,7 @@ class ESPCCSettings with Debug {
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
     String tag = "handleApiMessageSuccess";
-    debugLog("$tag $message");
+    //debugLog("$tag $message");
 
     if ("peers" == message.commandStr) {
       String? v = message.valueAsString;

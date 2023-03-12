@@ -271,7 +271,12 @@ class Device with Debug {
     // }
     await _unsubscribeCharacteristics();
     _deinitCharacteristics();
+
     //streamSendIfNotClosed(stateController, newState);
+
+    isCharging = ExtendedBool.Unknown;
+    Notifications().cancel(peripheral.hashCode);
+
     debugLog("$tag autoConnect.value: ${autoConnect.value}");
     if (autoConnect.value && !await connected) {
       await Future.delayed(Duration(seconds: 15)).then((_) async {

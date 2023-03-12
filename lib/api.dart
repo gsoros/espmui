@@ -218,7 +218,7 @@ class Api with Debug {
     return null;
   }
 
-  Api(this.device, {this.queueDelayMs = 200}) {
+  Api(this.device, {this.queueDelayMs = 100}) {
     commands.addAll(_initialCommands);
     _subscription = characteristic?.defaultStream.listen((reply) => _onNotify(reply));
   }
@@ -239,7 +239,7 @@ class Api with Debug {
   /// format: resultCode[:resultStr];commandCode[]:commandStr][=[value]]
   void _onNotify(String reply) {
     String tag = "${device.name} Api._onNotify()";
-    debugLog("$tag $reply");
+    //debugLog("$tag $reply");
     int resultEnd = reply.indexOf(";");
     if (resultEnd < 1) {
       debugLog("$tag Error parsing notification: $reply");
@@ -466,8 +466,8 @@ class Api with Debug {
     _queue.removeWhere((queued) => queued.command == message.command);
     int removed = before - _queue.length;
     if (removed > 0) debugLog("removed $removed duplicate messages");
-    debugLog("adding to queue: $message");
     _queue.add(message);
+    //debugLog("added to queue (length: ${_queue.length}): $message");
     _runQueue();
     return message;
   }
@@ -564,14 +564,14 @@ class Api with Debug {
       //debugLog("${device.name} Api delaying $message");
       _queue.addLast(message);
     } else {
-      debugLog("${device.name} Api sending $message");
+      //debugLog("${device.name} Api sending $message");
       if (!await device.ready()) {
         debugLog("${device.name} Api _send() device not ready");
       } else {
         message.lastSentAt = now;
         message.attempts = (message.attempts ?? 0) + 1;
         String toWrite = "${message.commandCode}" + (null != message.arg ? "=" + message.arg! : "");
-        //debugLog("_send() calling char.write($toWrite)");
+        //debugLog("_send() $now attempt #${message.attempts} calling char.write($toWrite)");
         characteristic?.write(toWrite);
       }
       _queue.addLast(message);

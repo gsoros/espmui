@@ -21,10 +21,14 @@ class ESPCCSyncer with Debug {
     if (_queue.isNotEmpty) _startQueueSchedule();
   }
 
-  void queue(ESPCCFile f) {
+  void queue(ESPCCFile f) async {
     debugLog("queue ${f.name}");
     f.cancelDownload = false;
     if (!_queue.contains(f)) _queue.add(f);
+    int? mtu = await device.peripheral?.requestMtu(512).catchError((e) {
+      debugLog(e);
+    });
+    if (null != mtu) debugLog("got mtu=$mtu");
     _startQueueSchedule();
   }
 
@@ -110,11 +114,18 @@ class ESPCCSyncer with Debug {
       _running = false;
       return;
     }
+    await ef.updateLocalStatus();
     int offset = ef.localSize <= 0 ? 0 : ef.localSize + 1;
     String request = "rec=get:${ef.name};offset:$offset";
     String expect = "get:${ef.name}:$offset;";
-    debugLog("$tag requesting: $request, expecting: $expect");
-    String? reply = await device.api.request<String>(request, expectValue: expect);
+    // debugLog("$tag (ef.hash: ${ef.hashCode}) requesting: $request, expecting: $expect");
+    String? reply = await device.api.request<String>(
+      request,
+      expectValue: expect,
+      minDelayMs: 1000,
+      maxAgeMs: 3000,
+      maxAttempts: 3,
+    );
     if (null == reply || reply.length < 1) {
       debugLog("$tag empty reply for $request");
       _queue.add(ef);
@@ -140,6 +151,7 @@ class ESPCCSyncer with Debug {
     // in case of a binary (rec) file, at this point the local file should be
     // updated by EspccApiCharacteristic::onNotify()
     await ef.updateLocalStatus();
+    //debugLog("$tag ef.hash ${ef.hashCode} local size is now ${ef.localSize}");
     device.files.notifyListeners();
     _queue.addFirst(ef);
     _running = false;

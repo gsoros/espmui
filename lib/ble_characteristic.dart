@@ -480,10 +480,14 @@ class EspccApiCharacteristic extends ApiCharacteristic {
     if (null != noBinary && 0 < noBinary.length) {
       // debugLog("$tag found match: '$noBinary'");
       Uint8List? valueAsList;
-      if (null != device.mtu && 0 < device.mtu! && null != lastRawValue && lastRawValue!.length < device.mtu! - 5)
+      if (null != device.mtu && 0 < device.mtu! && null != lastRawValue && lastRawValue!.length < device.mtu! - 2) {
         valueAsList = lastRawValue;
-      else
+        //debugLog("$tag $noBinary ready");
+      } else {
         valueAsList = await readAsUint8List();
+        //debugLog("$tag $noBinary was re-read, mtu: ${device.mtu}, "
+        //    "lastRawValue.length: ${lastRawValue?.length}");
+      }
       if (null == valueAsList || 0 == valueAsList.length) {
         debugLog("$tag could not get valueAsList");
         return super.onNotify(noBinary);
@@ -515,6 +519,7 @@ class EspccApiCharacteristic extends ApiCharacteristic {
       ESPCCFile f = device.files.value.files.firstWhere(
         (candidate) => candidate.name == fileName,
         orElse: () {
+          debugLog("$tag $fileName not found in list, creating new ef");
           var f = ESPCCFile(fileName, device);
           f.updateLocalStatus();
           device.files.value.files.add(f);
