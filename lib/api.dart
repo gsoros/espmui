@@ -189,6 +189,18 @@ class ApiMessage with Debug {
   int? get valueAsInt => int.tryParse(value ?? "");
   double? get valueAsDouble => double.tryParse(value ?? "");
   String? get valueAsString => value;
+
+  String? getParamValue(String param, {String delim = ";"}) {
+    if (null == value) return null;
+    int start = value!.indexOf(param);
+    if (start < 0) return null;
+    start += param.length;
+    int end = value!.indexOf(delim, start);
+    if (end < 0) end = param.length - 1;
+    return value!.substring(start, end);
+  }
+
+  bool hasParamValue(String param, {String delim = ";"}) => null != getParamValue(param, delim: delim);
 }
 
 class Api with Debug {

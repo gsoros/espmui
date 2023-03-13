@@ -25,9 +25,7 @@ class ESPCCSyncer with Debug {
     debugLog("queue ${f.name}");
     f.cancelDownload = false;
     if (!_queue.contains(f)) _queue.add(f);
-    int? mtu = await device.peripheral?.requestMtu(512).catchError((e) {
-      debugLog(e);
-    });
+    int? mtu = await device.requestMtu(512);
     if (null != mtu) debugLog("got mtu=$mtu");
     _startQueueSchedule();
   }

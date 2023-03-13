@@ -177,18 +177,18 @@ class BLE with Debug {
   }
 
   Future<int?> requestMtu(Device device, int mtuRequest) async {
-    String call = "requestMtu(${device.peripheral?.name}, $mtuRequest)";
-    //debugLog("$call");
+    String tag = "BLE::requestMtu(${device.peripheral?.name}, $mtuRequest)";
+    //debugLog("$tag");
     if (null == device.peripheral) {
-      debugLog("requestMtu: peripheral is null");
+      debugLog("$tag peripheral is null");
       return null;
     }
     await _exclusiveAccess.protect(() async {
       int result = await device.peripheral!.requestMtu(mtuRequest).catchError((e) {
-        bleError(debugTag, call, e);
+        bleError(debugTag, tag, e);
         return 0;
       }).then((newMtu) {
-        debugLog("$call got MTU=$newMtu");
+        debugLog("$tag got MTU=$newMtu");
         device.mtu = newMtu;
         return newMtu;
       });

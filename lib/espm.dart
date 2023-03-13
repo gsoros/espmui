@@ -16,7 +16,7 @@ class ESPM extends PowerMeter {
   late Api api;
   final weightServiceMode = ValueNotifier<int>(ESPMWeightServiceMode.UNKNOWN);
   final hallEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
-  final settings = AlwaysNotifier<ESPMSettings>(ESPMSettings());
+  late final AlwaysNotifier<ESPMSettings> settings;
   final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
   //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
   StreamSubscription<ApiMessage>? _apiSubsciption;
@@ -26,6 +26,7 @@ class ESPM extends PowerMeter {
   TemperatureCharacteristic? get tempChar => characteristic("temp") as TemperatureCharacteristic?;
 
   ESPM(Peripheral peripheral) : super(peripheral) {
+    settings = AlwaysNotifier<ESPMSettings>(ESPMSettings(this));
     characteristics.addAll({
       'api': CharacteristicListItem(
         EspmApiCharacteristic(this),
@@ -163,7 +164,7 @@ class ESPM extends PowerMeter {
     weightServiceMode.value = ESPMWeightServiceMode.UNKNOWN;
     wifiSettings.value = WifiSettings();
     wifiSettings.notifyListeners();
-    settings.value = ESPMSettings();
+    settings.value = ESPMSettings(this);
     settings.notifyListeners();
     api.reset();
   }
@@ -190,6 +191,12 @@ class ESPM extends PowerMeter {
 }
 
 class ESPMSettings with Debug {
+  ESPM device;
+
+  ESPMSettings(this.device) {
+    tc = TemperatureControlSettings(device);
+  }
+
   double? cranklength;
   var reverseStrain = ExtendedBool.Unknown;
   var doublePower = ExtendedBool.Unknown;
@@ -202,7 +209,7 @@ class ESPMSettings with Debug {
   int? autoTareDelayMs;
   int? autoTareRangeG;
   bool otaMode = false;
-  TemperatureControlSettings? tc;
+  late TemperatureControlSettings tc;
 
   final motionDetectionMethods = {
     0: "Hall effect sensor",
@@ -281,17 +288,7 @@ class ESPMSettings with Debug {
     }
     if ("tc" == message.commandStr) {
       debugLog("$tag tc message: $message");
-      if (null == tc) tc = TemperatureControlSettings(); // TC is supported
-      if (null == message.value) return true;
-      if (message.value == "0")
-        tc!.enabled = ExtendedBool.False;
-      else if (message.value == "1")
-        tc!.enabled = ExtendedBool.True;
-      else if (message.value!.contains("table;")) //
-        debugLog("TODO set table params: " + message.value!.substring(message.value!.indexOf("table;")));
-      else if (message.value!.contains("valuesFrom;")) //
-        debugLog("TODO set table values: " + message.value!.substring(message.value!.indexOf("valuesFrom;")));
-      return true;
+      return tc.handleApiMessage(message);
     }
 
     return false;
@@ -359,12 +356,204 @@ class ESPMWeightServiceMode {
   static const int WHEN_NO_CRANK = 2;
 }
 
-class TemperatureControlSettings {
-  ExtendedBool enabled = ExtendedBool.Unknown;
-  int? size;
-  int? keyOffset;
-  double? keyResolution;
-  double? valueResolution;
-  List<int>? values;
+class TemperatureControlSettings with Debug {
+  ESPM device;
+
+  TemperatureControlSettings(this.device);
+
+  ExtendedBool _enabled = ExtendedBool.Unknown;
+  ExtendedBool get enabled => _enabled;
+  set enabled(ExtendedBool value) {
+    _enabled = value;
+    setUpdated();
+  }
+
+  int? get size => _values?.length;
+  set size(int? newSize) {
+    if (newSize != size) {
+      _initValues();
+      setUpdated();
+    }
+  }
+
+  int? _keyOffset;
+  int? get keyOffset => _keyOffset;
+  set keyOffset(int? value) {
+    _keyOffset = value;
+    setUpdated();
+  }
+
+  double? _keyResolution;
+  double? get keyResolution => _keyResolution;
+  set keyResolution(double? value) {
+    _keyResolution = value;
+    setUpdated();
+  }
+
+  double? _valueResolution;
+  double? get valueResolution => _valueResolution;
+  set valueResolution(double? value) {
+    _valueResolution = value;
+    setUpdated();
+  }
+
+  List<int?>? _values;
+  List<int?>? get values => _values;
+  set values(List<int?>? newValues) {
+    if ((size ?? 0) != (newValues?.length ?? 0)) size = newValues?.length ?? 0;
+    _values = newValues;
+    setUpdated();
+  }
+
+  int? getValueAt(int key) {
+    if ((size ?? 1) - 1 < key) return null;
+    if ((values?.length ?? 1) - 1 < key) return null;
+    return values?[key];
+  }
+
+  bool setValueAt(int key, int? value) {
+    if (null == size || size! < key - 1) return false;
+    if (null == _values) _initValues();
+    _values![key] = value;
+    setUpdated();
+    return true;
+  }
+
+  void _initValues() {
+    _values = List<int?>.filled(size ?? 0, null);
+  }
+
+  int _lastUpdate = 0;
+  int get lastUpdate => _lastUpdate;
+  setUpdated() {
+    _lastUpdate = uts();
+    device.settings.notifyListeners();
+  }
+
   static const int valueUnset = -128; // INT8_MIN
+  static const int valueMin = -127; // INT8_MIN + 1
+  static const int valueMax = 128; // INT8_MAX
+
+  double keyToTemperature(int key) => ((_keyOffset ?? 0) + key * (_keyResolution ?? 0)).toDouble();
+  double valueToMass(int value) => value == valueUnset ? 0 : value * (_valueResolution ?? 1);
+
+  Future<bool> readFromDevice() async {
+    bool res = true;
+    int? rc;
+    await device.requestMtu(512);
+    [
+      "tc", // enabled?
+      "tc=table", // table size, offsets, resolution
+      "tc=valuesFrom:0", // table values
+    ].forEach((command) async {
+      rc = await device.api.requestResultCode(command);
+      if (ApiResult.success != rc) {
+        debugLog("readFromDevice $command fail, rc: $rc");
+        res = false;
+      }
+    });
+    return res;
+  }
+
+  bool handleApiMessage(ApiMessage m) {
+    String tag = "handleApiMessage";
+    if (null == m.value) {
+      debugLog("$tag m.value is null");
+      return true;
+    }
+    if (m.value == "0") {
+      enabled = ExtendedBool.False;
+      return true;
+    }
+    if (m.value == "1") {
+      enabled = ExtendedBool.True;
+      return true;
+    }
+    if (m.value!.contains("table;")) {
+      return handleApiTableParams(m);
+    }
+    if (m.value!.contains("valuesFrom:")) {
+      return handleApiTableValues(m);
+    }
+    debugLog("$tag invalid message: ${m.value}");
+    return true;
+  }
+
+  bool handleApiTableParams(ApiMessage m) {
+    if (null == m.value || m.value!.indexOf("table;") < 0) return true;
+    if (m.hasParamValue("size:")) size = int.tryParse(m.getParamValue("size:") ?? "");
+    if (m.hasParamValue("keyOffset:")) keyOffset = int.tryParse(m.getParamValue("keyOffset:") ?? "");
+    if (m.hasParamValue("keyRes:")) keyResolution = double.tryParse(m.getParamValue("keyRes:") ?? "");
+    if (m.hasParamValue("valueRes:")) valueResolution = double.tryParse(m.getParamValue("valueRes:") ?? "");
+    return true;
+  }
+
+  bool handleApiTableValues(ApiMessage m) {
+    String tag = "handleApiTableValues";
+    if (null == m.value || m.value!.indexOf("valuesFrom:") < 0) {
+      debugLog("$tag invalid message");
+      return true;
+    }
+    int? startKey = int.tryParse(m.getParamValue("valuesFrom:") ?? "");
+    if (null == startKey) {
+      debugLog("$tag could not get start key");
+      return true;
+    }
+    int key = startKey;
+    String v = m.value!;
+    int semi = v.indexOf(";", v.indexOf("valuesFrom:"));
+    if (semi < 0) {
+      debugLog("$tag could not get first semi");
+      return true;
+    }
+    v = v.substring(semi + 1);
+
+    v.split(",").forEach((nStr) {
+      if ((size ?? 0) <= key) return;
+      //int? oldValue = getValueAt(key);
+      setValueAt(key, int.tryParse(nStr) ?? valueUnset);
+      //debugLog("$tag $key: $oldValue -> ${getValueAt(key)})");
+      key++;
+    });
+
+    if (key < (size ?? 0)) {
+      debugLog("$tag requesting tc=valuesFrom:$key");
+      device.api.requestResultCode("tc=valuesFrom:$key");
+    }
+
+    return true;
+  }
+
+  int? get valuesMin {
+    int? i;
+    _values?.forEach((v) {
+      if (null == i || null == v || v < i!) i = v;
+    });
+    return i;
+  }
+
+  int? get valuesMax {
+    int? i;
+    _values?.forEach((v) {
+      if (null == i || null == v || i! < v) i = v;
+    });
+    return i;
+  }
+
+  @override
+  bool operator ==(other) {
+    debugLog("comparing $this to $other");
+    return (other is TemperatureControlSettings) &&
+        other.device == device &&
+        other.enabled == enabled &&
+        other.size == size &&
+        other.keyOffset == keyOffset &&
+        other.keyResolution == keyResolution &&
+        other.valueResolution == valueResolution &&
+        other.values == values;
+  }
+
+  @override
+  int get hashCode =>
+      device.hashCode ^ enabled.hashCode ^ size.hashCode ^ keyOffset.hashCode ^ keyResolution.hashCode ^ valueResolution.hashCode ^ values.hashCode;
 }

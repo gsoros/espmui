@@ -924,7 +924,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
         }
 
         int? tcCode = device.api.commandCode("tc");
-        if (null != tcCode && null != settings.tc) {
+        if (null != tcCode && ExtendedBool.Unknown != settings.tc.enabled) {
           widgets.add(
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -947,9 +947,9 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                     api: device.api,
                     name: "Temperature Compensation",
                     commandCode: device.api.commandCode("tc"),
-                    value: settings.tc!.enabled,
+                    value: settings.tc.enabled,
                     onChanged: () {
-                      device.settings.value.tc!.enabled = ExtendedBool.Waiting;
+                      device.settings.value.tc.enabled = ExtendedBool.Waiting;
                       device.settings.notifyListeners();
                     },
                   ),

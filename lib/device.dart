@@ -471,6 +471,8 @@ class Device with Debug {
     return "" == item ? null : item;
   }
 
+  Future<int?> requestMtu(int mtu) => BLE().requestMtu(this, mtu);
+
   Future<Type> correctType() async {
     return runtimeType;
   }
