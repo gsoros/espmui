@@ -204,3 +204,9 @@ class Path {
     return s.replaceAll("[^A-Za-z0-9]", "_");
   }
 }
+
+extension StringExtension on String {
+  String capitalize() {
+    return "${this[0].toUpperCase()}${this.substring(1).toLowerCase()}";
+  }
+}

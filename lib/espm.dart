@@ -371,7 +371,7 @@ class TemperatureControlSettings with Debug {
   int? get size => _values?.length;
   set size(int? newSize) {
     if (newSize != size) {
-      _initValues();
+      _initValues(size: newSize);
       setUpdated();
     }
   }
@@ -419,7 +419,7 @@ class TemperatureControlSettings with Debug {
     return true;
   }
 
-  void _initValues() {
+  void _initValues({int? size}) {
     _values = List<int?>.filled(size ?? 0, null);
   }
 
@@ -438,25 +438,31 @@ class TemperatureControlSettings with Debug {
   double valueToMass(int value) => value == valueUnset ? 0 : value * (_valueResolution ?? 1);
 
   Future<bool> readFromDevice() async {
-    bool res = true;
+    bool success = true;
     int? rc;
+    status("Requesting MTU", type: TCSST.reading);
     await device.requestMtu(512);
-    [
-      "tc", // enabled?
-      "tc=table", // table size, offsets, resolution
-      "tc=valuesFrom:0", // table values
-    ].forEach((command) async {
+    status("Reading settings");
+    <String, String>{
+      "tc": "getting enabled",
+      "tc=table": "reading table settings",
+      "tc=valuesFrom:0": "reading table values",
+    }.forEach((command, msg) async {
+      status(msg.capitalize());
       rc = await device.api.requestResultCode(command);
       if (ApiResult.success != rc) {
+        status("Failed $msg");
         debugLog("readFromDevice $command fail, rc: $rc");
-        res = false;
+        success = false;
       }
     });
-    return res;
+    status(success ? "" : null, type: TCSST.idle);
+    return success;
   }
 
   bool handleApiMessage(ApiMessage m) {
     String tag = "handleApiMessage";
+    debugLog("$tag");
     if (null == m.value) {
       debugLog("$tag m.value is null");
       return true;
@@ -480,6 +486,8 @@ class TemperatureControlSettings with Debug {
   }
 
   bool handleApiTableParams(ApiMessage m) {
+    String tag = "handleApiTableParams";
+    debugLog("$tag");
     if (null == m.value || m.value!.indexOf("table;") < 0) return true;
     if (m.hasParamValue("size:")) size = int.tryParse(m.getParamValue("size:") ?? "");
     if (m.hasParamValue("keyOffset:")) keyOffset = int.tryParse(m.getParamValue("keyOffset:") ?? "");
@@ -490,6 +498,7 @@ class TemperatureControlSettings with Debug {
 
   bool handleApiTableValues(ApiMessage m) {
     String tag = "handleApiTableValues";
+    debugLog("$tag");
     if (null == m.value || m.value!.indexOf("valuesFrom:") < 0) {
       debugLog("$tag invalid message");
       return true;
@@ -508,13 +517,15 @@ class TemperatureControlSettings with Debug {
     }
     v = v.substring(semi + 1);
 
+    int updated = 0;
     v.split(",").forEach((nStr) {
       if ((size ?? 0) <= key) return;
       //int? oldValue = getValueAt(key);
-      setValueAt(key, int.tryParse(nStr) ?? valueUnset);
+      if (setValueAt(key, int.tryParse(nStr) ?? valueUnset)) updated++;
       //debugLog("$tag $key: $oldValue -> ${getValueAt(key)})");
       key++;
     });
+    debugLog("$tag $updated values updated, size: $size");
 
     if (key < (size ?? 0)) {
       debugLog("$tag requesting tc=valuesFrom:$key");
@@ -540,6 +551,15 @@ class TemperatureControlSettings with Debug {
     return i;
   }
 
+  TCSST statusType = TCSST.idle;
+  String statusMessage = "";
+  void status(String? message, {TCSST? type}) {
+    if (null != message) statusMessage = message;
+    if (null != type) statusType = type;
+    device.settings.notifyListeners();
+    debugLog("status $statusMessage $statusType");
+  }
+
   @override
   bool operator ==(other) {
     debugLog("comparing $this to $other");
@@ -550,10 +570,29 @@ class TemperatureControlSettings with Debug {
         other.keyOffset == keyOffset &&
         other.keyResolution == keyResolution &&
         other.valueResolution == valueResolution &&
-        other.values == values;
+        other.values == values &&
+        other.statusType == statusType &&
+        other.statusMessage == statusMessage;
   }
 
   @override
   int get hashCode =>
-      device.hashCode ^ enabled.hashCode ^ size.hashCode ^ keyOffset.hashCode ^ keyResolution.hashCode ^ valueResolution.hashCode ^ values.hashCode;
+      device.hashCode ^
+      enabled.hashCode ^
+      size.hashCode ^
+      keyOffset.hashCode ^
+      keyResolution.hashCode ^
+      valueResolution.hashCode ^
+      values.hashCode ^
+      statusMessage.hashCode ^
+      statusType.hashCode;
 }
+
+enum TemperatureControlSettingsStatusType {
+  idle,
+  reading,
+  collecting,
+  writing,
+}
+
+typedef TCSST = TemperatureControlSettingsStatusType;

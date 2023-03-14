@@ -2,43 +2,23 @@
 //import 'dart:developer' as dev;
 import 'dart:math';
 
-//import 'package:espmui/device_widgets.dart';
+import 'package:espmui/util.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import 'ble.dart';
 import 'espm.dart';
 //import 'util.dart';
+//import 'device_widgets.dart';
 import 'debug.dart';
 
-class TemperatureCompensationRoute extends StatefulWidget {
+class TemperatureCompensationRoute extends StatelessWidget with Debug {
   final ESPM device;
+  //final _key = GlobalKey<TemperatureCompensationRouteState>();
 
-  TemperatureCompensationRoute(this.device, {Key? key}) : super(key: key);
-
-  @override
-  TemperatureCompensationRouteState createState() => TemperatureCompensationRouteState(device);
-}
-
-class TemperatureCompensationRouteState extends State<TemperatureCompensationRoute> with Debug {
-  final ESPM device;
-  final _key = GlobalKey<TemperatureCompensationRouteState>();
-
-  TemperatureCompensationRouteState(this.device) {
+  TemperatureCompensationRoute(this.device, {Key? key}) : super(key: key) {
     debugLog("construct");
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    debugLog("initState()");
     device.settings.value.tc.readFromDevice();
-  }
-
-  @override
-  void dispose() {
-    debugLog("dispose()");
-    super.dispose();
   }
 
   @override
@@ -54,24 +34,68 @@ class TemperatureCompensationRouteState extends State<TemperatureCompensationRou
         margin: EdgeInsets.all(6),
         child: Column(
           children: [
-            Flexible(
-              fit: FlexFit.tight,
-              child: getChart(),
-            ),
-            Flexible(
-              child: Row(
-                children: [
-                  Text("Button"),
-                  Text("Button"),
-                  Text("Button"),
-                  Text("Button"),
-                  Text("Button"),
-                ],
-              ),
-            )
+            Expanded(child: zoomableChart()),
+            buttons(),
+            status(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget buttons() {
+    var tc = device.settings.value.tc;
+    return ValueListenableBuilder(
+      valueListenable: device.settings,
+      builder: (context, ESPMSettings settings, widget) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 0, 10, 0),
+                child: EspmuiElevatedButton(
+                  child: Text("Read"),
+                  onPressed: tc.statusType == TCSST.reading
+                      ? null
+                      : () {
+                          tc.readFromDevice();
+                        },
+                  backgroundColorEnabled: Colors.blueGrey,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                child: EspmuiElevatedButton(
+                  child: Text("Collect"),
+                  onPressed: () {},
+                  backgroundColorEnabled: Colors.green,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
+                child: EspmuiElevatedButton(
+                  child: Text("Write"),
+                  onPressed: () {},
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget status() {
+    return ValueListenableBuilder(
+      valueListenable: device.settings,
+      builder: (context, ESPMSettings settings, widget) {
+        return Text(settings.tc.statusMessage);
+      },
     );
   }
 
@@ -80,7 +104,7 @@ class TemperatureCompensationRouteState extends State<TemperatureCompensationRou
     int key = 0;
     tc.values?.forEach((value) {
       if (null == value || TemperatureControlSettings.valueUnset == value) {
-        if (spots.last != FlSpot.nullSpot) spots.add(FlSpot.nullSpot);
+        if (0 < spots.length && spots.last != FlSpot.nullSpot) spots.add(FlSpot.nullSpot);
       } else
         spots.add(FlSpot(
           tc.keyToTemperature(key),
@@ -91,12 +115,53 @@ class TemperatureCompensationRouteState extends State<TemperatureCompensationRou
     return spots;
   }
 
-  Widget getChart() {
+  Widget chart() {
     return ValueListenableBuilder(
-      key: _key,
+      //key: _key,
       valueListenable: device.settings,
       builder: (context, ESPMSettings settings, widget) {
         var tc = settings.tc;
+        if (null == tc.values) return Text("Waiting for chart data...");
+        //int numValues = tc.size ?? 0;
+        //double tempMin = tc.keyToTemperature(0);
+        //double tempMax = tc.keyToTemperature(0 < numValues ? numValues - 1 : 0);
+        //print("tempMin: $tempMin, tempMax: $tempMax, tc: ${tc.values}");
+        return LineChart(
+          LineChartData(
+              clipData: FlClipData.all(),
+              //minX: minX,
+              //maxX: maxX,
+              lineTouchData: LineTouchData(enabled: false),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots(tc),
+                  isCurved: false,
+                  barWidth: 2,
+                  color: Colors.blueAccent,
+                  dotData: FlDotData(show: false),
+                ),
+              ],
+              borderData: FlBorderData(show: false),
+              titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    axisNameWidget: Text("Temperature (˚C)"),
+                  ),
+                  rightTitles: AxisTitles(
+                    axisNameWidget: Text("Mass (kg)"),
+                  ))),
+        );
+      },
+    );
+  }
+
+  Widget zoomableChart() {
+    return ValueListenableBuilder(
+      // key: _key,
+      valueListenable: device.settings,
+      builder: (context, ESPMSettings settings, widget) {
+        var tc = settings.tc;
+        print("rebuilding chart size: ${tc.size}, keyOffset: ${tc.keyOffset}, keyResolution: ${tc.keyResolution}, valueResolution: ${tc.valueResolution}");
         if (null == tc.values) return Text("Waiting for chart data...");
         int numValues = tc.size ?? 0;
         double tempMin = tc.keyToTemperature(0);
@@ -109,25 +174,28 @@ class TemperatureCompensationRouteState extends State<TemperatureCompensationRou
             print("rebuilding chart");
             return LineChart(
               LineChartData(
-                clipData: FlClipData.all(),
-                minX: minX,
-                maxX: maxX,
-                lineTouchData: LineTouchData(enabled: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots(tc),
-                    isCurved: false,
-                    barWidth: 2,
-                    color: Colors.blueAccent,
-                    dotData: FlDotData(
-                      show: false,
+                  clipData: FlClipData.all(),
+                  minX: minX,
+                  maxX: maxX,
+                  lineTouchData: LineTouchData(enabled: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots(tc),
+                      isCurved: false,
+                      barWidth: 2,
+                      color: Colors.blueAccent,
+                      dotData: FlDotData(show: false),
                     ),
-                  ),
-                ],
-                borderData: FlBorderData(
-                  show: false,
-                ),
-              ),
+                  ],
+                  borderData: FlBorderData(show: false),
+                  titlesData: FlTitlesData(
+                      show: true,
+                      topTitles: AxisTitles(
+                        axisNameWidget: Text("Temperature (˚C)"),
+                      ),
+                      leftTitles: AxisTitles(
+                        axisNameWidget: Text("Compensation (kg)"),
+                      ))),
             );
           },
         );
