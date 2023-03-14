@@ -1,4 +1,4 @@
-//import 'dart:async';
+// import 'dart:async';
 //import 'dart:developer' as dev;
 import 'dart:math';
 
@@ -9,7 +9,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'ble.dart';
 import 'espm.dart';
 //import 'util.dart';
-//import 'device_widgets.dart';
+import 'device_widgets.dart';
 import 'debug.dart';
 
 class TemperatureCompensationRoute extends StatelessWidget with Debug {
@@ -18,7 +18,8 @@ class TemperatureCompensationRoute extends StatelessWidget with Debug {
 
   TemperatureCompensationRoute(this.device, {Key? key}) : super(key: key) {
     debugLog("construct");
-    device.settings.value.tc.readFromDevice();
+    var readSuccess = device.settings.value.tc.readFromDevice();
+    debugLog("construct readSuccess: $readSuccess");
   }
 
   @override
@@ -26,7 +27,24 @@ class TemperatureCompensationRoute extends StatelessWidget with Debug {
     return Scaffold(
       appBar: AppBar(
         title: BleAdapterCheck(
-          Text("${device.name} TC"),
+          DeviceAppBarTitle(
+            device,
+            nameEditable: false,
+            prefix: "TC ",
+            onConnected: () async {
+              device.settings.value.tc.status("waiting for init to complete");
+              int attempts = 0;
+              await Future.doWhile(() async {
+                await Future.delayed(Duration(milliseconds: 300));
+                //debugLog("attempt #$attempts checking if tc command is available...");
+                if (null != device.api.commandCode("tc")) return false;
+                attempts++;
+                return attempts < 50;
+              });
+              debugLog("${device.name} init done, calling readFromDevice()");
+              device.settings.value.tc.readFromDevice();
+            },
+          ),
           ifDisabled: (state) => BleDisabled(state),
         ),
       ),
@@ -58,8 +76,9 @@ class TemperatureCompensationRoute extends StatelessWidget with Debug {
                   child: Text("Read"),
                   onPressed: tc.statusType == TCSST.reading
                       ? null
-                      : () {
-                          tc.readFromDevice();
+                      : () async {
+                          var success = await tc.readFromDevice();
+                          debugLog("read button onPressed success: $success");
                         },
                   backgroundColorEnabled: Colors.blueGrey,
                 ),
@@ -102,7 +121,7 @@ class TemperatureCompensationRoute extends StatelessWidget with Debug {
   List<FlSpot> spots(TemperatureControlSettings tc) {
     var spots = List<FlSpot>.empty(growable: true);
     int key = 0;
-    tc.values?.forEach((value) {
+    tc.values.forEach((value) {
       if (null == value || TemperatureControlSettings.valueUnset == value) {
         if (0 < spots.length && spots.last != FlSpot.nullSpot) spots.add(FlSpot.nullSpot);
       } else
@@ -115,46 +134,6 @@ class TemperatureCompensationRoute extends StatelessWidget with Debug {
     return spots;
   }
 
-  Widget chart() {
-    return ValueListenableBuilder(
-      //key: _key,
-      valueListenable: device.settings,
-      builder: (context, ESPMSettings settings, widget) {
-        var tc = settings.tc;
-        if (null == tc.values) return Text("Waiting for chart data...");
-        //int numValues = tc.size ?? 0;
-        //double tempMin = tc.keyToTemperature(0);
-        //double tempMax = tc.keyToTemperature(0 < numValues ? numValues - 1 : 0);
-        //print("tempMin: $tempMin, tempMax: $tempMax, tc: ${tc.values}");
-        return LineChart(
-          LineChartData(
-              clipData: FlClipData.all(),
-              //minX: minX,
-              //maxX: maxX,
-              lineTouchData: LineTouchData(enabled: false),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: spots(tc),
-                  isCurved: false,
-                  barWidth: 2,
-                  color: Colors.blueAccent,
-                  dotData: FlDotData(show: false),
-                ),
-              ],
-              borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    axisNameWidget: Text("Temperature (˚C)"),
-                  ),
-                  rightTitles: AxisTitles(
-                    axisNameWidget: Text("Mass (kg)"),
-                  ))),
-        );
-      },
-    );
-  }
-
   Widget zoomableChart() {
     return ValueListenableBuilder(
       // key: _key,
@@ -162,8 +141,8 @@ class TemperatureCompensationRoute extends StatelessWidget with Debug {
       builder: (context, ESPMSettings settings, widget) {
         var tc = settings.tc;
         print("rebuilding chart size: ${tc.size}, keyOffset: ${tc.keyOffset}, keyResolution: ${tc.keyResolution}, valueResolution: ${tc.valueResolution}");
-        if (null == tc.values) return Text("Waiting for chart data...");
-        int numValues = tc.size ?? 0;
+        if (tc.size < 1) return Text("No chart data");
+        int numValues = tc.size;
         double tempMin = tc.keyToTemperature(0);
         double tempMax = tc.keyToTemperature(0 < numValues ? numValues - 1 : 0);
         //print("tempMin: $tempMin, tempMax: $tempMax, tc: ${tc.values}");
@@ -184,6 +163,18 @@ class TemperatureCompensationRoute extends StatelessWidget with Debug {
                       isCurved: false,
                       barWidth: 2,
                       color: Colors.blueAccent,
+                      dotData: FlDotData(show: false),
+                    ),
+                    LineChartBarData(
+                      spots: [
+                        FlSpot(10, -1),
+                        FlSpot(11, 1),
+                        FlSpot(12, 2),
+                        FlSpot(15, 4),
+                      ],
+                      isCurved: false,
+                      barWidth: 2,
+                      color: Colors.red,
                       dotData: FlDotData(show: false),
                     ),
                   ],

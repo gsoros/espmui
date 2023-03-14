@@ -69,8 +69,8 @@ class Device with Debug {
 
   // Connection state
   PeripheralConnectionState lastConnectionState = PeripheralConnectionState.disconnected;
-  final _stateController = StreamController<PeripheralConnectionState>.broadcast();
-  Stream<PeripheralConnectionState> get stateStream => _stateController.stream;
+  final stateController = StreamController<PeripheralConnectionState>.broadcast();
+  Stream<PeripheralConnectionState> get stateStream => stateController.stream;
   StreamSubscription<PeripheralConnectionState>? stateSubscription;
   StreamSubscription<PeripheralConnectionState>? _stateChangeSubscription;
 
@@ -189,7 +189,7 @@ class Device with Debug {
             await _onConnected();
           else if (state == disconnectedState) await _onDisconnected();
           */
-          streamSendIfNotClosed(_stateController, state);
+          streamSendIfNotClosed(stateController, state);
         },
         onError: (e) => bleError(debugTag, "$name _stateSubscription", e),
       );
@@ -219,7 +219,7 @@ class Device with Debug {
   Future<void> dispose() async {
     debugLog("$name dispose");
     await disconnect();
-    await _stateController.close();
+    await stateController.close();
     characteristics.forEachCharacteristic((_, char) async {
       await char?.unsubscribe();
       await char?.dispose();
@@ -294,7 +294,7 @@ class Device with Debug {
 
     if (await connected) {
       debugLog("Not connecting to $name, already connected");
-      streamSendIfNotClosed(_stateController, connectedState);
+      streamSendIfNotClosed(stateController, connectedState);
       //await discoverCharacteristics();
       //await _subscribeCharacteristics();
       //_requestInit();
@@ -302,7 +302,7 @@ class Device with Debug {
     }
     if (await BLE().currentState() != BluetoothState.POWERED_ON) {
       debugLog("$name connect() Adapter is off, not connecting");
-      streamSendIfNotClosed(_stateController, disconnectedState);
+      streamSendIfNotClosed(stateController, disconnectedState);
       return;
     }
     if (null == peripheral) {

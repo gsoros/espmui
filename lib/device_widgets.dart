@@ -17,6 +17,169 @@ import 'temperature_compensation_route.dart';
 import 'util.dart';
 import 'debug.dart';
 
+class DeviceConnectionState extends StatelessWidget {
+  final Device device;
+  final void Function()? onConnected;
+
+  DeviceConnectionState(this.device, {this.onConnected});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<PeripheralConnectionState?>(
+      stream: device.stateStream,
+      initialData: null,
+      builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
+        if (PeripheralConnectionState.connected == snapshot.data && null != onConnected) onConnected!();
+        String connState = snapshot.hasData ? snapshot.data.toString() : "....";
+        //debugLog("Device status: connState=$connState");
+        return Text(
+          connState.substring(connState.lastIndexOf(".") + 1),
+          style: TextStyle(fontSize: 10),
+        );
+      },
+    );
+  }
+}
+
+class DeviceAppBarTitle extends StatelessWidget {
+  final Device device;
+  final bool nameEditable;
+  final String prefix;
+  final void Function()? onConnected;
+
+  DeviceAppBarTitle(this.device, {this.nameEditable = true, this.prefix = "", this.onConnected});
+
+  @override
+  Widget build(BuildContext context) {
+    void editDeviceName() async {
+      if (!(device is ESPM) && !(device is ESPCC)) return;
+
+      Future<bool> apiDeviceName(String name) async {
+        var api = (ESPM == await device.correctType()) ? (device as ESPM).api : (device as ESPCC).api;
+        snackbar("Sending new device name: $name", context);
+        String? value = await api.request<String>("hostName=$name");
+        if (value != name) {
+          snackbar("Error renaming device", context);
+          return false;
+        }
+        snackbar("Success setting new hostname on device: $value", context);
+        snackbar("Sending reboot command", context);
+        await api.request<bool>("reboot=2000"); // reboot in 2s
+        snackbar("Disconnecting", context);
+        await device.disconnect();
+        snackbar("Waiting for device to boot", context);
+        await Future.delayed(Duration(milliseconds: 4000));
+        snackbar("Connecting to device", context);
+        await device.connect();
+        snackbar("Success", context);
+        return true;
+      }
+
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            scrollable: true,
+            title: Text("Rename device"),
+            content: TextField(
+              maxLength: 31,
+              maxLines: 1,
+              textInputAction: TextInputAction.send,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+              controller: TextEditingController()..text = device.name ?? "",
+              onSubmitted: (text) async {
+                Navigator.of(context).pop();
+                await apiDeviceName(text);
+              },
+            ),
+          );
+        },
+      );
+    }
+
+    Widget deviceName() {
+      return Text(
+        prefix + (device.name ?? "unknown"),
+        style: Theme.of(context).textTheme.headline6,
+        maxLines: 1,
+        overflow: TextOverflow.clip,
+      );
+    }
+
+    return Container(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, // Align left
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Container(
+                      height: 40,
+                      alignment: Alignment.bottomLeft,
+                      child: nameEditable
+                          ? TextButton(
+                              style: ButtonStyle(
+                                alignment: Alignment.bottomLeft,
+                                padding: MaterialStateProperty.all<EdgeInsets>(const EdgeInsets.all(0)),
+                              ),
+                              onPressed: () {},
+                              onLongPress: (device is ESPM) ? editDeviceName : null,
+                              child: deviceName(),
+                            )
+                          : deviceName(),
+                    ),
+                  ),
+                ]),
+                Row(
+                  children: [
+                    DeviceConnectionState(device, onConnected: onConnected),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end, // Align right
+            children: [ConnectButton(device)],
+          )
+        ],
+      ),
+    );
+  }
+}
+
+class ConnectButton extends StatelessWidget with Debug {
+  final Device device;
+  ConnectButton(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    //debugLog("initialState: ${device.lastConnectionState}");
+    return StreamBuilder<PeripheralConnectionState?>(
+      stream: device.stateStream,
+      initialData: device.lastConnectionState,
+      builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
+        //debugLog("$snapshot");
+        var action;
+        var label = "Connect";
+        if (snapshot.data == PeripheralConnectionState.connected) {
+          action = device.disconnect;
+          label = "Disconnect";
+        } else if (snapshot.data == PeripheralConnectionState.connecting) {
+          action = device.disconnect;
+          label = "Cancel";
+        } else if (snapshot.data == PeripheralConnectionState.disconnecting)
+          label = "Disonnecting";
+        else //if (snapshot.data == PeripheralConnectionState.disconnected)
+          action = device.connect;
+        return EspmuiElevatedButton(child: Text(label), onPressed: action);
+      },
+    );
+  }
+}
+
 class BatteryWidget extends StatelessWidget {
   final Device device;
   BatteryWidget(this.device);

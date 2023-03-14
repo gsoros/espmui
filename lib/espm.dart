@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:mutex/mutex.dart';
 
 import 'device.dart';
 import 'api.dart';
@@ -368,10 +369,17 @@ class TemperatureControlSettings with Debug {
     setUpdated();
   }
 
-  int? get size => _values?.length;
-  set size(int? newSize) {
-    if (newSize != size) {
-      _initValues(size: newSize);
+  int get size => _values.length;
+  set size(int newSize) {
+    if (newSize < size) {
+      debugLog("size $size: removeRange(${newSize - 1}, ${size - 1})");
+      _values.removeRange(newSize - 1, size - 1);
+      debugLog("size $size");
+      setUpdated();
+    } else if (size < newSize) {
+      debugLog("size $size: adding ${newSize - size} elements");
+      _values.addAll(List<int?>.filled(newSize - size, null));
+      debugLog("size $size");
       setUpdated();
     }
   }
@@ -397,30 +405,24 @@ class TemperatureControlSettings with Debug {
     setUpdated();
   }
 
-  List<int?>? _values;
-  List<int?>? get values => _values;
-  set values(List<int?>? newValues) {
-    if ((size ?? 0) != (newValues?.length ?? 0)) size = newValues?.length ?? 0;
+  var _values = <int?>[];
+  List<int?> get values => _values;
+  set values(List<int?> newValues) {
+    if (size != newValues.length) size = newValues.length;
     _values = newValues;
     setUpdated();
   }
 
   int? getValueAt(int key) {
-    if ((size ?? 1) - 1 < key) return null;
-    if ((values?.length ?? 1) - 1 < key) return null;
-    return values?[key];
+    if (size - 1 < key) return null;
+    return values[key];
   }
 
   bool setValueAt(int key, int? value) {
-    if (null == size || size! < key - 1) return false;
-    if (null == _values) _initValues();
-    _values![key] = value;
+    if (size < key + 1) size = key + 1;
+    _values[key] = value;
     setUpdated();
     return true;
-  }
-
-  void _initValues({int? size}) {
-    _values = List<int?>.filled(size ?? 0, null);
   }
 
   int _lastUpdate = 0;
@@ -439,25 +441,50 @@ class TemperatureControlSettings with Debug {
 
   Future<bool> readFromDevice() async {
     bool success = true;
+    bool done = false;
     int? rc;
     status("Requesting MTU", type: TCSST.reading);
     await device.requestMtu(512);
     status("Reading settings");
-    <String, String>{
-      "tc": "getting enabled",
-      "tc=table": "reading table settings",
-      "tc=valuesFrom:0": "reading table values",
-    }.forEach((command, msg) async {
-      status(msg.capitalize());
-      rc = await device.api.requestResultCode(command);
-      if (ApiResult.success != rc) {
-        status("Failed $msg");
-        debugLog("readFromDevice $command fail, rc: $rc");
-        success = false;
-      }
+    var mutex = Mutex();
+    <String, Map<String, String?>>{
+      "tc": {"expect": "enabled:", "msg": "checking if tc is enabled"},
+      "tc=table": {"expect": "table;", "msg": "reading table settings"},
+      //"invalidCommand": {"expect": "impossibleReply", "msg": "debug triggering failure"},
+      "tc=valuesFrom:0": {"expect": "valuesFrom:0;", "msg": "reading table values"},
+      "": {"msg": "done reading from device", "done": ""},
+    }.forEach((command, params) async {
+      await mutex.protect(() async {
+        if (done) {
+          status(null, type: TCSST.idle);
+          return;
+        }
+        status(params["msg"]?.capitalize());
+        if (0 < command.length) {
+          rc = await device.api.requestResultCode(command, expectValue: params["expect"]);
+          if (ApiResult.success != rc) {
+            status("Failed ${params["msg"]}");
+            debugLog("readFromDevice $command fail, rc: $rc");
+            success = false;
+            done = true;
+          }
+          await Future.delayed(Duration(milliseconds: 300));
+        }
+        if (null != params["done"]) {
+          done = true;
+          debugLog("readFromDevice success: $success");
+          status(success ? "" : null, type: TCSST.idle);
+        }
+      });
     });
-    status(success ? "" : null, type: TCSST.idle);
-    return success;
+    return null ==
+            await Future.doWhile(() async {
+              debugLog("readFromDevice waiting");
+              await Future.delayed(Duration(milliseconds: 300));
+              return !done;
+            })
+        ? success
+        : false;
   }
 
   bool handleApiMessage(ApiMessage m) {
@@ -467,11 +494,11 @@ class TemperatureControlSettings with Debug {
       debugLog("$tag m.value is null");
       return true;
     }
-    if (m.value == "0") {
+    if (m.value == "enabled:0") {
       enabled = ExtendedBool.False;
       return true;
     }
-    if (m.value == "1") {
+    if (m.value == "enabled:1") {
       enabled = ExtendedBool.True;
       return true;
     }
@@ -489,7 +516,7 @@ class TemperatureControlSettings with Debug {
     String tag = "handleApiTableParams";
     debugLog("$tag");
     if (null == m.value || m.value!.indexOf("table;") < 0) return true;
-    if (m.hasParamValue("size:")) size = int.tryParse(m.getParamValue("size:") ?? "");
+    if (m.hasParamValue("size:")) size = int.tryParse(m.getParamValue("size:") ?? "") ?? 0;
     if (m.hasParamValue("keyOffset:")) keyOffset = int.tryParse(m.getParamValue("keyOffset:") ?? "");
     if (m.hasParamValue("keyRes:")) keyResolution = double.tryParse(m.getParamValue("keyRes:") ?? "");
     if (m.hasParamValue("valueRes:")) valueResolution = double.tryParse(m.getParamValue("valueRes:") ?? "");
@@ -519,7 +546,10 @@ class TemperatureControlSettings with Debug {
 
     int updated = 0;
     v.split(",").forEach((nStr) {
-      if ((size ?? 0) <= key) return;
+      if (size <= key) {
+        debugLog("$tag key: $key but size: $size");
+        return;
+      }
       //int? oldValue = getValueAt(key);
       if (setValueAt(key, int.tryParse(nStr) ?? valueUnset)) updated++;
       //debugLog("$tag $key: $oldValue -> ${getValueAt(key)})");
@@ -527,9 +557,10 @@ class TemperatureControlSettings with Debug {
     });
     debugLog("$tag $updated values updated, size: $size");
 
-    if (key < (size ?? 0)) {
-      debugLog("$tag requesting tc=valuesFrom:$key");
-      device.api.requestResultCode("tc=valuesFrom:$key");
+    if (key < size) {
+      String exp = "=valuesFrom:$key;";
+      debugLog("$tag requesting tc$exp");
+      device.api.requestResultCode("tc$exp", expectValue: exp);
     }
 
     return true;
@@ -537,7 +568,7 @@ class TemperatureControlSettings with Debug {
 
   int? get valuesMin {
     int? i;
-    _values?.forEach((v) {
+    _values.forEach((v) {
       if (null == i || null == v || v < i!) i = v;
     });
     return i;
@@ -545,7 +576,7 @@ class TemperatureControlSettings with Debug {
 
   int? get valuesMax {
     int? i;
-    _values?.forEach((v) {
+    _values.forEach((v) {
       if (null == i || null == v || i! < v) i = v;
     });
     return i;
@@ -554,10 +585,13 @@ class TemperatureControlSettings with Debug {
   TCSST statusType = TCSST.idle;
   String statusMessage = "";
   void status(String? message, {TCSST? type}) {
-    if (null != message) statusMessage = message;
-    if (null != type) statusType = type;
-    device.settings.notifyListeners();
-    debugLog("status $statusMessage $statusType");
+    // workaround for "setState() or markNeedsBuild() called during build"
+    Future.delayed(Duration.zero, () {
+      if (null != message) statusMessage = message;
+      if (null != type) statusType = type;
+      device.settings.notifyListeners();
+      debugLog("status $statusMessage $statusType");
+    });
   }
 
   @override

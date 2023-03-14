@@ -96,6 +96,7 @@ class ApiMessage with Debug {
     if (this.minDelayMs > 10000) this.minDelayMs = 10000;
     var maxAttemtsTotalTime = this.maxAttempts * this.minDelayMs;
     if (this.maxAgeMs < maxAttemtsTotalTime) this.maxAgeMs = maxAttemtsTotalTime + this.minDelayMs;
+    debugLog("Created $this");
   }
 
   /// Attempts to create commandCode and commandStr from command
@@ -296,7 +297,7 @@ class Api with Debug {
     for (ApiMessage m in _queue) {
       if (m.commandCode == commandCode) {
         if (m.expectValue != null) {
-          //debugLog("expected: '${m.expectValue}' got '${value.substring(0, min(m.expectValue!.length, value.length))}'");
+          debugLog("expected: '${m.expectValue}' got '${value.substring(0, min(m.expectValue!.length, value.length))}'");
           // no match if expected value is set and value does not begin with it
           if (m.expectValue != value.substring(0, min(m.expectValue!.length, value.length))) continue;
         }
