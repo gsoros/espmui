@@ -437,7 +437,7 @@ class TemperatureControlSettings with Debug {
   static const int valueMax = 128; // INT8_MAX
 
   double keyToTemperature(int key) => ((_keyOffset ?? 0) + key * (_keyResolution ?? 0)).toDouble();
-  double valueToMass(int value) => value == valueUnset ? 0 : value * (_valueResolution ?? 1);
+  double valueToWeight(int value) => value == valueUnset ? 0 : value * (_valueResolution ?? 1);
 
   Future<bool> readFromDevice() async {
     bool success = true;
@@ -566,6 +566,62 @@ class TemperatureControlSettings with Debug {
     return true;
   }
 
+  Map<double, List<double>> collected = {};
+
+  void addCollected(double temperature, double weight) {
+    if (collected.containsKey(temperature)) {
+      collected[temperature]?.add(weight);
+      //collected[temperature]?.sort();
+    } else {
+      collected.addAll({
+        temperature: [weight]
+      });
+    }
+    collected = Map.fromEntries(collected.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
+    device.settings.notifyListeners();
+  }
+
+  int collectedSize() {
+    int size = 0;
+    collected.forEach((key, value) {
+      size += value.length;
+    });
+    return size;
+  }
+
+  double? collectedMinTemp() {
+    double? d;
+    collected.forEach((key, value) {
+      if (null == d || key < d!) d = key;
+    });
+    return d;
+  }
+
+  double? collectedMaxTemp() {
+    double? d;
+    collected.forEach((key, value) {
+      if (null == d || d! < key) d = key;
+    });
+    return d;
+  }
+
+  bool isCollecting = false;
+
+  void startCollecting() {
+    if (isCollecting) return;
+    isCollecting = true;
+    Future.doWhile(() async {
+      status("Collecting: ${collectedSize()}", type: TCSST.collecting);
+      await Future.delayed(Duration(seconds: 1));
+      return isCollecting;
+    });
+  }
+
+  void stopCollecting() {
+    isCollecting = false;
+    status("", type: TCSST.idle);
+  }
+
   int? get valuesMin {
     int? i;
     _values.forEach((v) {
@@ -622,11 +678,11 @@ class TemperatureControlSettings with Debug {
       statusType.hashCode;
 }
 
-enum TemperatureControlSettingsStatusType {
+enum TCSettingsStatusType {
   idle,
   reading,
   collecting,
   writing,
 }
 
-typedef TCSST = TemperatureControlSettingsStatusType;
+typedef TCSST = TCSettingsStatusType;

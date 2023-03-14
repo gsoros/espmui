@@ -1099,7 +1099,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                       context,
                       PageTransition(
                         type: PageTransitionType.rightToLeft,
-                        child: TemperatureCompensationRoute(device),
+                        child: TCRoute(device),
                       ),
                     );
                   },
