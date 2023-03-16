@@ -22,16 +22,16 @@ class ESPCCSyncer with Debug {
   }
 
   void queue(ESPCCFile f) async {
-    debugLog("queue ${f.name}");
+    logD("queue ${f.name}");
     f.cancelDownload = false;
     if (!_queue.contains(f)) _queue.add(f);
     int? mtu = await device.requestMtu(512);
-    if (null != mtu) debugLog("got mtu=$mtu");
+    if (null != mtu) logD("got mtu=$mtu");
     _startQueueSchedule();
   }
 
   void dequeue(ESPCCFile f) {
-    debugLog("dequeue ${f.name}");
+    logD("dequeue ${f.name}");
     f.cancelDownload = true;
     var file = getFromQueue(file: f);
     if (null != file) file.cancelDownload = true;
@@ -54,15 +54,15 @@ class ESPCCSyncer with Debug {
   }
 
   bool isDownloading(ESPCCFile f) {
-    //if (f.name == _current?.name) debugLog("f: $f _current: $_current");
+    //if (f.name == _current?.name) logD("f: $f _current: $_current");
     return !f.cancelDownload && _current == f && (_running || _timer != null);
   }
 
   Future<void> _runQueue() async {
-    String tag = "_runQueue()";
+    String tag = "";
 
     if (_running) {
-      // debugLog("$tag already _running");
+      // logD("$tag already _running");
       return;
     }
     _running = true;
@@ -74,29 +74,29 @@ class ESPCCSyncer with Debug {
     ESPCCFile ef = _queue.removeFirst();
     _current = ef;
     if (ef.cancelDownload) {
-      debugLog("$tag cancelling download of $ef");
+      logD("$tag cancelling download of $ef");
       // ef is not placed back into the queue
       device.files.notifyListeners();
       _running = false;
       return;
     }
     if (ef.remoteExists != ExtendedBool.True || ef.remoteSize <= 0) {
-      debugLog("$tag invalid remote $ef");
+      logD("$tag invalid remote $ef");
       // ef is not placed back into the queue
       _running = false;
       return;
     }
     await ef.updateLocalStatus();
     if (ef.localExists == ExtendedBool.Unknown) {
-      debugLog("$tag could not get local status for ${ef.name}");
+      logD("$tag could not get local status for ${ef.name}");
       _queue.add(ef);
       _running = false;
       return;
     }
     if (ef.remoteSize <= ef.localSize) {
-      debugLog("$tag finished downloading ${ef.name}");
+      logD("$tag finished downloading ${ef.name}");
       device.files.notifyListeners();
-      if (ef.remoteSize < ef.localSize) debugLog("!!! remote size ${ef.remoteSize} < local size ${ef.localSize}");
+      if (ef.remoteSize < ef.localSize) logD("!!! remote size ${ef.remoteSize} < local size ${ef.localSize}");
       if (ef.isRec) {
         String msg = "generating ${ef.name}-local.gpx";
         snackbar(msg);
@@ -107,7 +107,7 @@ class ESPCCSyncer with Debug {
       return;
     }
     if (!await device.connected) {
-      debugLog("$tag not connected");
+      logD("$tag not connected");
       _queue.add(ef);
       _running = false;
       return;
@@ -116,7 +116,7 @@ class ESPCCSyncer with Debug {
     int offset = ef.localSize <= 0 ? 0 : ef.localSize + 1;
     String request = "rec=get:${ef.name};offset:$offset";
     String expect = "get:${ef.name}:$offset;";
-    // debugLog("$tag (ef.hash: ${ef.hashCode}) requesting: $request, expecting: $expect");
+    // logD("$tag (ef.hash: ${ef.hashCode}) requesting: $request, expecting: $expect");
     String? reply = await device.api.request<String>(
       request,
       expectValue: expect,
@@ -125,46 +125,46 @@ class ESPCCSyncer with Debug {
       maxAttempts: 3,
     );
     if (null == reply || reply.length < 1) {
-      debugLog("$tag empty reply for $request");
+      logD("$tag empty reply for $request");
       _queue.add(ef);
       _running = false;
       return;
     }
-    // debugLog("$ef reply: $reply");
+    // logD("$ef reply: $reply");
     int answerPos = reply.indexOf(";");
     if (answerPos < 0) {
-      debugLog("$tag invalid answer to $request");
+      logD("$tag invalid answer to $request");
       _queue.add(ef);
       _running = false;
       return;
     }
     if (!ef.isBinary) {
       String value = reply.substring(answerPos + 1);
-      // debugLog("$tag $ef got ${value.length}B");
+      // logD("$tag $ef got ${value.length}B");
       int written = await ef.appendLocal(offset: offset, data: value);
       if (written != value.length) {
-        debugLog("$ef, received: ${value.length}, written: $written");
+        logD("$ef, received: ${value.length}, written: $written");
       }
     }
     // in case of a binary (rec) file, at this point the local file should be
     // updated by EspccApiCharacteristic::onNotify()
     await ef.updateLocalStatus();
-    //debugLog("$tag ef.hash ${ef.hashCode} local size is now ${ef.localSize}");
+    //logD("$tag ef.hash ${ef.hashCode} local size is now ${ef.localSize}");
     device.files.notifyListeners();
     _queue.addFirst(ef);
     _running = false;
   }
 
   void _startQueueSchedule() {
-    debugLog("queueSchedule already running");
+    logD("queueSchedule already running");
     if (_timer != null) return;
-    debugLog("queueSchedule start");
+    logD("queueSchedule start");
     _timer = Timer.periodic(Duration(milliseconds: queueDelayMs), (_) => _runQueue());
   }
 
   void _stopQueueSchedule() {
     if (_timer == null) return;
-    debugLog("queueSchedule stop");
+    logD("queueSchedule stop");
     _timer?.cancel();
     _timer = null;
   }

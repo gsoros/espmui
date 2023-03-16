@@ -89,7 +89,7 @@ class Notifications with Debug {
   }
 
   void onResponse(NotificationResponse? response) {
-    debugLog("Notifications::onResponse($response)");
+    logD("Notifications::onResponse($response)");
   }
 
   /// returns a singleton
@@ -98,7 +98,7 @@ class Notifications with Debug {
   }
 
   Notifications._construct() {
-    debugLog('_construct()');
+    logD('_construct()');
     _init();
   }
 }

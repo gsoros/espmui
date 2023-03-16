@@ -40,7 +40,7 @@ abstract class BleCharacteristic<T> with Debug {
   Stream<T> get defaultStream => _controller.stream;
 
   BleCharacteristic(this.device) {
-    debugLog("construct ${device.peripheral?.identifier}");
+    logD("construct ${device.peripheral?.identifier}");
     //lastValue = fromUint8List(Uint8List.fromList([]));
   }
 
@@ -60,7 +60,7 @@ abstract class BleCharacteristic<T> with Debug {
   /// Reads raw value from characteristic and sets [lastRawValue]
   Future<Uint8List?> readAsUint8List() async {
     await _init();
-    String tag = "readAsUint8List()";
+    String tag = "";
     if (null == _characteristic) {
       bleError(debugTag, "$tag characteristic is null");
       return null;
@@ -105,7 +105,7 @@ abstract class BleCharacteristic<T> with Debug {
       bleError(debugTag, "write() characteristic not writableWithResponse");
       return Future.value(null);
     }
-    //debugLog("write($value)");
+    //logD("write($value)");
     await _exclusiveAccess.protect(() async {
       if (null == char) return;
       char
@@ -121,7 +121,7 @@ abstract class BleCharacteristic<T> with Debug {
   }
 
   Future<void> subscribe() async {
-    debugLog("subscribe()");
+    logD("subscribe()");
     if (isSubscribed) {
       bleError(debugTag, "already subscribed");
       return;
@@ -147,7 +147,7 @@ abstract class BleCharacteristic<T> with Debug {
         (value) async {
           lastRawValue = value;
           lastValue = await onNotify(fromUint8List(value));
-          //debugLog("$lastValue");
+          //logD("$lastValue");
           util.streamSendIfNotClosed(_controller, lastValue);
           _appendToHistory();
         },
@@ -156,7 +156,7 @@ abstract class BleCharacteristic<T> with Debug {
     });
     await read();
     _appendToHistory();
-    debugLog("subscribe() initial value: $lastValue");
+    logD("subscribe() initial value: $lastValue");
     util.streamSendIfNotClosed(_controller, lastValue);
   }
 
@@ -170,7 +170,7 @@ abstract class BleCharacteristic<T> with Debug {
   Future<void> unsubscribe() async {
     await _init();
     if (_subscription == null) return;
-    debugLog("unsubscribe");
+    logD("unsubscribe");
     //util.streamSendIfNotClosed(_controller, fromUint8List(Uint8List.fromList([])));
     await _subscription?.cancel();
     _subscription = null;
@@ -179,7 +179,7 @@ abstract class BleCharacteristic<T> with Debug {
   Future<void> _init() async {
     if (_characteristic != null) return; // already init'd
     if (null == device.peripheral) {
-      debugLog("_init(): peripheral is null");
+      logD("_init(): peripheral is null");
       return;
     }
     if (!(await device.peripheral!.isConnected())) return;
@@ -193,12 +193,12 @@ abstract class BleCharacteristic<T> with Debug {
     } catch (e) {
       bleError(debugTag, "_init() readCharacteristic()", e);
       _characteristic = null;
-      //  debugLog("readCharacteristic() serviceUUID: $serviceUUID, characteristicUUID: $characteristicUUID, $e");
+      //  logD("readCharacteristic() serviceUUID: $serviceUUID, characteristicUUID: $characteristicUUID, $e");
     }
   }
 
   Future<void> deinit() async {
-    //debugLog("deinit()");
+    //logD("deinit()");
     _characteristic = null;
   }
 
@@ -389,7 +389,7 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
     try {
       list = ascii.encode(value);
     } catch (e) {
-      debugLog("error: failed to ascii encode '$value': $e");
+      logE("error: failed to ascii encode '$value': $e");
       List<int> valid = [];
       for (int code in value.codeUnits) if (code < 256) valid.add(code);
       list = Uint8List.fromList(valid);
@@ -417,7 +417,7 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
     //await super._init();
     if (_rxChar != null || _characteristic != null) return; // already init'd
     if (null == device.peripheral) {
-      debugLog("_init(): peripheral is null");
+      logD("_init(): peripheral is null");
       return;
     }
     if (!(await device.peripheral!.isConnected())) return;
@@ -451,7 +451,7 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
     if (null != device.mtu && 0 < device.mtu! && value.length < device.mtu! - 3) return value;
     // read full value as the notification is limited to the size of one packet
     String? fullValue = await read();
-    debugLog("ApiCharacteristic::onNotify() mtu=${device.mtu} value(${value.length}) fullValue(${fullValue?.length})");
+    logD("ApiCharacteristic::onNotify() mtu=${device.mtu} value(${value.length}) fullValue(${fullValue?.length})");
     return fullValue;
   }
 }
@@ -468,60 +468,60 @@ class EspccApiCharacteristic extends ApiCharacteristic {
   @override
   Future<String?> onNotify(String value) async {
     // do not read the binary data after "success;rec=get:01231234:0;"
-    String tag = "EspccApiCharacteristic::onNotify:";
-    //debugLog("$tag '$value'");
+    String tag = "";
+    //logD("$tag '$value'");
     final int success = ApiResult.success;
     final int? rec = device.api.commandCode("rec", logOnError: false);
     if (null == rec) {
-      // debugLog("$tag could not find command code for 'rec'");
+      // logD("$tag could not find command code for 'rec'");
       return super.onNotify(value);
     }
     final reg = RegExp('(^$success;$rec=get:([0-9a-zA-Z]{8}):([0-9]+);*)(.+)');
     RegExpMatch? match = reg.firstMatch(value);
     String? noBinary = match?.group(1);
     if (null != noBinary && 0 < noBinary.length) {
-      // debugLog("$tag found match: '$noBinary'");
+      // logD("$tag found match: '$noBinary'");
       Uint8List? valueAsList;
       if (null != device.mtu && 0 < device.mtu! && null != lastRawValue && lastRawValue!.length < device.mtu! - 2) {
         valueAsList = lastRawValue;
-        //debugLog("$tag $noBinary ready");
+        //logD("$tag $noBinary ready");
       } else {
         valueAsList = await readAsUint8List();
-        //debugLog("$tag $noBinary was re-read, mtu: ${device.mtu}, "
+        //logD("$tag $noBinary was re-read, mtu: ${device.mtu}, "
         //    "lastRawValue.length: ${lastRawValue?.length}");
       }
       if (null == valueAsList || 0 == valueAsList.length) {
-        debugLog("$tag could not get valueAsList");
+        logD("$tag could not get valueAsList");
         return super.onNotify(noBinary);
       }
       String fullValue = fromUint8List(valueAsList);
       match = reg.firstMatch(fullValue);
       String? fileName = match?.group(2);
       if (null == fileName || fileName.length < 8) {
-        debugLog("$tag could not get filename");
+        logD("$tag could not get filename");
         return super.onNotify(noBinary);
       }
       String? offsetStr = match?.group(3);
       if (null == offsetStr || offsetStr.length < 1) {
-        debugLog("$tag could not get offsetStr");
+        logD("$tag could not get offsetStr");
         return super.onNotify(noBinary);
       }
       int? offset = int.tryParse(offsetStr);
       if (null == offset || offset < 0) {
-        debugLog("$tag could not get offset");
+        logD("$tag could not get offset");
         return super.onNotify(noBinary);
       }
       int? binaryStart = match?.group(1)?.length;
       if (null == binaryStart || binaryStart < 0 || valueAsList.length <= binaryStart) {
-        debugLog("$tag could not get binaryStart");
+        logD("$tag could not get binaryStart");
         return super.onNotify(noBinary);
       }
       Uint8List byteData = Uint8List.sublistView(valueAsList, binaryStart);
-      //debugLog("$tag file: $fileName, offset: $offset, byteData: ${byteData.length}B");
+      //logD("$tag file: $fileName, offset: $offset, byteData: ${byteData.length}B");
       ESPCCFile f = device.files.value.files.firstWhere(
         (candidate) => candidate.name == fileName,
         orElse: () {
-          debugLog("$tag $fileName not found in list, creating new ef");
+          logD("$tag $fileName not found in list, creating new ef");
           var f = ESPCCFile(fileName, device);
           f.updateLocalStatus();
           device.files.value.files.add(f);
@@ -531,7 +531,7 @@ class EspccApiCharacteristic extends ApiCharacteristic {
       );
       int written = await f.appendLocal(offset: offset, byteData: byteData);
       if (written == byteData.length) return super.onNotify(noBinary);
-      debugLog("$tag file: $fileName, received: ${byteData.length}, written: $written");
+      logD("$tag file: $fileName, received: ${byteData.length}, written: $written");
       return super.onNotify("${ApiResult.localFsError};$rec=get:$fileName:$offset;");
     }
     return super.onNotify(value);
@@ -560,19 +560,19 @@ class ApiLogCharacteristic extends BleCharacteristic<String> {
 
   @override
   Future<String?> onNotify(String value) async {
-    String tag = "onNotify()";
-    debugLog("$tag ${device.name} \"$value\"");
+    String tag = "";
+    logD("$tag ${device.name} \"$value\"");
     if (null != device.mtu && 0 < device.mtu! && device.mtu! - 3 <= value.length) {
       // read full value as the notification is limited to the size of one packet
       String? fullValue = await read();
-      debugLog("$tag mtu=${device.mtu} value(${value.length}) fullValue(${fullValue?.length})");
+      logD("$tag mtu=${device.mtu} value(${value.length}) fullValue(${fullValue?.length})");
       if (null != fullValue && value.length < fullValue.length) value = fullValue;
     }
     DateTime date = DateTime.now();
     String fileName = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.log";
     String? path = Platform.isAndroid ? await util.Path().external : await util.Path().documents;
     if (null == path) {
-      debugLog("$tag path is null");
+      logD("$tag path is null");
       return value;
     }
     String deviceName = "unnamedDevice";
@@ -583,11 +583,11 @@ class ApiLogCharacteristic extends BleCharacteristic<String> {
       try {
         f = await f.create(recursive: true);
       } catch (e) {
-        debugLog("$tag could not create $path, error: $e");
+        logE("$tag could not create $path, error: $e");
         return value;
       }
     }
-    // debugLog("$tag writing ${value.length} characters to ${f.path}: $value");
+    // logD("$tag writing ${value.length} characters to ${f.path}: $value");
     await f.writeAsString(
       "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')} $value\n",
       mode: FileMode.append,
@@ -679,13 +679,13 @@ class HeartRateCharacteristic extends BleCharacteristic<int> {
     var byteData = list.buffer.asByteData();
     int heartRate = 0;
     if (byteData.lengthInBytes < byteCount + 1) {
-      debugLog('fromUint8List() not enough bytes in $list');
+      logD('fromUint8List() not enough bytes in $list');
       return heartRate;
     }
     if (byteCount == 1)
       heartRate = byteData.getUint8(1);
     else if (byteCount == 2) heartRate = byteData.getUint16(1, Endian.little);
-    //debugLog("got list: $list byteCount: $byteCount hr: $heartRate');
+    //logD("got list: $list byteCount: $byteCount hr: $heartRate');
     return heartRate;
   }
 
@@ -736,7 +736,7 @@ class CharacteristicList with Debug {
   void addAll(Map<String, CharacteristicListItem> items) => _items.addAll(items);
 
   void dispose() {
-    debugLog("dispose");
+    logD("dispose");
     _items.forEach((_, item) => item.dispose());
     _items.clear();
   }
@@ -778,7 +778,7 @@ class CharacteristicHistory<T> with Debug {
   /// - [timestamp]: milliseconds since Epoch
   void append(T value, {int? timestamp}) {
     if (null == timestamp) timestamp = util.uts();
-    //debugLog("append timestamp: $timestamp value: $value length: ${_data.length}");
+    //logD("append timestamp: $timestamp value: $value length: ${_data.length}");
     if (absolute) {
       if (value.runtimeType == int) value = int.tryParse(value.toString())?.abs() as T;
       if (value.runtimeType == double) value = double.tryParse(value.toString())?.abs() as T;
@@ -797,7 +797,7 @@ class CharacteristicHistory<T> with Debug {
   Map<int, T> since({required int timestamp}) {
     Map<int, T> filtered = Map.of(_data);
     filtered.removeWhere((time, _) => time < timestamp);
-    //debugLog("since  timestamp: $timestamp data: ${_data.length} filtered: ${filtered.length}");
+    //logD("since  timestamp: $timestamp data: ${_data.length} filtered: ${filtered.length}");
     return filtered;
   }
 
@@ -812,7 +812,7 @@ class CharacteristicHistory<T> with Debug {
       if (null == min || val < min!) min = val.toDouble();
       if (null == max || max! < val) max = val.toDouble();
     });
-    //debugLog("min: $min max: $max");
+    //logD("min: $min max: $max");
     if (null == min || null == max) return util.Empty();
     var widgets = <Widget>[];
     Color outColor = color ?? Colors.red;

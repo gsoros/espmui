@@ -84,8 +84,8 @@ class ESPCC extends Device {
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    String tag = "handleApiMessageSuccess()";
-    //debugLog("$tag $message");
+    String tag = "";
+    //logD("$tag $message");
 
     if (await wifiSettings.value.handleApiMessageSuccess(message)) {
       wifiSettings.notifyListeners();
@@ -99,18 +99,18 @@ class ESPCC extends Device {
 
     if ("rec" == message.commandStr) {
       String? val = message.valueAsString;
-      //debugLog("$tag rec: received val=$val");
+      //logD("$tag rec: received val=$val");
       if (null == val) return true;
       if ("files:" == val.substring(0, min(6, val.length))) {
         List<String> names = val.substring(6).split(";");
-        debugLog("$tag rec:files received names=$names");
+        logD("$tag rec:files received names=$names");
         names.forEach((name) async {
           if (16 < name.length) {
-            debugLog("$tag rec:files name too long: $name");
+            logD("$tag rec:files name too long: $name");
             return;
           }
           if (name.length <= 2) {
-            debugLog("$tag rec:files name too short: $name");
+            logD("$tag rec:files name too short: $name");
             return;
           }
           ESPCCFile f = files.value.files.firstWhere(
@@ -139,7 +139,7 @@ class ESPCC extends Device {
         }
       } else if ("info:" == val.substring(0, min(5, val.length))) {
         List<String> tokens = val.substring(5).split(";");
-        debugLog("$tag got info: $tokens");
+        logD("$tag got info: $tokens");
         var f = ESPCCFile(tokens[0], this, remoteExists: ExtendedBool.True);
         if (8 <= f.name.length) {
           tokens.removeAt(0);
@@ -171,24 +171,24 @@ class ESPCC extends Device {
           files.notifyListeners();
         }
       }
-      //debugLog("files.length=${files.value.files.length}");
+      //logD("files.length=${files.value.files.length}");
       return true;
     }
 
     //snackbar("${message.info} ${message.command}");
-    debugLog("unhandled api response: $message");
+    logD("unhandled api response: $message");
 
     return false;
   }
 
   Future<void> dispose() async {
-    debugLog("$name dispose");
+    logD("$name dispose");
     _apiSubsciption?.cancel();
     super.dispose();
   }
 
   Future<void> onConnected() async {
-    debugLog("_onConnected()");
+    logD("_onConnected()");
     // api char can use values longer than 20 bytes
     await requestMtu(512);
     await super.onConnected();
@@ -196,9 +196,9 @@ class ESPCC extends Device {
   }
 
   Future<void> onDisconnected() async {
-    debugLog("$name onDisconnected()");
+    logD("$name onDisconnected()");
     // if (await connected) {
-    //   debugLog("but $name is connected");
+    //   logD("but $name is connected");
     //   return;
     // }
 
@@ -215,7 +215,7 @@ class ESPCC extends Device {
   /// request initial values, returned value is discarded
   /// because the message.done subscription will handle it
   void _requestInit() async {
-    debugLog("Requesting init start");
+    logD("Requesting init start");
     if (!await ready()) return;
     //await characteristic("api")?.write("init");
 
@@ -229,7 +229,7 @@ class ESPCC extends Device {
 
   Future<void> refreshFileList() async {
     if (files.value.syncing == ExtendedBool.True) {
-      debugLog("refreshFileList() already refreshing");
+      logD("refreshFileList() already refreshing");
       return;
     }
     files.value.syncing = ExtendedBool.True;
@@ -271,11 +271,11 @@ class ESPCCFile with Debug {
     if (null == p) return;
     final file = File(p);
     if (await file.exists()) {
-      //debugLog("updateLocalStatus() local file $p exists");
+      //logD("updateLocalStatus() local file $p exists");
       localExists = ExtendedBool.True;
       localSize = await file.length();
     } else {
-      debugLog("updateLocalStatus() local file $p does not exist");
+      logD("updateLocalStatus() local file $p does not exist");
       localExists = ExtendedBool.False;
       localSize = -1;
     }
@@ -301,28 +301,28 @@ class ESPCCFile with Debug {
     String? data,
     Uint8List? byteData,
   }) async {
-    String tag = "appendLocal ($name ef.hash $hashCode)";
+    String tag = "($name ef.hash $hashCode)";
     if (null != data && null != byteData) {
-      debugLog("$tag both data and byteData present");
+      logD("$tag both data and byteData present");
       return 0;
     }
 
     File? f = await getLocal();
     if (null == f) {
-      debugLog("$tag could not get local file");
+      logD("$tag could not get local file");
       return 0;
     }
     if (!await f.exists()) {
       try {
         f = await f.create(recursive: true);
       } catch (e) {
-        debugLog("$tag could not create ${await path}, error: $e");
+        logE("$tag could not create ${await path}, error: $e");
         return 0;
       }
     }
     int sizeBefore = await f.length();
     if (null != offset && sizeBefore != (offset <= 0 ? 0 : offset - 1)) {
-      debugLog("$tag local size is $sizeBefore but offset is $offset");
+      logD("$tag local size is $sizeBefore but offset is $offset");
       return 0;
     }
     if (null != data && 0 < data.length)
@@ -338,7 +338,7 @@ class ESPCCFile with Debug {
         flush: true,
       );
     else {
-      debugLog("$tag need either data or byteData");
+      logD("$tag need either data or byteData");
       return 0;
     }
     await updateLocalStatus();
@@ -355,43 +355,43 @@ class ESPCCFile with Debug {
 
   /// generates non-standard format for exporting to str%v#
   Future<bool> generateGpx({bool overwrite = false}) async {
-    String tag = "ESPCCFile::generateGpx() $name";
+    String tag = "$name";
     if (_generatingGpx) {
-      debugLog("$tag already generating");
+      logD("$tag already generating");
       return false;
     }
     _generatingGpx = true;
     if (!isRec) {
-      debugLog("$tag not a rec file");
+      logD("$tag not a rec file");
       _generatingGpx = false;
       return false;
     }
     File? f = await getLocal();
     if (null == f) {
-      debugLog("$tag could not get local file");
+      logD("$tag could not get local file");
       _generatingGpx = false;
       return false;
     }
     if (!await f.exists()) {
-      debugLog("$tag local file does not exist");
+      logD("$tag local file does not exist");
       _generatingGpx = false;
       return false;
     }
     if (await f.length() <= 0) {
-      debugLog("$tag local file has no size");
+      logD("$tag local file has no size");
       _generatingGpx = false;
       return false;
     }
     String? p = await path;
     if (null == p || p.length < 5) {
-      debugLog("$tag could not get path");
+      logD("$tag could not get path");
       _generatingGpx = false;
       return false;
     }
     String gpxPath = "$p-local.gpx";
     File g = File(gpxPath);
     if (await g.exists() && !overwrite) {
-      debugLog("$tag $gpxPath already exists, not overwriting");
+      logD("$tag $gpxPath already exists, not overwriting");
       _generatingGpx = false;
       return false;
     }
@@ -415,7 +415,7 @@ class ESPCCFile with Debug {
         done = true;
         continue;
       }
-      //debugLog("$tag size: $size, cursor: $cursor, toRead: $toRead");
+      //logD("$tag size: $size, cursor: $cursor, toRead: $toRead");
       var raf = await f.open(mode: FileMode.read);
       raf = await raf.setPosition(cursor);
       point.fromList(await raf.read(toRead));
@@ -426,22 +426,22 @@ class ESPCCFile with Debug {
           mode: FileMode.write, // truncate to zero
           flush: true,
         );
-        debugLog("$tag header written");
+        logD("$tag header written");
       }
       if (prevPoint.time != 0 && (point.time < prevPoint.time || prevPoint.time + 86400 < point.time)) {
         // 1 day
-        debugLog("$tag invalid time ${point.time} ${point.timeAsIso8601}");
+        logD("$tag invalid time ${point.time} ${point.timeAsIso8601}");
         cursor += toRead;
         continue;
       }
       if (!point.hasLocation) {
-        debugLog("$tag no location at point #$pointsWritten ${point.timeAsIso8601}");
+        logD("$tag no location at point #$pointsWritten ${point.timeAsIso8601}");
         if (prevPoint.hasLocation) {
-          debugLog("$tag copying location from prev point");
+          logD("$tag copying location from prev point");
           point.lat = prevPoint.lat;
           point.lon = prevPoint.lon;
         } else {
-          debugLog("$tag invalid point");
+          logD("$tag invalid point");
           cursor += toRead;
           continue;
         }
@@ -475,7 +475,7 @@ class ESPCCFile with Debug {
       pointsWritten++;
       prevPoint.from(point);
     }
-    debugLog("$tag $pointsWritten points written");
+    logD("$tag $pointsWritten points written");
     if (0 < pointsWritten) {
       await g.writeAsString(
         _gpxFooter(),
@@ -483,7 +483,7 @@ class ESPCCFile with Debug {
         flush: true,
       );
       var size = await g.length();
-      debugLog("$tag footer written, file size ${bytesToString(size)}");
+      logD("$tag footer written, file size ${bytesToString(size)}");
     }
     _generatingGpx = false;
     return true;
@@ -648,8 +648,8 @@ class ESPCCSettings with Debug {
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    String tag = "handleApiMessageSuccess";
-    //debugLog("$tag $message");
+    String tag = "";
+    //logD("$tag $message");
 
     if ("peers" == message.commandStr) {
       String? v = message.valueAsString;
@@ -660,7 +660,7 @@ class ESPCCSettings with Debug {
         if (token.length < 1) return;
         values.add(token);
       });
-      debugLog("$tag peers=$values");
+      logD("$tag peers=$values");
       peers = values;
       return true;
     }
@@ -679,7 +679,7 @@ class ESPCCSettings with Debug {
           index++;
         });
         touchRead = readings;
-        debugLog("$tag touchRead=$touchRead");
+        logD("$tag touchRead=$touchRead");
         return true;
       }
       if (0 == v.indexOf("thresholds:")) {
@@ -693,14 +693,14 @@ class ESPCCSettings with Debug {
           index++;
         });
         touchThres = thresholds;
-        debugLog("$tag touchThres=$touchThres");
+        logD("$tag touchThres=$touchThres");
         return true;
       }
       if (0 == v.indexOf("enabled:")) {
         int? i = int.tryParse(v.substring("enabled:".length));
         if (null != i) {
           touchEnabled = 0 < i;
-          debugLog("$tag touchEnabled=$touchEnabled");
+          logD("$tag touchEnabled=$touchEnabled");
         }
       }
       return true;
@@ -708,7 +708,7 @@ class ESPCCSettings with Debug {
 
     if ("scanResult" == message.commandStr) {
       String? result = message.valueAsString;
-      debugLog("$tag scanResult: received $result");
+      logD("$tag scanResult: received $result");
       if (null == result) return false;
       if (scanResults.contains(result)) return false;
       scanResults.add(result);
@@ -717,7 +717,7 @@ class ESPCCSettings with Debug {
 
     if ("scan" == message.commandStr) {
       int? timeout = message.valueAsInt;
-      debugLog("$tag scan: received scan=$timeout");
+      logD("$tag scan: received scan=$timeout");
       scanning = null != timeout && 0 < timeout;
       return true;
     }
@@ -727,7 +727,7 @@ class ESPCCSettings with Debug {
       String? s = message.valueAsString;
       if (null != i && null != s && 1 == s.length && int.tryParse(s) == i) {
         recording = (ESPCCRecordingState.MIN < i && i < ESPCCRecordingState.MAX) ? i : ESPCCRecordingState.UNKNOWN;
-        //debugLog("$tag received rec=${message.value}, parsed recording=${ESPCCRecordingState.getString(recording)}");
+        //logD("$tag received rec=${message.value}, parsed recording=${ESPCCRecordingState.getString(recording)}");
         return true;
       }
       return false;
@@ -739,7 +739,7 @@ class ESPCCSettings with Debug {
       tokens.forEach((token) {
         List<String> pair = token.split(":");
         if (2 != pair.length) {
-          debugLog("$tag invalid token: $token");
+          logD("$tag invalid token: $token");
           return;
         }
         switch (pair[0]) {
@@ -774,10 +774,10 @@ class ESPCCSettings with Debug {
             vescRampTime = int.tryParse(pair[1]) ?? vescRampTime;
             break;
           default:
-            debugLog("$tag unknown name: token: $token, name: ${pair[0]}, value: ${pair[1]}");
+            logD("$tag unknown name: token: $token, name: ${pair[0]}, value: ${pair[1]}");
         }
       });
-      debugLog("$tag updated settings: $this");
+      logD("$tag updated settings: $this");
       return true;
     }
 
@@ -911,12 +911,12 @@ class ESPCCDataPoint with Debug {
   var _temperature = Uint8List(2);
 
   bool fromList(Uint8List bytes) {
-    String tag = "$_tag fromList()";
+    String tag = "$_tag";
     if (bytes.length < sizeInBytes) {
-      debugLog("$tag incorrect length: ${bytes.length}, need at least $sizeInBytes");
+      logD("$tag incorrect length: ${bytes.length}, need at least $sizeInBytes");
       return false;
     }
-    //debugLog("$tag $bytes");
+    //logD("$tag $bytes");
     int cursor = 0;
     _flags = bytes.sublist(cursor, cursor + 1);
     cursor += 1;
@@ -994,11 +994,11 @@ class ESPCCDataPoint with Debug {
   bool get heartrateFlag => 0 < _flags[0] & ESPCCDataPointFlags.heartrate;
   set heartrateFlag(bool b) => _flags[0] |= b ? ESPCCDataPointFlags.heartrate : ~ESPCCDataPointFlags.heartrate;
   bool get hasHeartrate {
-    //String tag = "$_tag hasHeartrate()";
-    //debugLog("$tag flags: ${_flags[0]}");
+    //String tag = "$_tag";
+    //logD("$tag flags: ${_flags[0]}");
     if (!heartrateFlag) return false;
     int i = heartrate;
-    //debugLog("$tag heartrate: $i");
+    //logD("$tag heartrate: $i");
     return (30 <= i && i < 230);
   }
 
@@ -1049,14 +1049,14 @@ class ESPCCDataPoint with Debug {
   /*
   set flags(int v) {
     if (v < 0 || 255 < v) {
-      debugLog("$_tag set flags out of range: $v");
+      logD("$_tag set flags out of range: $v");
       return;
     }
     _flags.buffer.asByteData().setUint8(0, v);
   }
   set time(int v) {
     if (v < -2147483648 || 2147483647 < v) {
-      debugLog("$_tag set time out of range: $v");
+      logD("$_tag set time out of range: $v");
       return;
     }
     _time.buffer.asByteData().setInt32(0, v, _endian);

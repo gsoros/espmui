@@ -28,7 +28,7 @@ class DeviceList with Debug {
 
   DeviceList._construct() {
     _instances++;
-    debugLog('_construct() # of instances: $_instances');
+    logD('_construct() # of instances: $_instances');
     load();
     //_controller
   }
@@ -72,7 +72,7 @@ class DeviceList with Debug {
         return existing;
       },
       ifAbsent: () {
-        debugLog("addOrUpdate adding ${device.peripheral!.name}");
+        logD("addOrUpdate adding ${device.peripheral!.name}");
         return device;
       },
     );
@@ -90,7 +90,7 @@ class DeviceList with Debug {
     _items.update(
       result.peripheral.identifier,
       (existing) {
-        //debugLog("addFromScanResult already exists: ${existing.peripheral.name}");
+        //logD("addFromScanResult already exists: ${existing.peripheral.name}");
         existing.lastScanRssi = result.rssi;
         //var device = Device.fromScanResult(result);
         //if (existing.runtimeType != device.runtimeType) dev.log("$runtimeType type mismatch: existing: ${existing.runtimeType} new: ${existing.runtimeType}");
@@ -98,7 +98,7 @@ class DeviceList with Debug {
       },
       ifAbsent: () {
         Device device = Device.fromScanResult(result);
-        debugLog("addFromScanResult adding ${device.peripheral!.name}");
+        logD("addFromScanResult adding ${device.peripheral!.name}");
         return device;
       },
     );
@@ -113,7 +113,7 @@ class DeviceList with Debug {
   }
 
   Future<void> dispose() async {
-    debugLog("dispose");
+    logD("dispose");
     _items.forEach((_, device) => device.dispose());
     _items.clear();
     _controller.close();

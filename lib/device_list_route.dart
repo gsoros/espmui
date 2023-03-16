@@ -28,18 +28,18 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
   Scanner get scanner => Scanner();
 
   DeviceListRouteState() {
-    debugLog("construct");
+    logD("construct");
   }
 
   @override
   void initState() {
     super.initState();
-    debugLog("initState()");
+    logD("initState()");
   }
 
   @override
   void dispose() {
-    debugLog("dispose()");
+    logD("dispose()");
     //scanner.dispose();
     super.dispose();
   }
@@ -121,7 +121,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
       stream: DeviceList().stream,
       initialData: devices,
       builder: (BuildContext context, AsyncSnapshot<Map<String, Device>> snapshot) {
-        //debugLog("_list() rebuilding");
+        //logD("_list() rebuilding");
         List<Widget> items = [];
         if (devices.length < 1)
           items.add(Center(child: Text("No devices")));
@@ -134,7 +134,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
           });
           sorted.forEach(
             (device) {
-              //debugLog("_list() adding ${device.runtimeType} ${device.name} ${device.lastScanRssi}");
+              //logD("_list() adding ${device.runtimeType} ${device.name} ${device.lastScanRssi}");
               items.add(_listItem(device));
             },
           );

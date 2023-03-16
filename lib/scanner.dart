@@ -36,30 +36,30 @@ class Scanner with Debug {
   Timer? _stopTimer;
 
   Scanner._construct() {
-    debugLog("_construct()");
+    logD("_construct()");
     _init();
   }
 
   void _init() async {
-    debugLog("_init()");
+    logD("_init()");
     _scanningSubscription = scanningStream.listen(
       (value) {
         scanning = value;
-        //debugLog("scanningSubscription: $value");
+        //logD("scanningSubscription: $value");
       },
     );
     _resultSubscription = resultStream.listen(
       (result) {
         devices.addFromScanResult(result);
         //bool isNew = !devices.containsIdentifier(result.peripheral.identifier);
-        //debugLog("_resultSubscription: ${result.peripheral.identifier} new=$isNew rssi=${result.rssi}");
+        //logD("_resultSubscription: ${result.peripheral.identifier} new=$isNew rssi=${result.rssi}");
       },
     );
-    debugLog("_init() done");
+    logD("_init() done");
   }
 
   void dispose() async {
-    debugLog("dispose()");
+    logD("dispose()");
     await _scanResultSubscription?.cancel();
     await _scanningController.close();
     await _scanningSubscription?.cancel();
@@ -71,7 +71,7 @@ class Scanner with Debug {
 
   void startScan() async {
     if (scanning) {
-      debugLog("startScan() already scanning");
+      logD("startScan() already scanning");
       return;
     }
     if (await ble.currentState() != BluetoothState.POWERED_ON) {
@@ -100,7 +100,7 @@ class Scanner with Debug {
         .listen(
           (result) {
             // devices.addFromScanResult(result);
-            //debugLog("Device found: ${result.advertisementData.localName} ${result.peripheral.identifier}");
+            //logD("Device found: ${result.advertisementData.localName} ${result.peripheral.identifier}");
             streamSendIfNotClosed(_resultController, result);
           },
           onError: (e) => bleError(runtimeType.toString(), "scanResultSubscription", e),
@@ -108,7 +108,7 @@ class Scanner with Debug {
   }
 
   Future<void> stopScan() async {
-    //debugLog("stopScan()");
+    //logD("stopScan()");
     if (_stopTimer != null) {
       _stopTimer!.cancel();
       _stopTimer = null;
@@ -125,7 +125,7 @@ class ScanResultList {
   Map<String, ScanResult> _items = {};
 
   ScanResultList() {
-    debugLog("construct");
+    logD("construct");
   }
 
   bool containsIdentifier(String identifier) {
@@ -142,12 +142,12 @@ class ScanResultList {
     _items.update(
       scanResult.peripheral.identifier,
       (existing) {
-        debugLog("updating $subject");
+        logD("updating $subject");
         existing = scanResult;
         return existing;
       },
       ifAbsent: () {
-        debugLog("adding $subject");
+        logD("adding $subject");
         return scanResult;
       },
     );
@@ -160,7 +160,7 @@ class ScanResultList {
   }
 
   Future<void> dispose() async {
-    debugLog("dispose");
+    logD("dispose");
     //_items.forEach((_, scanResult) => scanResult.dispose());
     _items.clear();
   }

@@ -49,7 +49,7 @@ class AlwaysNotifier<T> extends ValueNotifier<T> with Debug {
   @override
   void notifyListeners() {
     super.notifyListeners();
-    //debugLog("notifyListeners");
+    //logD("notifyListeners");
   }
 }
 
@@ -67,7 +67,7 @@ void streamSendIfNotClosed(StreamController stream, dynamic value) {
     dev.log("[streamSendIfNotClosed] not sending null to stream ${stream.toString()}");
     return;
   }
-  //debugLog("[streamSendIfNotClosed] Stream ${stream.toString()} sending value: $value");
+  //logD("[streamSendIfNotClosed] Stream ${stream.toString()} sending value: $value");
   stream.sink.add(value);
 }
 
@@ -165,7 +165,7 @@ String distanceToString(int d, {int digits = 2}) {
 }
 
 /// singleton class
-class Path {
+class Path with Debug {
   String? _documents;
   String? _external;
   static final Path _instance = Path._construct();
@@ -180,7 +180,7 @@ class Path {
     try {
       _documents = (await getApplicationDocumentsDirectory()).path;
     } catch (e) {
-      dev.log("could not getApplicationDocumentsDirectory(), error: $e");
+      logE("could not getApplicationDocumentsDirectory(), error: $e");
       return null;
     }
     return _documents;
@@ -194,7 +194,7 @@ class Path {
       if (null == dir) return null;
       _external = dir.path;
     } catch (e) {
-      dev.log("could not getExternalStorageDirectory(), error: $e");
+      logE("could not getExternalStorageDirectory(), error: $e");
       return null;
     }
     return _external;

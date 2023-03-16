@@ -69,7 +69,7 @@ class Preferences with Debug {
   }
 
   Preferences._construct() {
-    debugLog('_construct()');
+    logD('_construct()');
     _init();
   }
 }

@@ -124,7 +124,7 @@ class Tile extends StatelessWidget with Debug {
     //if (!device?.tileStreams.containsKey(this.stream)) return Text("No stream");
     DeviceTileStream? stream = device?.tileStreams[this.stream];
     //if (null == stream) return Text("Invalid source");
-    //debugLog("build device: ${device?.name ?? 'null'} dl.l: ${DeviceList().devices.length}");
+    //logD("build device: ${device?.name ?? 'null'} dl.l: ${DeviceList().devices.length}");
 
     Widget getValue() {
       return StreamBuilder<String>(
@@ -144,7 +144,7 @@ class Tile extends StatelessWidget with Debug {
         stream: device?.stateStream,
         initialData: device?.lastConnectionState,
         builder: (_, snapshot) {
-          //debugLog("Tile build getValueIfConnected ${device?.name} ${stream?.label} ${snapshot.data}");
+          //logD("Tile build getValueIfConnected ${device?.name} ${stream?.label} ${snapshot.data}");
           if (!snapshot.hasData || snapshot.data == null || snapshot.data == PeripheralConnectionState.connected) return getValue();
           if (snapshot.data == PeripheralConnectionState.disconnected) return Empty();
           return CircularProgressIndicator();
@@ -316,15 +316,15 @@ class TileList with Debug {
 
   TileList._construct() {
     _instances++;
-    debugLog('_construct() # of instances: $_instances');
+    logD('_construct() # of instances: $_instances');
     load();
   }
 
   Future<void> load() async {
-    //debugLog("load() start");
+    //logD("load() start");
     await DeviceList().load();
     _fromJsonStringList((await Preferences().getTiles()).value);
-    //debugLog("load() end");
+    //logD("load() end");
     notifier.notifyListeners();
   }
 

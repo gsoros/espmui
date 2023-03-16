@@ -31,7 +31,7 @@ class DeviceConnectionState extends StatelessWidget {
       builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
         if (PeripheralConnectionState.connected == snapshot.data && null != onConnected) onConnected!();
         String connState = snapshot.hasData ? snapshot.data.toString() : "....";
-        //debugLog("Device status: connState=$connState");
+        //logD("Device status: connState=$connState");
         return Text(
           connState.substring(connState.lastIndexOf(".") + 1),
           style: TextStyle(fontSize: 10),
@@ -156,12 +156,12 @@ class ConnectButton extends StatelessWidget with Debug {
 
   @override
   Widget build(BuildContext context) {
-    //debugLog("initialState: ${device.lastConnectionState}");
+    //logD("initialState: ${device.lastConnectionState}");
     return StreamBuilder<PeripheralConnectionState?>(
       stream: device.stateStream,
       initialData: device.lastConnectionState,
       builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
-        //debugLog("$snapshot");
+        //logD("$snapshot");
         var action;
         var label = "Connect";
         if (snapshot.data == PeripheralConnectionState.connected) {
@@ -635,7 +635,7 @@ class ApiCliWidget extends StatelessWidget with Debug {
       ),
       onSubmitted: (String command) async {
         String? value = await api.request<String>(command);
-        debugLog("api.request($command): $value");
+        logD("api.request($command): $value");
       },
     );
   }
@@ -690,7 +690,7 @@ class SettingInputWidget extends StatelessWidget with Debug {
 
   @override
   Widget build(BuildContext context) {
-    //debugLog("SettingInputWidget build() value: $value");
+    //logD("SettingInputWidget build() value: $value");
     return Flexible(
       fit: FlexFit.loose,
       child: TextField(
@@ -747,7 +747,7 @@ class ApiSettingInputWidget extends SettingInputWidget {
   @override
   void Function(String)? _onSubmitted(BuildContext context) => (String edited) async {
         if (null == commandCode) {
-          debugLog("command is null");
+          logD("command is null");
           return;
         }
         if (transformInput != null) edited = transformInput!(edited);
@@ -759,7 +759,7 @@ class ApiSettingInputWidget extends SettingInputWidget {
           minDelayMs: 2000,
         );
         if (name != null) snackbar("$name update${result == ApiResult.success ? "d" : " failed"}", context);
-        debugLog('api.requestResultCode("$command", expectValue="$expect"): $result');
+        logD('api.requestResultCode("$command", expectValue="$expect"): $result');
       };
 }
 
@@ -788,7 +788,7 @@ class SettingSwitchWidget extends StatelessWidget with Debug {
             onChanged: enabled
                 ? (bool state) async {
                     if (onChanged != null) onChanged!(state);
-                    debugLog("[SettingSwitch] $label changed to $state");
+                    logD("[SettingSwitch] $label changed to $state");
                   }
                 : null);
     return (label == null)
@@ -837,7 +837,7 @@ class ApiSettingSwitchWidget extends StatelessWidget with Debug {
                 minDelayMs: 2000,
               );
               if (name != null) snackbar("$name ${enabled ? "en" : "dis"}able${result == ApiResult.success ? "d" : " failed"}", context);
-              debugLog("api.requestResultCode($commandCode): $result");
+              logD("api.requestResultCode($commandCode): $result");
             });
     return (name == null)
         ? onOff
@@ -873,9 +873,9 @@ class EspmuiDropdownWidget extends StatelessWidget with Debug {
 
   @override
   Widget build(BuildContext context) {
-    // debugLog("EspmuiDropdown build() value: $value items: $items");
+    // logD("EspmuiDropdown build() value: $value items: $items");
     // items?.forEach((item) {
-    //   debugLog("EspmuiDropdown build() item: ${item.child.toStringDeep()}");
+    //   logD("EspmuiDropdown build() item: ${item.child.toStringDeep()}");
     // });
     Widget dropdown = Empty();
     //return dropdown;
@@ -972,7 +972,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
     final deviceSettings = ValueListenableBuilder<ESPMSettings>(
       valueListenable: device.settings,
       builder: (_, settings, __) {
-        //debugLog("changed: $settings");
+        //logD("changed: $settings");
         var widgets = <Widget>[
           ApiSettingInputWidget(
             api: device.api,
@@ -1020,7 +1020,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             command: device.api.commandCode("ntm", logOnError: false),
             value: settings.negativeTorqueMethod.toString(),
             onChanged: (value) {
-              debugLog("Negative Torque Method: $value");
+              logD("Negative Torque Method: $value");
             },
             items: settings.negativeTorqueMethod == null
                 ? [
@@ -1041,7 +1041,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             command: device.api.commandCode("mdm", logOnError: false),
             value: settings.motionDetectionMethod.toString(),
             onChanged: (value) {
-              debugLog("Motion Detection Method: $value");
+              logD("Motion Detection Method: $value");
             },
             items: settings.motionDetectionMethod == null
                 ? [
@@ -1059,7 +1059,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
         ];
         if (settings.motionDetectionMethod ==
             settings.motionDetectionMethods.keys.firstWhere((k) => settings.motionDetectionMethods[k] == "Strain gauge", orElse: () => -1)) {
-          //debugLog("MDM==SG strainThresLow: ${settings.strainThresLow}");
+          //logD("MDM==SG strainThresLow: ${settings.strainThresLow}");
           widgets.add(Divider(color: Colors.white38));
           widgets.add(
             Row(children: [
@@ -1298,7 +1298,7 @@ class EspccTouchEditorWidget extends StatelessWidget with Debug {
                   min: 0.0,
                   max: 100.0,
                   onChanged: (newValue) {
-                    //debugLog("$k changed to $newValue");
+                    //logD("$k changed to $newValue");
                     device.settings.value.touchThres[k] = newValue.toInt();
                   },
                   onChangeEnd: (newValue) {
@@ -1328,7 +1328,7 @@ class EspccSyncWidget extends StatelessWidget with Debug {
   @override
   Widget build(BuildContext context) {
     device.syncer.start();
-    //debugLog("files: ${device.files.value.files}");
+    //logD("files: ${device.files.value.files}");
     return ValueListenableBuilder<ESPCCFileList>(
       valueListenable: device.files,
       builder: (_, filelist, __) {
@@ -1360,7 +1360,7 @@ class EspccSyncWidget extends StatelessWidget with Debug {
             0,
             100,
           ).toInt();
-          //debugLog("${f.name}: isQueued: $isQueued, isDownloading: $isDownloading, isDownloadable: $isDownloadable, downloadedPercent: $downloadedPercent");
+          //logD("${f.name}: isQueued: $isQueued, isDownloading: $isDownloading, isDownloadable: $isDownloadable, downloadedPercent: $downloadedPercent");
           if (isQueued) {
             actions.add(EspmuiElevatedButton(
               child: Wrap(children: [
@@ -1421,7 +1421,7 @@ class EspccSyncWidget extends StatelessWidget with Debug {
                       ]);
                 },
               );
-              debugLog("delete: ${f.name} sure: $sure");
+              logD("delete: ${f.name} sure: $sure");
               if (sure) {
                 int? code = await device.api.requestResultCode("rec=delete:${f.name}", expectValue: "deleted: ${f.name}");
                 if (code == 1) {
@@ -1546,7 +1546,7 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
           commandProcessor = (command, passcodeEntry) {
             if (null == command) return command;
             String? value = passcodeEntry?.getValue();
-            debugLog("commandProcessor: value=$value");
+            logD("commandProcessor: value=$value");
             if (null == value) return command;
             command += ",${int.tryParse(value)}";
             return command;
@@ -1887,7 +1887,7 @@ class ApiWifiSettingsWidget extends StatelessWidget {
     return ValueListenableBuilder<WifiSettings>(
       valueListenable: wifiSettings,
       builder: (context, settings, child) {
-        //debugLog("changed: $settings");
+        //logD("changed: $settings");
         var widgets = <Widget>[
           ApiSettingSwitchWidget(
             api: api,

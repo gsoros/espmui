@@ -96,13 +96,13 @@ class ApiMessage with Debug {
     if (this.minDelayMs > 10000) this.minDelayMs = 10000;
     var maxAttemtsTotalTime = this.maxAttempts * this.minDelayMs;
     if (this.maxAgeMs < maxAttemtsTotalTime) this.maxAgeMs = maxAttemtsTotalTime + this.minDelayMs;
-    debugLog("Created $this");
+    logD("Created $this");
   }
 
   /// Attempts to create commandCode and commandStr from command
   void parseCommand() {
     if (commandCode != null) return; // already parsed
-    //debugLog("parsing: $command");
+    //logD("parsing: $command");
     int eqSign = command.indexOf("=");
     String? parsedArg;
     if (eqSign > 0) {
@@ -124,14 +124,14 @@ class ApiMessage with Debug {
       resultStr = "ClientError";
       info = "Unrecognized command";
       isDone = true;
-      debugLog("parseCommand() failed: $command");
+      logD("parseCommand() failed: $command");
     }
-    //debugLog("parsed: " + toString());
+    //logD("parsed: " + toString());
   }
 
   void checkAge() {
     if (createdAt + maxAgeMs <= uts()) {
-      debugLog("max age reached: " + toString());
+      logD("max age reached: " + toString());
       resultCode = -1;
       resultStr = "ClientError";
       info = "Maximum age reached";
@@ -141,7 +141,7 @@ class ApiMessage with Debug {
 
   void checkAttempts() {
     if (maxAttempts <= (attempts ?? 0)) {
-      debugLog("max attmpts reached: " + toString());
+      logD("max attmpts reached: " + toString());
       resultCode = -1;
       resultStr = "ClientError";
       info = "Maximum attempts reached";
@@ -150,7 +150,7 @@ class ApiMessage with Debug {
   }
 
   void destruct() {
-    //debugLog("destruct " + toString());
+    //logD("destruct " + toString());
     isDone = true;
     //info = ((info == null) ? "" : info.toString()) + " destructed";
   }
@@ -222,14 +222,14 @@ class Api with Debug {
   int? commandCode(String s, {bool logOnError = true}) {
     if (commands.containsValue(s)) return commands.keys.firstWhere((k) => commands[k] == s);
     if (logOnError) {
-      debugLog("${device.name} code not found for command $s");
+      logD("${device.name} code not found for command $s");
     }
     return null;
   }
 
   String? commandStr(int code) {
     if (commands.containsKey(code)) return commands[code];
-    debugLog("str not found for command code $code");
+    logD("str not found for command code $code");
     return null;
   }
 
@@ -240,24 +240,24 @@ class Api with Debug {
 
   void _startQueueSchedule() {
     if (_timer != null) return;
-    debugLog("queueSchedule start");
+    logD("queueSchedule start");
     _timer = Timer.periodic(Duration(milliseconds: queueDelayMs), (_) => _runQueue());
   }
 
   void _stopQueueSchedule() {
     if (_timer == null) return;
-    debugLog("queueSchedule stop");
+    logD("queueSchedule stop");
     _timer?.cancel();
     _timer = null;
   }
 
   /// format: resultCode[:resultStr];commandCode[]:commandStr][=[value]]
   void _onNotify(String reply) {
-    String tag = "${device.name} Api._onNotify()";
-    //debugLog("$tag $reply");
+    String tag = device.name ?? "unknown device";
+    //logD("$tag $reply");
     int resultEnd = reply.indexOf(";");
     if (resultEnd < 1) {
-      debugLog("$tag Error parsing notification: $reply");
+      logD("$tag Error parsing notification: $reply");
       return;
     }
     String result = reply.substring(0, resultEnd);
@@ -272,25 +272,25 @@ class Api with Debug {
     } else
       resultCode = int.tryParse(result);
     if (resultCode == null) {
-      debugLog("$tag Error parsing resultCode as int");
+      logD("$tag Error parsing resultCode as int");
       return;
     }
     String commandWithValue = reply.substring(resultEnd + 1);
     int eq = commandWithValue.indexOf("=");
     if (eq < 1) {
-      debugLog("$tag Error parsing commandWithValue: $commandWithValue");
+      logD("$tag Error parsing commandWithValue: $commandWithValue");
       return;
     }
     String commandCodeStr = commandWithValue.substring(0, eq);
     int? commandCode = int.tryParse(commandCodeStr);
     if (commandCode == null) {
-      debugLog("$tag Error parsing commandCode as int: $commandCodeStr");
+      logD("$tag Error parsing commandCode as int: $commandCodeStr");
       return;
     }
     // String commandStrWithValue = commandWithValue.substring(colon + 1);
     // int eq = commandStrWithValue.indexOf("=");
     // if (eq < 1) {
-    //   debugLog("Error parsing commandStrWithValue: $commandStrWithValue");
+    //   logD("Error parsing commandStrWithValue: $commandStrWithValue");
     //   return;
     // }
     //String commandStr = commandStrWithValue.substring(0, eq);
@@ -299,7 +299,7 @@ class Api with Debug {
     for (ApiMessage m in _queue) {
       if (m.commandCode == commandCode) {
         if (m.expectValue != null) {
-          debugLog("expected: '${m.expectValue}' got '${value.substring(0, min(m.expectValue!.length, value.length))}'");
+          logD("expected: '${m.expectValue}' got '${value.substring(0, min(m.expectValue!.length, value.length))}'");
           // no match if expected value is set and value does not begin with it
           if (m.expectValue != value.substring(0, min(m.expectValue!.length, value.length))) continue;
         }
@@ -312,10 +312,10 @@ class Api with Debug {
       }
     }
     if (matches == 0) {
-      // debugLog("_onNotify() No matching queued message for the reply $reply, generating new one");
+      // logD("_onNotify() No matching queued message for the reply $reply, generating new one");
       var cStr = commandStr(commandCode);
       if (null == cStr) {
-        debugLog("$tag  commandStr is null");
+        logD("$tag  commandStr is null");
         return;
       }
       var m = ApiMessage(this, cStr);
@@ -330,7 +330,7 @@ class Api with Debug {
   }
 
   Future<void> _onDone(ApiMessage message) async {
-    //String tag = "${device.name} Api._onDone()";
+    //String tag = "${device.name}";
     if (null != message.onDone) {
       var onDone = message.onDone;
       message.onDone = null;
@@ -343,12 +343,12 @@ class Api with Debug {
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    String tag = "${device.name} Api.handleApiMessageSuccess()";
-    //debugLog("$tag handleApiMessageSuccess $message");
+    String tag = "${device.name}";
+    //logD("$tag handleApiMessageSuccess $message");
 
     if ("init" == message.commandStr) {
       if (null == message.value) {
-        debugLog("$tag init value null");
+        logD("$tag init value null");
         return true;
       }
       List<String> tokens = message.value!.split(";");
@@ -358,36 +358,36 @@ class Api with Debug {
         String? value;
         List<String> parts = token.split("=");
         if (parts.length == 1) {
-          //debugLog("parts.length == 1; $parts");
+          //logD("parts.length == 1; $parts");
           value = null;
         } else
           value = parts[1];
         List<String> c = parts[0].split(":");
         if (c.length != 2) {
-          //debugLog("c.length != 2; $c");
+          //logD("c.length != 2; $c");
           return;
         }
         code = int.tryParse(c[0]);
         command = c[1];
-        //debugLog("handleApiMessageSuccess() init: $code:$command=$value");
+        //logD("handleApiMessageSuccess() init: $code:$command=$value");
 
         if (null == code) {
-          debugLog("$tag code is null");
+          logD("$tag code is null");
         } else if (commands.containsKey(code) && commands[code] == command) {
-          // debugLog("skipping already existing command $command ($code)");
+          // logD("skipping already existing command $command ($code)");
         } else if (commands.containsKey(code)) {
-          debugLog("$tag command code already exists: $code");
+          logD("$tag command code already exists: $code");
         } else if (commands.containsValue(command)) {
-          debugLog("$tag command already exists: $command");
+          logD("$tag command already exists: $command");
         } else {
-          debugLog("$tag adding command $command ($code)");
+          logD("$tag adding command $command ($code)");
           commands.addAll({code: command});
         }
 
         if (null == value) {
-          //debugLog("value is null");
+          //logD("value is null");
           //} else if (value.length < 1) {
-          //  //debugLog("value is empty");
+          //  //logD("value is empty");
         } else {
           // generate a message
           ApiMessage m = ApiMessage(this, command);
@@ -412,13 +412,13 @@ class Api with Debug {
         String name = v.substring("hostname:".length);
         if (0 < name.length) {
           device.name = name;
-          debugLog("$tag device name: $name");
+          logD("$tag device name: $name");
         }
         return true;
       }
 
       if (0 == v.indexOf("build:")) {
-        debugLog("$tag $v");
+        logD("$tag $v");
         return true;
       }
 
@@ -434,7 +434,7 @@ class Api with Debug {
     }
 
     if ("bat" == message.commandStr) {
-      debugLog("$tag bat: ${message.valueAsString}");
+      logD("$tag bat: ${message.valueAsString}");
       List<String>? chunks = message.valueAsString?.split("|");
       if (null == chunks || chunks.length < 2) return true;
       if ("charging" == chunks[1]) {
@@ -481,9 +481,9 @@ class Api with Debug {
     int before = _queue.length;
     _queue.removeWhere((queued) => queued.command == message.command);
     int removed = before - _queue.length;
-    if (removed > 0) debugLog("removed $removed duplicate messages");
+    if (removed > 0) logD("removed $removed duplicate messages");
     _queue.add(message);
-    //debugLog("added to queue (length: ${_queue.length}): $message");
+    //logD("added to queue (length: ${_queue.length}): $message");
     _runQueue();
     return message;
   }
@@ -509,7 +509,7 @@ class Api with Debug {
     if (T == double) return message.valueAsDouble as T?;
     if (T == int) return message.valueAsInt as T?;
     if (T == bool) return message.valueAsBool as T?;
-    debugLog("request() error: type $T is not handled");
+    logE("request() error: type $T is not handled");
     return message as T?;
   }
 
@@ -528,7 +528,7 @@ class Api with Debug {
       minDelayMs: minDelayMs,
       maxAgeMs: maxAgeMs,
     );
-    //debugLog("requestResultCode: $message");
+    //logD("requestResultCode: $message");
     await isDone(message);
     return message.resultCode;
   }
@@ -538,11 +538,11 @@ class Api with Debug {
   Future<void> isDone(ApiMessage message) async {
     await Future.doWhile(() async {
       if (message.isDone != true && message.resultCode == null) {
-        // debugLog("polling...");
+        // logD("polling...");
         await Future.delayed(Duration(milliseconds: queueDelayMs));
         return true;
       }
-      // debugLog("poll end");
+      // logD("poll end");
       return false;
     });
   }
@@ -557,7 +557,7 @@ class Api with Debug {
 
   void _runQueue() async {
     if (_running) {
-      //debugLog("_runQueue() already running");
+      //logD("_runQueue() already running");
       return;
     }
     _running = true;
@@ -566,7 +566,7 @@ class Api with Debug {
       _running = false;
       return;
     }
-    //debugLog("queue run");
+    //logD("queue run");
     var message = _queue.removeFirst();
     message.parseCommand();
     message.checkAge();
@@ -577,17 +577,17 @@ class Api with Debug {
       _onDone(message);
       message.destruct();
     } else if (now < (message.lastSentAt ?? 0) + message.minDelayMs) {
-      //debugLog("${device.name} Api delaying $message");
+      //logD("${device.name} Api delaying $message");
       _queue.addLast(message);
     } else {
-      //debugLog("${device.name} Api sending $message");
+      //logD("${device.name} Api sending $message");
       if (!await device.ready()) {
-        debugLog("${device.name} Api _send() device not ready");
+        logD("${device.name} Api _send() device not ready");
       } else {
         message.lastSentAt = now;
         message.attempts = (message.attempts ?? 0) + 1;
         String toWrite = "${message.commandCode}" + (null != message.arg ? "=" + message.arg! : "");
-        //debugLog("_send() $now attempt #${message.attempts} calling char.write($toWrite)");
+        //logD("_send() $now attempt #${message.attempts} calling char.write($toWrite)");
         characteristic?.write(toWrite);
       }
       _queue.addLast(message);
@@ -602,11 +602,11 @@ class Api with Debug {
     _queue.clear();
     commands.clear();
     commands.addAll(_initialCommands);
-    debugLog("${device.name} reset() commands: $commands");
+    logD("${device.name} reset() commands: $commands");
   }
 
   Future<void> destruct() async {
-    debugLog("destruct");
+    logD("destruct");
     _stopQueueSchedule();
     await _subscription?.cancel();
     while (_queue.isNotEmpty) {

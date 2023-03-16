@@ -39,13 +39,13 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
   }
 
   Future<void> _showFab(dynamic _) async {
-    debugLog("showFab");
+    logD("showFab");
     setState(() {
       _fabVisible = true;
     });
     _fabTimer?.cancel();
     _fabTimer = Timer(Duration(seconds: 3), () {
-      debugLog("hideFab");
+      logD("hideFab");
       setState(() {
         _fabVisible = false;
       });
@@ -61,7 +61,7 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
         floatingActionButton: _fabVisible
             ? FloatingActionButton(
                 onPressed: () {
-                  debugLog("fab pressed");
+                  logD("fab pressed");
                   Navigator.push(
                     context,
                     HeroDialogRoute(
@@ -136,7 +136,7 @@ class TileGrid extends StatefulWidget with Debug {
 
   @override
   _TileGridState createState() {
-    debugLog('createState()');
+    logD('createState()');
     return _TileGridState();
   }
 }
@@ -155,7 +155,7 @@ class _TileGridState extends State<TileGrid> with Debug {
 
   @override
   void initState() {
-    debugLog('initState');
+    logD('initState');
     super.initState();
   }
 
@@ -357,7 +357,7 @@ class _TileGridState extends State<TileGrid> with Debug {
           builder: (context, List<Tile> tiles, _) {
             if (tiles.length <= index || index < 0) return Text("Cannot find tile $index");
             Tile tile = tiles[index];
-            //debugLog("source builder called: ${tile.stream}");
+            //logD("source builder called: ${tile.stream}");
             String value = "${tile.device};${tile.stream}";
             bool valuePresent = false;
             var items = <DropdownMenuItem<String>>[];
@@ -393,10 +393,10 @@ class _TileGridState extends State<TileGrid> with Debug {
               value: valuePresent ? value : "",
               items: items,
               onChanged: (value) {
-                debugLog("New source $value");
+                logD("New source $value");
                 var chunks = value?.split(";");
                 if (chunks == null || chunks.length < 2 || chunks[0].length < 1 || chunks[1].length < 1) {
-                  debugLog("Wrong chunks: $chunks");
+                  logD("Wrong chunks: $chunks");
                   return;
                 }
                 _tiles[index] = Tile.from(
@@ -409,7 +409,7 @@ class _TileGridState extends State<TileGrid> with Debug {
             );
             CharacteristicHistory? charHistory = DeviceList().byIdentifier(tile.device)?.tileStreams[tile.stream]?.history;
             if (null == charHistory) return sourceDropdown;
-            debugLog("this stream supports history");
+            logD("this stream supports history");
             double max = charHistory.maxAge.toDouble();
 
             /// Slider power curve
@@ -426,7 +426,7 @@ class _TileGridState extends State<TileGrid> with Debug {
 
             /// special case: linear curve
             if ((cX - 2 * cY + cZ) == 0) {
-              debugLog("linear curve");
+              logD("linear curve");
               cY += 1;
             }
 
@@ -458,7 +458,7 @@ class _TileGridState extends State<TileGrid> with Debug {
                 snackbar("History: ${sliderToValue(value).round()} seconds", context);
               },
               onChanged: (value) {
-                //debugLog("v: $value s2v(v): ${sliderToValue(value)} v2s(s2v(v)): ${valueToSlider(sliderToValue(value))}");
+                //logD("v: $value s2v(v): ${sliderToValue(value)} v2s(s2v(v)): ${valueToSlider(sliderToValue(value))}");
                 _tiles[index] = Tile.from(
                   tile,
                   history: sliderToValue(value).round(),
@@ -480,14 +480,14 @@ class _TileGridState extends State<TileGrid> with Debug {
           builder: (context, List<Tile> tiles, _) {
             if (tiles.length <= index || index < 0) return Text("Cannot find tile $index");
             Tile tile = tiles[index];
-            //debugLog("tapAction builder called: ${tile.tap}");
+            //logD("tapAction builder called: ${tile.tap}");
             bool valuePresent = false;
             var items = <DropdownMenuItem<String>>[];
             DeviceList().forEach((_, device) {
               if (device.tileActions.length < 1) return;
               device.tileActions.forEach((name, action) {
                 String itemValue = "${device.peripheral?.identifier};$name";
-                //debugLog("${device.name ?? 'unnamed device'} ${action.label} $itemValue");
+                //logD("${device.name ?? 'unnamed device'} ${action.label} $itemValue");
                 if (itemValue == tile.tap) valuePresent = true;
                 items.add(DropdownMenuItem(
                   value: itemValue,
@@ -507,7 +507,7 @@ class _TileGridState extends State<TileGrid> with Debug {
               value: valuePresent ? tile.tap : "",
               items: items,
               onChanged: (value) {
-                debugLog("New tapAction $value");
+                logD("New tapAction $value");
                 _tiles[index] = Tile.from(
                   tile,
                   tap: value ?? "",
@@ -520,7 +520,7 @@ class _TileGridState extends State<TileGrid> with Debug {
 
     void onTap(Tile? tile) {
       if (null == tile) return;
-      debugLog("onTap: ${tile.tap}");
+      logD("onTap: ${tile.tap}");
       if (tile.tap.length < 3) return;
       var chunks = tile.tap.split(";");
       if (chunks.length != 2) return;
@@ -593,11 +593,11 @@ class _TileGridState extends State<TileGrid> with Debug {
                             child: InkWell(
                               child: tiles[index],
                               onTap: () {
-                                debugLog("tile $index tap");
+                                logD("tile $index tap");
                                 onTap(tiles[index]);
                               },
                               onDoubleTap: () {
-                                debugLog("tile $index doubleTap");
+                                logD("tile $index doubleTap");
                                 Navigator.push(
                                   context,
                                   HeroDialogRoute(
@@ -624,7 +624,7 @@ class _TileGridState extends State<TileGrid> with Debug {
                                               EspmuiElevatedButton(
                                                 child: Text("Delete Tile"),
                                                 onPressed: () {
-                                                  debugLog("delete tile $index");
+                                                  logD("delete tile $index");
                                                   setState(() {
                                                     tiles.removeAt(index);
                                                     _tiles.tiles = tiles;

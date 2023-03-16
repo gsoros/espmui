@@ -87,7 +87,7 @@ class Device with Debug {
   int get largeMtu => 512;
 
   Device(this.peripheral) {
-    debugLog("construct");
+    logD("construct");
     if (null != peripheral)
       characteristics.addAll({
         'battery': CharacteristicListItem(BatteryCharacteristic(this)),
@@ -185,7 +185,7 @@ class Device with Debug {
       )
           .listen(
         (state) async {
-          //debugLog("new connection state: $state");
+          //logD("new connection state: $state");
           lastConnectionState = state;
           /*
           if (state == connectedState)
@@ -200,7 +200,7 @@ class Device with Debug {
     if (_stateChangeSubscription == null) {
       _stateChangeSubscription = stateStream.listen(
         (state) async {
-          debugLog("$name _stateChangeSubscription state: $state");
+          logD("$name _stateChangeSubscription state: $state");
           if (state == connectedState)
             await onConnected();
           else if (state == disconnectedState) await onDisconnected();
@@ -211,16 +211,16 @@ class Device with Debug {
     if (_batteryLevelSubscription == null && peripheral != null) {
       _batteryLevelSubscription = battery?.defaultStream.listen(
         (level) {
-          debugLog("$name _batteryLevelSubscription level: $level%, charging: $isCharging");
+          logD("$name _batteryLevelSubscription level: $level%, charging: $isCharging");
           if (isCharging.asBool) notifyCharging();
         },
-        onError: (e) => debugLog("$debugTag _batteryLevelSubscription $e"),
+        onError: (e) => logD("$debugTag _batteryLevelSubscription $e"),
       );
     }
   }
 
   Future<void> dispose() async {
-    debugLog("$name dispose");
+    logD("$name dispose");
     await disconnect();
     await stateController.close();
     characteristics.forEachCharacteristic((_, char) async {
@@ -267,9 +267,9 @@ class Device with Debug {
   }
 
   Future<void> onDisconnected() async {
-    String tag = "Device::onDisconnected() $name";
+    String tag = "$name";
     // if (await connected) {
-    //   debugLog("but $name is connected");
+    //   logD("but $name is connected");
     //   return;
     // }
     await _unsubscribeCharacteristics();
@@ -280,11 +280,11 @@ class Device with Debug {
     isCharging = ExtendedBool.Unknown;
     Notifications().cancel(peripheral.hashCode);
 
-    debugLog("$tag autoConnect.value: ${autoConnect.value}");
+    logD("$tag autoConnect.value: ${autoConnect.value}");
     if (autoConnect.value && !await connected) {
       await Future.delayed(Duration(seconds: 15)).then((_) async {
         if (autoConnect.value && !await connected) {
-          debugLog("$tag calling connect()");
+          logD("$tag calling connect()");
           await connect();
         }
       });
@@ -296,7 +296,7 @@ class Device with Debug {
     final disconnectedState = PeripheralConnectionState.disconnected;
 
     if (await connected) {
-      debugLog("Not connecting to $name, already connected");
+      logD("Not connecting to $name, already connected");
       streamSendIfNotClosed(stateController, connectedState);
       //await discoverCharacteristics();
       //await _subscribeCharacteristics();
@@ -304,19 +304,19 @@ class Device with Debug {
       return;
     }
     if (await BLE().currentState() != BluetoothState.POWERED_ON) {
-      debugLog("$name connect() Adapter is off, not connecting");
+      logD("$name connect() Adapter is off, not connecting");
       streamSendIfNotClosed(stateController, disconnectedState);
       return;
     }
     if (null == peripheral) {
-      debugLog("$name connect() Peripheral is null)");
+      logD("$name connect() Peripheral is null)");
       return;
     }
     if (_connectionInitiated) {
-      debugLog("$name connect() Connection already initiated");
+      logD("$name connect() Connection already initiated");
       return;
     }
-    //debugLog("connect() Connecting to $name(${peripheral!.identifier})");
+    //logD("connect() Connecting to $name(${peripheral!.identifier})");
     _connectionInitiated = true;
     await peripheral!
         .connect(
@@ -340,47 +340,47 @@ class Device with Debug {
         }
       },
     );
-    //debugLog("peripheral.connect() returned");
+    //logD("peripheral.connect() returned");
     _connectionInitiated = false;
   }
 
   Future<void> discoverCharacteristics() async {
     String subject = "$debugTag discoverCharacteristics()";
-    //debugLog("$subject conn=${await connected}");
+    //logD("$subject conn=${await connected}");
     if (!await connected) return;
     if (null == peripheral) return;
-    //debugLog("$subject discoverAllServicesAndCharacteristics() start");
+    //logD("$subject discoverAllServicesAndCharacteristics() start");
     await peripheral!.discoverAllServicesAndCharacteristics().catchError((e) {
       bleError(debugTag, "discoverAllServicesAndCharacteristics()", e);
     });
-    //debugLog("$subject discoverAllServicesAndCharacteristics() end");
-    //debugLog("$subject services() start");
+    //logD("$subject discoverAllServicesAndCharacteristics() end");
+    //logD("$subject services() start");
     var services = await peripheral!.services().catchError((e) {
       bleError(debugTag, "services()", e);
       return <Service>[];
     });
-    //debugLog("$subject services() end");
+    //logD("$subject services() end");
     var serviceUuids = <String>[];
     services.forEach((s) {
       serviceUuids.add(s.uuid);
     });
-    debugLog("$subject end services: $serviceUuids");
+    logD("$subject end services: $serviceUuids");
     _discovered = true;
   }
 
   Future<void> subscribeCharacteristics() async {
-    debugLog('$name subscribeCharacteristics start');
+    logD('$name subscribeCharacteristics start');
     if (!await discovered()) return;
     await characteristics.forEachListItem((name, item) async {
       if (item.subscribeOnConnect) {
         if (null == item.characteristic) return;
-        debugLog('_subscribeCharacteristics $name ${item.characteristic?.charUUID} start');
+        logD('_subscribeCharacteristics $name ${item.characteristic?.charUUID} start');
         await item.characteristic?.subscribe();
-        debugLog('_subscribeCharacteristics $name ${item.characteristic?.charUUID} end');
+        logD('_subscribeCharacteristics $name ${item.characteristic?.charUUID} end');
       }
     });
     _subscribed = true;
-    debugLog('subscribeCharacteristics end');
+    logD('subscribeCharacteristics end');
   }
 
   Future<void> _unsubscribeCharacteristics() async {
@@ -399,10 +399,10 @@ class Device with Debug {
   }
 
   Future<void> disconnect() async {
-    debugLog("disconnect() $name");
+    logD("disconnect() $name");
     if (null == peripheral) return;
     if (!await peripheral!.isConnected()) {
-      debugLog("disconnect(): not connected, but proceeding anyway");
+      logD("disconnect(): not connected, but proceeding anyway");
       //return;
     }
     //await _unsubscribeCharacteristics();
@@ -448,7 +448,7 @@ class Device with Debug {
   Future<void> updatePreferences() async {
     if (null == peripheral) return;
     List<String> devices = (await Preferences().getDevices()).value;
-    debugLog('updatePreferences savedDevices before: $devices');
+    logD('updatePreferences savedDevices before: $devices');
     devices.removeWhere((item) => item.startsWith(peripheral!.identifier));
     if (remember.value) {
       String item = peripheral!.identifier +
@@ -460,11 +460,11 @@ class Device with Debug {
           (autoConnect.value ? "true" : "false") +
           ";saveLog=" +
           (saveLog.value ? "true" : "false");
-      debugLog('updatePreferences item: $item');
+      logD('updatePreferences item: $item');
       devices.add(item);
     }
     Preferences().setDevices(devices);
-    debugLog('updatePreferences savedDevices after: $devices');
+    logD('updatePreferences savedDevices after: $devices');
   }
 
   Future<String?> getSaved() async {
@@ -498,7 +498,7 @@ class Device with Debug {
 
     Notifications().cancel(peripheral.hashCode);
 
-    debugLog("$name notifyCharging() battery charging: $charging");
+    logD("$name notifyCharging() battery charging: $charging");
 
     Notifications().notify(
       name ?? "unknown device",
@@ -548,12 +548,12 @@ class PowerMeter extends Device {
   @override
   Future<Type> correctType() async {
     Type t = runtimeType;
-    debugLog("correctType peripheral: $peripheral");
+    logD("correctType peripheral: $peripheral");
     if (null == peripheral || !await discovered()) return t;
-    debugLog("_correctType 2");
+    logD("_correctType 2");
     (await peripheral!.services()).forEach((s) {
       if (s.uuid == BleConstants.ESPM_API_SERVICE_UUID) {
-        debugLog("correctType() ESPM detected");
+        logD("correctType() ESPM detected");
         t = ESPM;
         return;
       }
@@ -565,7 +565,7 @@ class PowerMeter extends Device {
   Future<Device> copyToCorrectType() async {
     if (null == peripheral) return this;
     Type t = await correctType();
-    debugLog("copyToCorrectType $t");
+    logD("copyToCorrectType $t");
     Device device = this;
     if (ESPM == t) {
       device = ESPM(peripheral!);
@@ -614,7 +614,7 @@ class WifiSettings with Debug {
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    //debugLog("handleApiDoneMessage $message");
+    //logD("handleApiDoneMessage $message");
 
     //////////////////////////////////////////////////// wifi
     if ("w" == message.commandStr) {

@@ -19,12 +19,12 @@ class DeviceRoute extends StatefulWidget with Debug {
   final Device device;
 
   DeviceRoute(this.device) {
-    debugLog("construct");
+    logD("construct");
   }
 
   @override
   DeviceRouteState createState() {
-    debugLog("createState()");
+    logD("createState()");
     if (device is ESPM) return ESPMRouteState(device as ESPM);
     if (device is ESPCC) return ESPCCRouteState(device as ESPCC);
     if (device is PowerMeter) return PowerMeterRouteState(device as PowerMeter);
@@ -37,31 +37,31 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
   Device device;
 
   DeviceRouteState(this.device) {
-    debugLog("construct");
+    logD("construct");
   }
 
   @override
   void initState() {
-    debugLog("initState");
+    logD("initState");
     _checkCorrectType();
     super.initState();
   }
 
   Future<void> _checkCorrectType() async {
-    //debugLog("_checkCorrectType() $device");
+    //logD("_checkCorrectType() $device");
     if (await device.isCorrectType()) return;
     var newDevice = await device.copyToCorrectType();
     device.peripheral = null;
     device.dispose();
     device = newDevice;
     DeviceList().addOrUpdate(device);
-    debugLog("_checkCorrectType() reloading DeviceRoute($device)");
+    logD("_checkCorrectType() reloading DeviceRoute($device)");
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => DeviceRoute(device)));
   }
 
   @override
   void dispose() async {
-    debugLog("dispose");
+    logD("dispose");
     // if (!device.autoConnect.value) device.disconnect();
     super.dispose();
   }
@@ -93,7 +93,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
   List<StaggeredGridItem> _deviceStreamTiles() {
     List<StaggeredGridItem> items = [];
     device.tileStreams.forEach((name, stream) {
-      //debugLog("_deviceStreamTiles: name: $name, label: ${stream.label}");
+      //logD("_deviceStreamTiles: name: $name, label: ${stream.label}");
       if (ESPM == device.runtimeType && "scale" == name) return; // TODO
       Tile tile = Tile(
         device: device.identifier,
@@ -117,7 +117,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
         value: ValueListenableBuilder<bool>(
           valueListenable: device.remember,
           builder: (_, value, __) {
-            //debugLog("remember changed: $value");
+            //logD("remember changed: $value");
             return SettingSwitchWidget(
               label: FavoriteIcon(active: value),
               value: ExtendedBool.fromBool(value),
@@ -133,7 +133,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
         value: ValueListenableBuilder<bool>(
           valueListenable: device.autoConnect,
           builder: (_, value, __) {
-            //debugLog("autoconnect changed: $value");
+            //logD("autoconnect changed: $value");
             return SettingSwitchWidget(
               label: AutoConnectIcon(active: value),
               value: ExtendedBool.fromBool(value),
@@ -149,7 +149,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
         value: ValueListenableBuilder<bool>(
             valueListenable: device.saveLog,
             builder: (_, value, __) {
-              //debugLog("saveLog changed: $value");
+              //logD("saveLog changed: $value");
               return SettingSwitchWidget(
                 label: Text("Log"),
                 value: ExtendedBool.fromBool(device.saveLog.value),
