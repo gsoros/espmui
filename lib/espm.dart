@@ -56,7 +56,7 @@ class ESPM extends PowerMeter {
       "scale": DeviceTileStream(
         label: "Weight Scale",
         stream: weightScaleChar?.defaultStream.map<String>((value) {
-          String s = value.toStringAsFixed(2);
+          String s = value?.toStringAsFixed(2) ?? " ";
           if (s.length > 6) s = s.substring(0, 6);
           if (s == "-0.00") s = "0.00";
           return s;
@@ -70,7 +70,7 @@ class ESPM extends PowerMeter {
       "temp": DeviceTileStream(
         label: "Temperature",
         stream: tempChar?.defaultStream.map<String>((value) {
-          String s = value.toStringAsFixed(1);
+          String s = value?.toStringAsFixed(1) ?? " ";
           if (s.length > 6) s = s.substring(0, 6);
           return s;
         }),

@@ -28,8 +28,8 @@ class TCRoute extends StatefulWidget with Debug {
 
 class _TCRouteState extends State<TCRoute> with Debug {
   ESPM espm;
-  late StreamSubscription<double>? temperatureSubscription;
-  late StreamSubscription<double>? weightSubscription;
+  late StreamSubscription<double?>? temperatureSubscription;
+  late StreamSubscription<double?>? weightSubscription;
   double? temperature, weight, lastTemperature, lastWeight;
 
   _TCRouteState(this.espm) {
@@ -49,22 +49,33 @@ class _TCRouteState extends State<TCRoute> with Debug {
     super.dispose();
   }
 
-  void onTempChange(double value) {
+  void onTempChange(double? value) {
     temperature = value;
     var tc = espm.settings.value.tc;
-    if (!tc.isCollecting || null == weight || weight == lastWeight) return;
+    if (null == weight || weight == lastWeight) return;
     lastWeight = weight;
-    tc.addCollected(value, weight!);
+    if (null == value) return;
+    if (tc.isCollecting)
+      tc.addCollected(value, weight!);
+    else
+      espm.settings.notifyListeners();
     //logD("onTempChange $value ${tc.collectedSize()}");
   }
 
-  void onWeightChange(double value) {
+  void onWeightChange(double? value) {
+    if (null == value) {
+      weight = value;
+      return;
+    }
     value = -value; // flip sign
     weight = value;
     var tc = espm.settings.value.tc;
-    if (!tc.isCollecting || null == temperature || temperature == lastTemperature) return;
+    if (null == temperature || temperature == lastTemperature) return;
     lastTemperature = temperature;
-    tc.addCollected(temperature!, value);
+    if (tc.isCollecting)
+      tc.addCollected(temperature!, value);
+    else
+      espm.settings.notifyListeners();
     //logD("onWeightChange $value ${tc.collectedSize()}");
   }
 
@@ -232,6 +243,44 @@ class _TCRouteState extends State<TCRoute> with Debug {
     return spots;
   }
 
+  LineTouchData? touchData(TC tc) {
+    /*
+    LineTouchData LineTouchData({
+      bool? enabled,
+      void Function(FlTouchEvent, LineTouchResponse?)? touchCallback,
+      MouseCursor Function(FlTouchEvent, LineTouchResponse?)? mouseCursorResolver,
+      Duration? longPressDuration,
+      LineTouchTooltipData? touchTooltipData,
+      List<TouchedSpotIndicatorData?> Function(LineChartBarData, List<int>)? getTouchedSpotIndicator,
+      double? touchSpotThreshold,
+      double Function(Offset, Offset)? distanceCalculator,
+      bool? handleBuiltInTouches,
+      double Function(LineChartBarData, int)? getTouchLineStart,
+      double Function(LineChartBarData, int)? getTouchLineEnd,
+    })
+    package:fl_chart/src/chart/line_chart/line_chart_data.dart
+
+    You can disable or enable the touch system using [enabled] flag,
+
+    [touchCallback] notifies you about the happened touch/pointer events. It gives you a [FlTouchEvent] which is the happened event such as [FlPointerHoverEvent], [FlTapUpEvent], ... It also gives you a [LineTouchResponse] which contains information about the elements that has touched.
+
+    Using [mouseCursorResolver] you can change the mouse cursor based on the provided [FlTouchEvent] and [LineTouchResponse]
+
+    if [handleBuiltInTouches] is true, [LineChart] shows a tooltip popup on top of the spots if touch occurs (or you can show it manually using, [LineChartData.showingTooltipIndicators]) and also it shows an indicator (contains a thicker line and larger dot on the targeted spot), You can define how this indicator looks like through [getTouchedSpotIndicator] callback, You can customize this tooltip using [touchTooltipData], indicator lines starts from position controlled by [getTouchLineStart] and ends at position controlled by [getTouchLineEnd]. If you need to have a distance threshold for handling touches, use [touchSpotThreshold].
+    */
+    return LineTouchData(
+      enabled: true,
+      handleBuiltInTouches: false,
+      longPressDuration: Duration(milliseconds: 800),
+      touchCallback: (event, response) {
+        if (!(event is FlLongPressStart)) return;
+        var data = response?.lineBarSpots;
+        if (null == data || data.length < 1) return;
+        logD("${data.firstWhere((e) => 2 == e.barIndex).spotIndex}");
+      },
+    );
+  }
+
   List<LineChartBarData> chartData(TC tc) {
     List<LineChartBarData> data = [
       LineChartBarData(
@@ -243,10 +292,10 @@ class _TCRouteState extends State<TCRoute> with Debug {
       ),
       LineChartBarData(
         spots: collectedSpots(tc),
-        isCurved: false,
+        isCurved: true,
         barWidth: 2,
         color: Colors.green.shade700,
-        dotData: FlDotData(show: true),
+        dotData: FlDotData(show: false),
       ),
     ];
     var suggested = suggestedSpots(tc);
@@ -256,7 +305,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
         isCurved: false,
         //barWidth: 5,
         color: Colors.purple.shade500,
-        dotData: FlDotData(show: false),
+        dotData: FlDotData(show: true),
       ));
     }
     if (null != temperature && null != weight) {
@@ -291,13 +340,12 @@ class _TCRouteState extends State<TCRoute> with Debug {
           minX: tempMin,
           maxX: tempMax,
           builder: (minX, maxX) {
-            //print("rebuilding chart");
             return LineChart(
               LineChartData(
                   clipData: FlClipData.none(),
                   minX: minX,
                   maxX: maxX,
-                  lineTouchData: LineTouchData(enabled: false),
+                  lineTouchData: touchData(tc),
                   lineBarsData: chartData(tc),
                   borderData: FlBorderData(show: false),
                   titlesData: FlTitlesData(

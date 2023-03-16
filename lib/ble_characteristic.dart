@@ -31,6 +31,12 @@ abstract class BleCharacteristic<T> with Debug {
   T? lastValue;
   Uint8List? lastRawValue;
 
+  /// whether to send [beforeUnsubscribeValue] before unsubscribing
+  bool sendBeforeUnsubscribe = false;
+
+  /// the value to send to listeners before unsubscribing
+  T? beforeUnsubscribeValue;
+
   /// mutex shared with BLE
   final _exclusiveAccess = BLE().mutex;
 
@@ -170,8 +176,13 @@ abstract class BleCharacteristic<T> with Debug {
   Future<void> unsubscribe() async {
     await _init();
     if (_subscription == null) return;
-    logD("unsubscribe");
-    //util.streamSendIfNotClosed(_controller, fromUint8List(Uint8List.fromList([])));
+    logD("unsubscribe $runtimeType");
+    if (sendBeforeUnsubscribe)
+      util.streamSendIfNotClosed(
+        _controller,
+        beforeUnsubscribeValue,
+        allowNull: true,
+      );
     await _subscription?.cancel();
     _subscription = null;
   }
@@ -597,12 +608,13 @@ class ApiLogCharacteristic extends BleCharacteristic<String> {
   }
 }
 
-class WeightScaleCharacteristic extends BleCharacteristic<double> {
+class WeightScaleCharacteristic extends BleCharacteristic<double?> {
   final serviceUUID = BleConstants.WEIGHT_SCALE_SERVICE_UUID;
   final charUUID = BleConstants.WEIGHT_MEASUREMENT_CHAR_UUID;
 
   WeightScaleCharacteristic(Device device) : super(device) {
     histories['measurement'] = CharacteristicHistory<double>(maxEntries: 360, maxAge: 60, absolute: true);
+    super.sendBeforeUnsubscribe = true;
   }
 
   @override
@@ -620,7 +632,7 @@ class WeightScaleCharacteristic extends BleCharacteristic<double> {
   }
 
   @override
-  Uint8List toUint8List(double value) => Uint8List(3)..buffer.asByteData().setInt16(1, (value * 200).round(), Endian.little);
+  Uint8List toUint8List(double? value) => Uint8List(3)..buffer.asByteData().setInt16(1, (value ?? 0 * 200).round(), Endian.little);
 }
 
 class HallCharacteristic extends BleCharacteristic<int> {
@@ -639,12 +651,13 @@ class HallCharacteristic extends BleCharacteristic<int> {
   Uint8List toUint8List(int value) => Uint8List(2)..buffer.asByteData().setInt16(0, (value).round(), Endian.little);
 }
 
-class HeartRateCharacteristic extends BleCharacteristic<int> {
+class HeartRateCharacteristic extends BleCharacteristic<int?> {
   final serviceUUID = BleConstants.HEART_RATE_SERVICE_UUID;
   final charUUID = BleConstants.HEART_RATE_MEASUREMENT_CHAR_UUID;
 
   HeartRateCharacteristic(Device device) : super(device) {
     histories['measurement'] = CharacteristicHistory<int>(maxEntries: 120, maxAge: 120);
+    super.sendBeforeUnsubscribe = true;
   }
 
   @override
@@ -690,22 +703,24 @@ class HeartRateCharacteristic extends BleCharacteristic<int> {
   }
 
   @override
-  Uint8List toUint8List(int value) => Uint8List(2); // we are not writing
+  Uint8List toUint8List(int? value) => Uint8List(2); // we are not writing
 }
 
-class TemperatureCharacteristic extends BleCharacteristic<double> {
+class TemperatureCharacteristic extends BleCharacteristic<double?> {
   final serviceUUID = BleConstants.ENVIRONMENTAL_SENSING_SERVICE_UUID;
   final charUUID = BleConstants.TEMPERATURE_CHAR_UUID;
 
   TemperatureCharacteristic(Device device) : super(device) {
     histories['measurement'] = CharacteristicHistory<double>(maxEntries: 360, maxAge: 60);
+    super.sendBeforeUnsubscribe = true;
   }
 
   @override
   void _appendToHistory() {
     super._appendToHistory();
     var history = histories['measurement'];
-    if (null != lastValue || null != history) history!.append(lastValue!);
+    var value = lastValue;
+    if (null != value || null != history) history!.append(value!);
   }
 
   @override
@@ -721,7 +736,7 @@ class TemperatureCharacteristic extends BleCharacteristic<double> {
   }
 
   @override
-  Uint8List toUint8List(double value) => Uint8List(2); // we are not writing
+  Uint8List toUint8List(double? value) => Uint8List(2); // we are not writing
 }
 
 class CharacteristicList with Debug {

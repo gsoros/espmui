@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:developer' as dev;
+// import 'dart:developer' as dev;
 import 'dart:io';
 import 'dart:math';
 
@@ -58,16 +58,23 @@ int uts() {
   return DateTime.now().millisecondsSinceEpoch;
 }
 
-void streamSendIfNotClosed(StreamController stream, dynamic value) {
+void streamSendIfNotClosed(
+  StreamController stream,
+  dynamic value, {
+  allowNull = false,
+}) {
   if (stream.isClosed) {
-    dev.log("[streamSendIfNotClosed] Stream ${stream.toString()} is closed");
+    Debug.log("$stream is closed");
     return;
   }
   if (null == value) {
-    dev.log("[streamSendIfNotClosed] not sending null to stream ${stream.toString()}");
-    return;
+    if (!allowNull) {
+      Debug.log("not sending null to $stream (type: ${stream.sink.runtimeType})");
+      return;
+    }
+    Debug.log("sending null to $stream (type: ${stream.sink.runtimeType})");
   }
-  //logD("[streamSendIfNotClosed] Stream ${stream.toString()} sending value: $value");
+  //Debug.log("$stream sending value: $value");
   stream.sink.add(value);
 }
 

@@ -224,10 +224,10 @@ class EspmWeightScaleStreamListenerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<double>(
+    return StreamBuilder<double?>(
       stream: device.weightScaleChar?.defaultStream,
       initialData: device.weightScaleChar?.lastValue,
-      builder: (BuildContext context, AsyncSnapshot<double> snapshot) {
+      builder: (BuildContext context, AsyncSnapshot<double?> snapshot) {
         String weight = snapshot.hasData && 0 < mode ? snapshot.data!.toStringAsFixed(2) : "--";
         if (weight.length > 6) weight = weight.substring(0, 6);
         if (weight == "-0.00") weight = "0.00";
@@ -571,12 +571,12 @@ class HeartRateWidget extends StatelessWidget {
     if (!(tmpChar is HeartRateCharacteristic)) return Text('Error: not HR char');
     HeartRateCharacteristic char = tmpChar;
 
-    var value = StreamBuilder<int>(
+    var value = StreamBuilder<int?>(
       stream: char.defaultStream,
       initialData: char.lastValue,
-      builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
+      builder: (BuildContext context, AsyncSnapshot<int?> snapshot) {
         return Text(
-          snapshot.hasData ? (snapshot.data! > 0 ? snapshot.data.toString() : "--") : "--",
+          snapshot.hasData ? (snapshot.data! > 0 ? snapshot.data.toString() : " ") : " ",
           style: const TextStyle(fontSize: 60),
         );
       },

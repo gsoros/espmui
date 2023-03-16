@@ -1,8 +1,9 @@
 //import 'dart:async';
-import 'dart:developer' as dev;
+import 'dart:developer' as dev show log;
+import 'package:flutter/foundation.dart' show kDebugMode;
 
 // import 'package:flutter_ble_lib/flutter_ble_lib.dart';
-import 'package:logging/logging.dart';
+import 'package:logging/logging.dart' show Level;
 //import 'package:espmui/main.dart';
 import 'package:flutter/material.dart';
 
@@ -19,6 +20,7 @@ class DebugBorder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!kDebugMode) return Container(child: child);
     return Container(
       decoration: BoxDecoration(
           border: Border.all(
@@ -31,9 +33,10 @@ class DebugBorder extends StatelessWidget {
 }
 
 class Debug {
-  String get debugTag => "$runtimeType(${identityHashCode(this)})";
+  String get debugTag => !kDebugMode ? "$runtimeType(${identityHashCode(this)})" : "";
 
-  void devLog(String s, {Level level = Level.FINE}) {
+  static void log(String s, {Level level = Level.FINE}) {
+    if (!kDebugMode) return;
     var match = RegExp(r'^#(\d+) +(.+) +(.+)').firstMatch(StackTrace.current.toString().split("\n")[2]);
     dev.log(
       "$s ${match?[3]}",
@@ -44,14 +47,14 @@ class Debug {
   }
 
   void logD(String s) {
-    devLog("[D] $s", level: Level.SHOUT);
+    log("[D] $s", level: Level.SHOUT);
   }
 
   void logE(String s) {
-    devLog("[E] $s", level: Level.SEVERE);
+    log("[E] $s", level: Level.SEVERE);
   }
 
   void logI(String s) {
-    devLog("[I] $s", level: Level.INFO);
+    log("[I] $s", level: Level.INFO);
   }
 }

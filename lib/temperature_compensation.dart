@@ -101,7 +101,24 @@ class TC with Debug {
   /// highest value in the table
   int get valuesMax => _values.fold(0, max);
 
+  int? get firstNonNullKey {
+    int i = _values.indexWhere((v) => v != 0);
+    return i == -1 ? null : i;
+  }
+
+  int? get lastNonNullKey {
+    int i = _values.lastIndexWhere((v) => v != 0);
+    return i == -1 ? null : i;
+  }
+
   double keyToTemperature(int key) => ((_keyOffset ?? 0) + key * (_keyResolution ?? 0)).toDouble();
+
+  int? temperatureToKey(double temp) {
+    // index = (temp - offset) / resolution
+    if (null == keyResolution || keyResolution! <= 0.0) return null;
+    return (temp - (keyOffset ?? 0)) ~/ keyResolution!;
+  }
+
   double valueToWeight(int value) => value * (_valueResolution ?? 1);
 
   bool isReading = false;
@@ -150,6 +167,7 @@ class TC with Debug {
           if (ApiResult.success != rc) {
             status("Failed ${params["msg"]}");
             logD("readFromDevice $command fail, rc: $rc");
+            isReading = false;
             success = false;
             done = true;
           }
@@ -422,8 +440,24 @@ class TC with Debug {
 
   bool isCollecting = false;
 
-  void startCollecting() {
-    //if (isCollecting) return;
+  ExtendedBool prevEnabled = ExtendedBool.Unknown;
+  void startCollecting() async {
+    if (isCollecting) return;
+    prevEnabled = enabled;
+    status("Disabling TC");
+    int? rc = await espm.api.requestResultCode("tc=enabled:0", expectValue: "enabled:0");
+    if (rc != ApiResult.success) {
+      logE("rc: $rc");
+      status("Failed to disable TC");
+      return;
+    }
+    status("Sending tare");
+    rc = await espm.api.requestResultCode("tare=0");
+    if (rc != ApiResult.success) {
+      logE("rc: $rc");
+      status("Tare failed");
+      return;
+    }
     isCollecting = true;
     status("Collecting: ${collected.length}");
     // Future.doWhile(() async {
@@ -433,8 +467,17 @@ class TC with Debug {
     // });
   }
 
-  void stopCollecting() {
+  void stopCollecting() async {
     isCollecting = false;
+    if (prevEnabled.asBool) {
+      status("Re-enabling TC");
+      int? rc = await espm.api.requestResultCode("tc=enabled:1", expectValue: "enabled:1");
+      if (rc != ApiResult.success) {
+        logE("rc: $rc");
+        status("Failed to ensable TC");
+        return;
+      }
+    }
     status("");
   }
 
@@ -442,17 +485,21 @@ class TC with Debug {
     String tag = "";
     Map<double, double> result = {};
     if (size < 1) return result;
+    var firstNN = firstNonNullKey;
+    var lastNN = lastNonNullKey;
+    double? savedMin = null == firstNN ? null : keyToTemperature(firstNN);
+    double? savedMax = null == lastNN ? null : keyToTemperature(lastNN);
     double? collMin = collectedMinTemp;
     double? collMax = collectedMaxTemp;
-    if (null == collMin || null == collMax) return result;
-    //double start = min(keyToTemperature(0), collMin);
-    //double end = max(collMax, keyToTemperature(size - 1));
-    double start = collMin;
-    double end = collMax;
+    if (null == savedMin && null == collMin) return result;
+    if (null == savedMax && null == collMax) return result;
+
+    double start = min(savedMin ?? collMin!, collMin ?? savedMin!);
+    double end = max(savedMax ?? collMax!, collMax ?? savedMax!);
     double step = (end - start) / size;
     //logD("$tag start: $start, end: $end, step: $step");
     if (step <= 0) {
-      logD("$tag invalid step: $step");
+      logE("$tag invalid step: $step");
       return result;
     }
 
@@ -485,6 +532,16 @@ class TC with Debug {
             crosses.addAll({
               current: [weightToAdd]
             });
+        }
+        if (!crosses.containsKey(current)) {
+          var key = temperatureToKey(current);
+          if (null != key) {
+            var savedWeight = getValueAt(key);
+            if (null != savedWeight)
+              crosses.addAll({
+                current: [valueToWeight(savedWeight)]
+              });
+          }
         }
       }
     }
