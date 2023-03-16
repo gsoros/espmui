@@ -221,7 +221,9 @@ class Api with Debug {
 
   int? commandCode(String s, {bool logOnError = true}) {
     if (commands.containsValue(s)) return commands.keys.firstWhere((k) => commands[k] == s);
-    if (logOnError) debugLog("${device.name} code not found for command $s");
+    if (logOnError) {
+      debugLog("${device.name} code not found for command $s");
+    }
     return null;
   }
 
@@ -398,6 +400,7 @@ class Api with Debug {
           _onDone(m);
         }
       });
+      device.requestMtu(device.defaultMtu);
       return true;
     }
 

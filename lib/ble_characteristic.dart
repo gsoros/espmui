@@ -41,7 +41,7 @@ abstract class BleCharacteristic<T> with Debug {
 
   BleCharacteristic(this.device) {
     debugLog("construct ${device.peripheral?.identifier}");
-    lastValue = fromUint8List(Uint8List.fromList([]));
+    //lastValue = fromUint8List(Uint8List.fromList([]));
   }
 
   T fromUint8List(Uint8List list);
@@ -171,7 +171,7 @@ abstract class BleCharacteristic<T> with Debug {
     await _init();
     if (_subscription == null) return;
     debugLog("unsubscribe");
-    util.streamSendIfNotClosed(_controller, fromUint8List(Uint8List.fromList([])));
+    //util.streamSendIfNotClosed(_controller, fromUint8List(Uint8List.fromList([])));
     await _subscription?.cancel();
     _subscription = null;
   }
@@ -211,6 +211,8 @@ abstract class BleCharacteristic<T> with Debug {
     await _controller.close();
     deinit();
   }
+
+  String lastValueToString() => (null == lastValue) ? "" : lastValue.toString();
 }
 
 class BatteryCharacteristic extends BleCharacteristic<int> {

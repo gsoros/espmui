@@ -183,7 +183,7 @@ class BLE with Debug {
       debugLog("$tag peripheral is null");
       return null;
     }
-    await _exclusiveAccess.protect(() async {
+    return await _exclusiveAccess.protect<int>(() async {
       int result = await device.peripheral!.requestMtu(mtuRequest).catchError((e) {
         bleError(debugTag, tag, e);
         return 0;
@@ -194,7 +194,6 @@ class BLE with Debug {
       });
       return result;
     });
-    return 0;
   }
 
   Future<void> enableRadio() async {

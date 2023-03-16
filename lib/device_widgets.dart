@@ -431,7 +431,7 @@ class EspmHallSensorWidget extends StatelessWidget {
                     value: hallOffset.toString(),
                     keyboardType: TextInputType.number,
                     api: device.api,
-                    commandCode: device.api.commandCode("ho"),
+                    commandCode: device.api.commandCode("ho", logOnError: false),
                   ),
                 ]),
                 Row(children: [
@@ -440,7 +440,7 @@ class EspmHallSensorWidget extends StatelessWidget {
                     value: hallThreshold.toString(),
                     keyboardType: TextInputType.number,
                     api: device.api,
-                    commandCode: device.api.commandCode("ht"),
+                    commandCode: device.api.commandCode("ht", logOnError: false),
                   ),
                 ]),
                 Row(children: [
@@ -449,7 +449,7 @@ class EspmHallSensorWidget extends StatelessWidget {
                     value: hallThresLow.toString(),
                     keyboardType: TextInputType.number,
                     api: device.api,
-                    commandCode: device.api.commandCode("htl"),
+                    commandCode: device.api.commandCode("htl", logOnError: false),
                   ),
                 ]),
               ]),
@@ -977,7 +977,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           ApiSettingInputWidget(
             api: device.api,
             name: "Crank Length",
-            commandCode: device.api.commandCode("cl"),
+            commandCode: device.api.commandCode("cl", logOnError: false),
             value: settings.cranklength == null ? "" : settings.cranklength.toString(),
             suffix: Text("mm"),
             keyboardType: TextInputType.number,
@@ -985,7 +985,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           ApiSettingSwitchWidget(
             api: device.api,
             name: "Reverse Strain",
-            commandCode: device.api.commandCode("rs"),
+            commandCode: device.api.commandCode("rs", logOnError: false),
             value: settings.reverseStrain,
             onChanged: () {
               device.settings.value.reverseStrain = ExtendedBool.Waiting;
@@ -995,7 +995,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           ApiSettingSwitchWidget(
             api: device.api,
             name: "Double Power",
-            commandCode: device.api.commandCode("dp"),
+            commandCode: device.api.commandCode("dp", logOnError: false),
             value: settings.doublePower,
             onChanged: () {
               device.settings.value.doublePower = ExtendedBool.Waiting;
@@ -1005,7 +1005,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           ApiSettingInputWidget(
             api: device.api,
             name: "Sleep Delay",
-            commandCode: device.api.commandCode("sd"),
+            commandCode: device.api.commandCode("sd", logOnError: false),
             value: settings.sleepDelay == null ? "" : settings.sleepDelay.toString(),
             transformInput: (value) {
               var ms = int.tryParse(value);
@@ -1017,7 +1017,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           ApiSettingDropdownWidget(
             name: "Negative Torque Method",
             api: device.api,
-            command: device.api.commandCode("ntm"),
+            command: device.api.commandCode("ntm", logOnError: false),
             value: settings.negativeTorqueMethod.toString(),
             onChanged: (value) {
               debugLog("Negative Torque Method: $value");
@@ -1038,7 +1038,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           ApiSettingDropdownWidget(
             name: "Motion Detection Method",
             api: device.api,
-            command: device.api.commandCode("mdm"),
+            command: device.api.commandCode("mdm", logOnError: false),
             value: settings.motionDetectionMethod.toString(),
             onChanged: (value) {
               debugLog("Motion Detection Method: $value");
@@ -1066,7 +1066,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
               ApiSettingInputWidget(
                 api: device.api,
                 name: "Low Threshold",
-                commandCode: device.api.commandCode("stl"),
+                commandCode: device.api.commandCode("stl", logOnError: false),
                 value: settings.strainThresLow == null ? null : settings.strainThresLow.toString(),
                 keyboardType: TextInputType.number,
                 enabled: settings.strainThresLow != null,
@@ -1076,7 +1076,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
               ApiSettingInputWidget(
                 api: device.api,
                 name: "High Threshold",
-                commandCode: device.api.commandCode("st"),
+                commandCode: device.api.commandCode("st", logOnError: false),
                 value: settings.strainThreshold == null ? null : settings.strainThreshold.toString(),
                 keyboardType: TextInputType.number,
                 enabled: settings.strainThreshold != null,
@@ -1086,7 +1086,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           );
         }
 
-        int? tcCode = device.api.commandCode("tc");
+        int? tcCode = device.api.commandCode("tc", logOnError: false);
         if (null != tcCode && ExtendedBool.Unknown != settings.tc.enabled) {
           widgets.add(
             Row(
@@ -1109,7 +1109,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                   child: ApiSettingSwitchWidget(
                     api: device.api,
                     name: "Temperature Compensation",
-                    commandCode: device.api.commandCode("tc"),
+                    commandCode: device.api.commandCode("tc", logOnError: false),
                     value: settings.tc.enabled,
                     onChanged: () {
                       device.settings.value.tc.enabled = ExtendedBool.Waiting;
@@ -1126,7 +1126,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           ApiSettingSwitchWidget(
             api: device.api,
             name: "Auto Tare",
-            commandCode: device.api.commandCode("at"),
+            commandCode: device.api.commandCode("at", logOnError: false),
             value: settings.autoTare,
             onChanged: () {
               device.settings.value.autoTare = ExtendedBool.Waiting;
@@ -1140,7 +1140,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
               ApiSettingInputWidget(
                 api: device.api,
                 name: "Delay",
-                commandCode: device.api.commandCode("atd"),
+                commandCode: device.api.commandCode("atd", logOnError: false),
                 value: settings.autoTareDelayMs == null ? null : settings.autoTareDelayMs.toString(),
                 keyboardType: TextInputType.number,
                 enabled: settings.autoTareDelayMs != null,
@@ -1150,7 +1150,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
               ApiSettingInputWidget(
                 api: device.api,
                 name: "Max. Range",
-                commandCode: device.api.commandCode("atr"),
+                commandCode: device.api.commandCode("atr", logOnError: false),
                 value: settings.autoTareRangeG == null ? null : settings.autoTareRangeG.toString(),
                 keyboardType: TextInputType.number,
                 enabled: settings.autoTareRangeG != null,
@@ -1892,7 +1892,7 @@ class ApiWifiSettingsWidget extends StatelessWidget {
           ApiSettingSwitchWidget(
             api: api,
             name: "Wifi",
-            commandCode: api.commandCode("w"),
+            commandCode: api.commandCode("w", logOnError: false),
             value: settings.enabled,
             onChanged: () {
               wifiSettings.value.enabled = ExtendedBool.Waiting;

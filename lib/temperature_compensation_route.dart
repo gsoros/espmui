@@ -1,7 +1,7 @@
 import 'dart:async';
 //import 'dart:developer' as dev;
 import 'dart:math';
-import 'package:collection/collection.dart';
+//import 'package:collection/collection.dart';
 
 import 'package:espmui/util.dart';
 import 'package:flutter/material.dart';
@@ -29,7 +29,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
   ESPM device;
   late StreamSubscription<double>? temperatureSubscription;
   late StreamSubscription<double>? weightSubscription;
-  double? temperature, weight;
+  double? temperature, weight, lastTemperature, lastWeight;
 
   _TCRouteState(this.device) {
     temperatureSubscription = device.tempChar?.defaultStream.listen((value) {
@@ -51,15 +51,18 @@ class _TCRouteState extends State<TCRoute> with Debug {
   void onTempChange(double value) {
     temperature = value;
     var tc = device.settings.value.tc;
-    if (!tc.isCollecting || null == weight) return;
+    if (!tc.isCollecting || null == weight || weight == lastWeight) return;
+    lastWeight = weight;
     tc.addCollected(value, weight!);
     //debugLog("onTempChange $value ${tc.collectedSize()}");
   }
 
   void onWeightChange(double value) {
+    value = -value; // flip sign
     weight = value;
     var tc = device.settings.value.tc;
-    if (!tc.isCollecting || null == temperature) return;
+    if (!tc.isCollecting || null == temperature || temperature == lastTemperature) return;
+    lastTemperature = temperature;
     tc.addCollected(temperature!, value);
     //debugLog("onWeightChange $value ${tc.collectedSize()}");
   }
@@ -70,21 +73,21 @@ class _TCRouteState extends State<TCRoute> with Debug {
       appBar: AppBar(
         title: BleAdapterCheck(
           DeviceAppBarTitle(
-            widget.device,
+            device,
             nameEditable: false,
             prefix: "TC ",
             onConnected: () async {
-              widget.device.settings.value.tc.status("waiting for init to complete");
+              device.settings.value.tc.status("waiting for init to complete");
               int attempts = 0;
               await Future.doWhile(() async {
                 await Future.delayed(Duration(milliseconds: 300));
                 //debugLog("attempt #$attempts checking if tc command is available...");
-                if (null != widget.device.api.commandCode("tc")) return false;
+                if (null != device.api.commandCode("tc", logOnError: false)) return false;
                 attempts++;
                 return attempts < 50;
               });
-              debugLog("${widget.device.name} init done, calling readFromDevice()");
-              widget.device.settings.value.tc.readFromDevice();
+              debugLog("${device.name} init done, calling readFromDevice()");
+              device.settings.value.tc.readFromDevice();
             },
           ),
           ifDisabled: (state) => BleDisabled(state),
@@ -104,51 +107,76 @@ class _TCRouteState extends State<TCRoute> with Debug {
   }
 
   Widget buttons() {
-    var tc = widget.device.settings.value.tc;
     return ValueListenableBuilder(
-      valueListenable: widget.device.settings,
+      valueListenable: device.settings,
       builder: (context, ESPMSettings settings, widget) {
+        var tc = settings.tc;
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 0, 10, 0),
+                padding: const EdgeInsets.fromLTRB(0, 0, 3, 0),
                 child: EspmuiElevatedButton(
-                  child: Text(tc.statusType == TCSST.reading ? "Reading" : "Read"),
-                  onPressed: tc.statusType == TCSST.reading || tc.statusType == TCSST.collecting
+                  child: Text(tc.isReading ? "Reading" : "Read"),
+                  onPressed: tc.isReading || tc.isCollecting
                       ? null
                       : () async {
                           var success = await tc.readFromDevice();
                           debugLog("read button onPressed success: $success");
                         },
-                  backgroundColorEnabled: Colors.blueGrey,
+                  backgroundColorEnabled: Colors.blue.shade900,
                   backgroundColorDisabled: Colors.black54,
+                  padding: EdgeInsets.all(0),
                 ),
               ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                padding: const EdgeInsets.fromLTRB(3, 0, 3, 0),
                 child: EspmuiElevatedButton(
-                  child: Text(tc.statusType == TCSST.collecting ? "Stop" : "Collect"),
-                  onPressed: tc.statusType == TCSST.collecting
+                  child: Text(tc.isCollecting ? "Stop" : "Collect"),
+                  onPressed: tc.isCollecting
                       ? () {
                           tc.stopCollecting();
                         }
                       : () {
                           tc.startCollecting();
                         },
-                  backgroundColorEnabled: tc.statusType == TCSST.collecting ? Colors.deepOrange : Colors.green,
+                  backgroundColorEnabled: tc.isCollecting ? Colors.red : Colors.green.shade900,
+                  padding: EdgeInsets.all(0),
                 ),
               ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
+                padding: const EdgeInsets.fromLTRB(3, 0, 3, 0),
+                child: EspmuiElevatedButton(
+                  child: Text("Clear"),
+                  onPressed: 0 < tc.collected.length && !tc.isCollecting
+                      ? () {
+                          tc.collected.clear();
+                          device.settings.notifyListeners();
+                        }
+                      : null,
+                  backgroundColorEnabled: Colors.purple.shade900,
+                  backgroundColorDisabled: Colors.black54,
+                  padding: EdgeInsets.all(0),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(3, 0, 0, 0),
                 child: EspmuiElevatedButton(
                   child: Text("Write"),
-                  onPressed: () {},
+                  onPressed: !tc.isCollecting && !tc.isWriting
+                      ? () async {
+                          if (await tc.writeToDevice()) tc.readFromDevice();
+                        }
+                      : null,
+                  backgroundColorDisabled: Colors.black54,
+                  padding: EdgeInsets.all(0),
                 ),
               ),
             ),
@@ -160,7 +188,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
 
   Widget status() {
     return ValueListenableBuilder(
-      valueListenable: widget.device.settings,
+      valueListenable: device.settings,
       builder: (context, ESPMSettings settings, widget) {
         return Text(settings.tc.statusMessage);
       },
@@ -171,13 +199,13 @@ class _TCRouteState extends State<TCRoute> with Debug {
     var spots = List<FlSpot>.empty(growable: true);
     int key = 0;
     tc.values.forEach((value) {
-      if (null == value || TemperatureControlSettings.valueUnset == value) {
-        if (0 < spots.length && spots.last != FlSpot.nullSpot) spots.add(FlSpot.nullSpot);
-      } else
-        spots.add(FlSpot(
-          tc.keyToTemperature(key),
-          tc.valueToWeight(value),
-        ));
+      // if (0 == value) {
+      //   if (0 < spots.length && spots.last != FlSpot.nullSpot) spots.add(FlSpot.nullSpot);
+      // } else
+      spots.add(FlSpot(
+        tc.keyToTemperature(key),
+        tc.valueToWeight(value),
+      ));
       key++;
     });
     return spots;
@@ -185,38 +213,56 @@ class _TCRouteState extends State<TCRoute> with Debug {
 
   List<FlSpot> collectedSpots(TemperatureControlSettings tc) {
     var spots = List<FlSpot>.empty(growable: true);
-    tc.collected.forEach((key, value) {
-      if (0 < value.length)
-        spots.add(FlSpot(
-          key,
-          value.average,
-        ));
+    tc.collected.forEach((value) {
+      if (value.length < 2) return;
+      spots.add(FlSpot(
+        value[0],
+        value[1],
+      ));
     });
     return spots;
   }
 
-  List<LineChartBarData> lineBars(TemperatureControlSettings tc) {
+  List<FlSpot> suggestedSpots(TemperatureControlSettings tc) {
+    var spots = List<FlSpot>.empty(growable: true);
+    tc.suggested.forEach((key, value) {
+      spots.add(FlSpot(key, value));
+    });
+    return spots;
+  }
+
+  List<LineChartBarData> chartData(TemperatureControlSettings tc) {
     List<LineChartBarData> data = [
       LineChartBarData(
         spots: savedSpots(tc),
         isCurved: false,
         barWidth: 2,
-        color: Colors.blueAccent,
+        color: Colors.blue.shade500,
         dotData: FlDotData(show: false),
       ),
       LineChartBarData(
         spots: collectedSpots(tc),
         isCurved: false,
         barWidth: 2,
-        color: Colors.red,
-        dotData: FlDotData(show: false),
+        color: Colors.green.shade700,
+        dotData: FlDotData(show: true),
       ),
     ];
+    var suggested = suggestedSpots(tc);
+    if (0 < suggested.length) {
+      data.add(LineChartBarData(
+        spots: suggested,
+        isCurved: false,
+        //barWidth: 5,
+        color: Colors.purple.shade500,
+        dotData: FlDotData(show: false),
+      ));
+    }
     if (null != temperature && null != weight) {
       data.add(LineChartBarData(
         spots: [FlSpot(temperature!, weight!)],
         isCurved: false,
-        barWidth: 2,
+        //barWidth: 5,
         color: Colors.yellow,
         dotData: FlDotData(show: true),
       ));
@@ -227,7 +273,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
   Widget chart() {
     return ValueListenableBuilder(
       // key: _key,
-      valueListenable: widget.device.settings,
+      valueListenable: device.settings,
       builder: (context, ESPMSettings settings, widget) {
         var tc = settings.tc;
         //print("rebuilding chart size: ${tc.size}, keyOffset: ${tc.keyOffset}, keyResolution: ${tc.keyResolution}, valueResolution: ${tc.valueResolution}");
@@ -235,8 +281,8 @@ class _TCRouteState extends State<TCRoute> with Debug {
         int numValues = tc.size;
         double savedMin = tc.keyToTemperature(0);
         double savedMax = tc.keyToTemperature(0 < numValues ? numValues - 1 : 0);
-        double? collectedMin = tc.collectedMinTemp();
-        double? collectedMax = tc.collectedMaxTemp();
+        double? collectedMin = tc.collectedMinTemp;
+        double? collectedMax = tc.collectedMaxTemp;
         double tempMin = null == collectedMin ? savedMin : min(savedMin, collectedMin);
         double tempMax = null == collectedMax ? savedMax : max(savedMax, collectedMax);
         //print("collectedMin: $collectedMin, collectedMax: $collectedMax, tempMin: $tempMin, tempMax: $tempMax, tc: ${tc.values}");
@@ -247,11 +293,11 @@ class _TCRouteState extends State<TCRoute> with Debug {
             //print("rebuilding chart");
             return LineChart(
               LineChartData(
-                  clipData: FlClipData.all(),
+                  clipData: FlClipData.none(),
                   minX: minX,
                   maxX: maxX,
                   lineTouchData: LineTouchData(enabled: false),
-                  lineBarsData: lineBars(tc),
+                  lineBarsData: chartData(tc),
                   borderData: FlBorderData(show: false),
                   titlesData: FlTitlesData(
                       show: true,
@@ -300,8 +346,14 @@ class _ZoomableChartState extends State<ZoomableChart> {
     return GestureDetector(
       onDoubleTap: () {
         setState(() {
-          minX = widget.minX;
-          maxX = widget.maxX;
+          if (minX == widget.minX && maxX == widget.maxX) {
+            var diff = (maxX - minX).abs() / 2.5;
+            minX += diff;
+            maxX -= diff;
+          } else {
+            minX = widget.minX;
+            maxX = widget.maxX;
+          }
         });
       },
       onHorizontalDragStart: (details) {
@@ -309,22 +361,22 @@ class _ZoomableChartState extends State<ZoomableChart> {
         lastMaxX = maxX;
       },
       onHorizontalDragUpdate: (details) {
-        var horizontalDistance = details.primaryDelta ?? 0;
-        if (horizontalDistance == 0) return;
+        var distance = details.primaryDelta ?? 0;
+        if (distance == 0) return;
         //print("_ZoomableChartState build horizontalDistance: $horizontalDistance");
-        var lastMinMaxDistance = (lastMaxX - lastMinX).abs();
+        var lastDistance = (lastMaxX - lastMinX).abs();
 
         setState(() {
-          minX -= lastMinMaxDistance * 0.005 * horizontalDistance;
-          maxX -= lastMinMaxDistance * 0.005 * horizontalDistance;
+          minX -= lastDistance * 0.004 * distance;
+          maxX -= lastDistance * 0.004 * distance;
 
           if (minX < widget.minX) {
             minX = widget.minX;
-            maxX = minX + lastMinMaxDistance;
+            maxX = minX + lastDistance;
           }
           if (maxX > widget.maxX) {
             maxX = widget.maxX;
-            minX = maxX - lastMinMaxDistance;
+            minX = maxX - lastDistance;
           }
           //print("_ZoomableChartState onHorizontalDragUpdate $minX, $maxX");
         });
@@ -332,20 +384,18 @@ class _ZoomableChartState extends State<ZoomableChart> {
       onScaleStart: (details) {
         lastMinX = minX;
         lastMaxX = maxX;
+        //print("_ZoomableChartState build onScaleStart");
       },
       onScaleUpdate: (details) {
-        const double minDistance = 10.0;
-        var horizontalScale = details.horizontalScale;
-        if (horizontalScale == 0) return;
-        var lastMinMaxDistance = (lastMaxX - lastMinX).abs();
-        var newMinMaxDistance = max(lastMinMaxDistance / horizontalScale, minDistance);
-        var distanceDifference = newMinMaxDistance - lastMinMaxDistance;
-        //print("_ZoomableChartState build onScaleUpdate horizontalScale: $horizontalScale "
-        //    "lastMinMaxDistance: $lastMinMaxDistance, newMinMaxDistance: $newMinMaxDistance, "
-        //    "distanceDifference: $distanceDifference");
+        const double minDistance = 2.0;
+        var scale = details.scale;
+        if (scale == 0) return;
+        var lastDistance = (lastMaxX - lastMinX).abs();
+        var newDistance = max(lastDistance / scale, minDistance);
+        var diff = newDistance - lastDistance;
         setState(() {
-          final newMinX = lastMinX - distanceDifference;
-          final newMaxX = lastMaxX + distanceDifference;
+          final newMinX = lastMinX - diff;
+          final newMaxX = lastMaxX + diff;
 
           if (minDistance < newMaxX - newMinX) {
             minX = newMinX;

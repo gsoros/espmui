@@ -13,7 +13,7 @@ import 'package:intl/intl.dart';
 import 'device.dart';
 import 'api.dart';
 import 'espcc_syncer.dart';
-import 'ble.dart';
+//import 'ble.dart';
 import 'ble_characteristic.dart';
 import 'ble_constants.dart';
 import 'device_widgets.dart';
@@ -30,6 +30,12 @@ class ESPCC extends Device {
   //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
   StreamSubscription<ApiMessage>? _apiSubsciption;
   Stream<ESPCCSettings>? _settingsStream;
+
+  @override
+  int get defaultMtu => 512;
+
+  @override
+  int get largeMtu => 512;
 
   ESPCC(Peripheral peripheral) : super(peripheral) {
     characteristics.addAll({
@@ -184,7 +190,7 @@ class ESPCC extends Device {
   Future<void> onConnected() async {
     debugLog("_onConnected()");
     // api char can use values longer than 20 bytes
-    await BLE().requestMtu(this, 512);
+    await requestMtu(512);
     await super.onConnected();
     _requestInit();
   }

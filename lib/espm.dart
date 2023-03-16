@@ -1,13 +1,15 @@
 import 'dart:async';
 // import 'dart:html';
+import 'dart:math';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:mutex/mutex.dart';
 
 import 'device.dart';
 import 'api.dart';
-import 'ble.dart';
+//import 'ble.dart';
 import 'ble_characteristic.dart';
 
 import 'util.dart';
@@ -58,7 +60,7 @@ class ESPM extends PowerMeter {
           if (s == "-0.00") s = "0.00";
           return s;
         }),
-        initialData: weightScaleChar?.lastValue.toString,
+        initialData: weightScaleChar?.lastValueToString,
         units: "kg",
         history: weightScaleChar?.histories['measurement'],
       ),
@@ -71,7 +73,7 @@ class ESPM extends PowerMeter {
           if (s.length > 6) s = s.substring(0, 6);
           return s;
         }),
-        initialData: tempChar?.lastValue.toString,
+        initialData: tempChar?.lastValueToString,
         units: "˚C",
         history: tempChar?.histories['measurement'],
       ),
@@ -129,8 +131,7 @@ class ESPM extends PowerMeter {
 
   Future<void> onConnected() async {
     debugLog("_onConnected()");
-    // api char can use values longer than 20 bytes
-    await BLE().requestMtu(this, 512);
+    await requestMtu(defaultMtu);
     await super.onConnected();
     _requestInit();
   }
@@ -144,9 +145,10 @@ class ESPM extends PowerMeter {
   /// request initial values, returned values are discarded
   /// because the message.done subscription will handle them
   void _requestInit() async {
-    debugLog("Requesting init start");
+    //debugLog("Requesting init start");
     if (!await ready()) return;
-    debugLog("Requesting init ready to go");
+    await requestMtu(largeMtu);
+    //debugLog("Requesting init ready to go");
     weightServiceMode.value = ESPMWeightServiceMode.UNKNOWN;
     [
       "init",
@@ -165,7 +167,8 @@ class ESPM extends PowerMeter {
     weightServiceMode.value = ESPMWeightServiceMode.UNKNOWN;
     wifiSettings.value = WifiSettings();
     wifiSettings.notifyListeners();
-    settings.value = ESPMSettings(this);
+    settings.value = ESPMSettings(this, tc: settings.value.tc); // preserve collected values
+    //debugLog("_resetInit tc.isCollecting: ${settings.value.tc.isCollecting}");
     settings.notifyListeners();
     api.reset();
   }
@@ -194,8 +197,11 @@ class ESPM extends PowerMeter {
 class ESPMSettings with Debug {
   ESPM device;
 
-  ESPMSettings(this.device) {
-    tc = TemperatureControlSettings(device);
+  ESPMSettings(this.device, {TemperatureControlSettings? tc}) {
+    if (null != tc && tc.device == device)
+      this.tc = tc;
+    else
+      this.tc = TemperatureControlSettings(device);
   }
 
   double? cranklength;
@@ -369,6 +375,7 @@ class TemperatureControlSettings with Debug {
     setUpdated();
   }
 
+  /// table size
   int get size => _values.length;
   set size(int newSize) {
     if (newSize < size) {
@@ -378,7 +385,7 @@ class TemperatureControlSettings with Debug {
       setUpdated();
     } else if (size < newSize) {
       debugLog("size $size: adding ${newSize - size} elements");
-      _values.addAll(List<int?>.filled(newSize - size, null));
+      _values.addAll(List<int>.filled(newSize - size, 0));
       debugLog("size $size");
       setUpdated();
     }
@@ -405,9 +412,9 @@ class TemperatureControlSettings with Debug {
     setUpdated();
   }
 
-  var _values = <int?>[];
-  List<int?> get values => _values;
-  set values(List<int?> newValues) {
+  var _values = <int>[];
+  List<int> get values => _values;
+  set values(List<int> newValues) {
     if (size != newValues.length) size = newValues.length;
     _values = newValues;
     setUpdated();
@@ -418,7 +425,7 @@ class TemperatureControlSettings with Debug {
     return values[key];
   }
 
-  bool setValueAt(int key, int? value) {
+  bool setValueAt(int key, int value) {
     if (size < key + 1) size = key + 1;
     _values[key] = value;
     setUpdated();
@@ -432,35 +439,63 @@ class TemperatureControlSettings with Debug {
     device.settings.notifyListeners();
   }
 
-  static const int valueUnset = -128; // INT8_MIN
-  static const int valueMin = -127; // INT8_MIN + 1
-  static const int valueMax = 128; // INT8_MAX
+  /// INT8_MIN
+  static const int valueAllowedMin = -128;
+
+  /// INT8_MAX
+  static const int valueAllowedMax = 127;
+
+  /// lowest value in the table
+  int get valuesMin => _values.fold(0, min);
+
+  /// highest value in the table
+  int get valuesMax => _values.fold(0, max);
 
   double keyToTemperature(int key) => ((_keyOffset ?? 0) + key * (_keyResolution ?? 0)).toDouble();
-  double valueToWeight(int value) => value == valueUnset ? 0 : value * (_valueResolution ?? 1);
+  double valueToWeight(int value) => value * (_valueResolution ?? 1);
 
+  bool isReading = false;
   Future<bool> readFromDevice() async {
+    String tag = "readFromDevice";
     bool success = true;
     bool done = false;
     int? rc;
-    status("Requesting MTU", type: TCSST.reading);
-    await device.requestMtu(512);
+    isReading = true;
+    status("Requesting MTU");
+    int mtu = await device.requestMtu(device.largeMtu) ?? device.defaultMtu;
+    if (mtu < 200) {
+      debugLog("$tag mtu: $mtu");
+      status("could not get MTU");
+    }
     status("Reading settings");
     var mutex = Mutex();
     <String, Map<String, String?>>{
-      "tc": {"expect": "enabled:", "msg": "checking if tc is enabled"},
-      "tc=table": {"expect": "table;", "msg": "reading table settings"},
-      //"invalidCommand": {"expect": "impossibleReply", "msg": "debug triggering failure"},
-      "tc=valuesFrom:0": {"expect": "valuesFrom:0;", "msg": "reading table values"},
-      "": {"msg": "done reading from device", "done": ""},
+      "tc": {
+        "expect": "enabled:",
+        "msg": "checking if tc is enabled",
+      },
+      "tc=table": {
+        "expect": "table;",
+        "msg": "reading table settings",
+      },
+      //"invalidCommand": {"expect": "impossibleReply", "msg": "debug triggering failure",},
+      "tc=valuesFrom:0": {
+        "expect": "valuesFrom:0;",
+        "msg": "reading table values",
+      },
+      "0": {
+        "mtu": "${device.defaultMtu}",
+        "msg": "restoring MTU",
+      },
+      "1": {"msg": "done reading from device"},
     }.forEach((command, params) async {
       await mutex.protect(() async {
         if (done) {
-          status(null, type: TCSST.idle);
+          isReading = false;
           return;
         }
         status(params["msg"]?.capitalize());
-        if (0 < command.length) {
+        if (1 < command.length) {
           rc = await device.api.requestResultCode(command, expectValue: params["expect"]);
           if (ApiResult.success != rc) {
             status("Failed ${params["msg"]}");
@@ -469,12 +504,15 @@ class TemperatureControlSettings with Debug {
             done = true;
           }
           await Future.delayed(Duration(milliseconds: 300));
+          return;
         }
-        if (null != params["done"]) {
-          done = true;
-          debugLog("readFromDevice success: $success");
-          status(success ? "" : null, type: TCSST.idle);
+        if (params.containsKey("mtu")) {
+          device.requestMtu(int.tryParse(params["mtu"] ?? "") ?? device.defaultMtu);
         }
+        isReading = false;
+        done = true;
+        debugLog("readFromDevice success: $success");
+        status(success ? "" : null);
       });
     });
     return null ==
@@ -484,6 +522,134 @@ class TemperatureControlSettings with Debug {
               return !done;
             })
         ? success
+        : false;
+  }
+
+  bool isWriting = false;
+  Future<bool> writeToDevice() async {
+    String tag = "writeToDevice";
+    bool result = true;
+    bool done = false;
+    int? rc;
+    isWriting = true;
+
+    var sugg = Map.fromEntries(suggested.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
+    if (sugg.length != size || size < 1) {
+      status("Error: suggested table size is ${sugg.length}, saved size is $size");
+      isWriting = false;
+      return false;
+    }
+    status("Requesting MTU");
+    int mtu = await device.requestMtu(device.largeMtu) ?? device.defaultMtu;
+    if (mtu < 200) {
+      debugLog("$tag mtu: $mtu");
+      status("could not get MTU");
+      isWriting = false;
+      return false;
+    }
+    int commandMaxLen = mtu - 10;
+    status("Writing TC");
+
+    int newKeyOffset = sugg.entries.first.key.toInt();
+    double newKeyResolution = (sugg.entries.last.key.toInt() - sugg.entries.first.key.toInt()).abs() / size;
+    var suggValues = sugg.values.toList(growable: false);
+    double newValueResolution = max(suggValues.max.abs(), suggValues.min.abs()) / (valueAllowedMax - 1);
+    // debugLog("newValueResolution: $newValueResolution, suggValues.min: ${suggValues.min}, suggValues.max: ${suggValues.max}");
+
+    var tasks = <String, Map<String, String?>>{
+      "tc=table;size:$size;"
+          "keyOffset:$newKeyOffset;"
+          "keyRes:${newKeyResolution.toStringAsFixed(4)};"
+          "valueRes:${newValueResolution.toStringAsFixed(4)};": {
+        "expect": "table;size:$size;",
+        "msg": "writing table settings",
+      },
+    };
+
+    String command = "", expect = "";
+    int i = 0, page = 0;
+    sugg.forEach((temp, weight) {
+      if (!result) return;
+      if ("" == command) {
+        command = "tc=valuesFrom:$i;set:";
+        expect = "valuesFrom:$i;";
+        page++;
+      }
+      int value = weight ~/ newValueResolution;
+      if (value < valueAllowedMin || valueAllowedMax < value) {
+        result = false;
+        debugLog("$tag value out of range: $value, weight: $weight, newValueResolution: $newValueResolution");
+        status("Error writing table, value $value out of range");
+        return;
+      }
+      command += value.toString();
+      if (i < size - 1) command += ",";
+      if (i == size - 1 || commandMaxLen - 3 <= command.length) {
+        tasks.addAll({
+          command: {
+            "expect": expect,
+            "msg": "writing table, page $page",
+          }
+        });
+        command = "";
+      }
+      if (i == size - 1) return;
+      i++;
+    });
+
+    if (!result) {
+      isWriting = false;
+      return result;
+    }
+
+    tasks.addAll({
+      "0": {
+        "mtu": "${device.defaultMtu}",
+        "msg": "restoring MTU",
+      }
+    });
+
+    tasks.addAll({
+      "1": {"msg": "done writing to device"}
+    });
+
+    var mutex = Mutex();
+    tasks.forEach((command, params) async {
+      await mutex.protect(() async {
+        if (done) {
+          isWriting = false;
+          return;
+        }
+        status(params["msg"]?.capitalize());
+        if (1 < command.length) {
+          //debugLog("$tag not sending (len: ${command.length}) $command");
+          //rc = ApiResult.success;
+          rc = await device.api.requestResultCode(command, expectValue: params["expect"]);
+          if (ApiResult.success != rc) {
+            status("Failed ${params["msg"]}");
+            debugLog("$tag $command fail, rc: $rc");
+            result = false;
+            done = true;
+          }
+          await Future.delayed(Duration(milliseconds: 300));
+          return;
+        }
+        if (params.containsKey("mtu")) {
+          device.requestMtu(int.tryParse(params["mtu"] ?? "") ?? 23);
+        }
+        isWriting = false;
+        done = true;
+        debugLog("$tag success: $result");
+        status(result ? "" : null);
+      });
+    });
+    return null ==
+            await Future.doWhile(() async {
+              debugLog("$tag waiting");
+              await Future.delayed(Duration(milliseconds: 300));
+              return !done;
+            })
+        ? result
         : false;
   }
 
@@ -551,7 +717,7 @@ class TemperatureControlSettings with Debug {
         return;
       }
       //int? oldValue = getValueAt(key);
-      if (setValueAt(key, int.tryParse(nStr) ?? valueUnset)) updated++;
+      if (setValueAt(key, int.tryParse(nStr) ?? 0)) updated++;
       //debugLog("$tag $key: $oldValue -> ${getValueAt(key)})");
       key++;
     });
@@ -566,41 +732,40 @@ class TemperatureControlSettings with Debug {
     return true;
   }
 
-  Map<double, List<double>> collected = {};
+  List<List<double>> collected = [[]];
 
   void addCollected(double temperature, double weight) {
-    if (collected.containsKey(temperature)) {
-      collected[temperature]?.add(weight);
-      //collected[temperature]?.sort();
-    } else {
-      collected.addAll({
-        temperature: [weight]
-      });
+    weight = (weight * 100).round() / 100; //reduce to 2 decimals
+    double? updateTemp, updateWeight;
+    if (0 < collected.length && 0 < collected.last.length) {
+      if (collected.last[0] == temperature) {
+        updateWeight = (collected.last[1] + weight) / 2;
+      } else if (collected.last[1] == weight) {
+        updateTemp = (collected.last[0] + temperature) / 2;
+      }
     }
-    collected = Map.fromEntries(collected.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
-    device.settings.notifyListeners();
+    if (null != updateTemp || null != updateWeight) {
+      collected.last = [updateTemp ?? temperature, updateWeight ?? weight];
+      debugLog("addCollected($temperature, $weight) last value updated");
+    } else {
+      collected.add([temperature, weight]);
+      debugLog("addCollected($temperature, $weight)");
+    }
+    status("Collecting: ${collected.length}");
   }
 
-  int collectedSize() {
-    int size = 0;
-    collected.forEach((key, value) {
-      size += value.length;
-    });
-    return size;
-  }
-
-  double? collectedMinTemp() {
+  double? get collectedMinTemp {
     double? d;
-    collected.forEach((key, value) {
-      if (null == d || key < d!) d = key;
+    collected.forEach((e) {
+      if ((0 < e.length) && (null == d || e[0] < d!)) d = e[0];
     });
     return d;
   }
 
-  double? collectedMaxTemp() {
+  double? get collectedMaxTemp {
     double? d;
-    collected.forEach((key, value) {
-      if (null == d || d! < key) d = key;
+    collected.forEach((e) {
+      if ((0 < e.length) && (null == d || d! < e[0])) d = e[0];
     });
     return d;
   }
@@ -608,51 +773,104 @@ class TemperatureControlSettings with Debug {
   bool isCollecting = false;
 
   void startCollecting() {
-    if (isCollecting) return;
+    //if (isCollecting) return;
     isCollecting = true;
-    Future.doWhile(() async {
-      status("Collecting: ${collectedSize()}", type: TCSST.collecting);
-      await Future.delayed(Duration(seconds: 1));
-      return isCollecting;
-    });
+    status("Collecting: ${collected.length}");
+    // Future.doWhile(() async {
+    //   status("Collecting: ${collected.length}");
+    //   await Future.delayed(Duration(seconds: 1));
+    //   return isCollecting;
+    // });
   }
 
   void stopCollecting() {
     isCollecting = false;
-    status("", type: TCSST.idle);
+    status("");
   }
 
-  int? get valuesMin {
-    int? i;
-    _values.forEach((v) {
-      if (null == i || null == v || v < i!) i = v;
+  Map<double, double> get suggested {
+    String tag = "suggested";
+    Map<double, double> sugg = {};
+    if (size < 1) return sugg;
+    double? collMin = collectedMinTemp;
+    double? collMax = collectedMaxTemp;
+    if (null == collMin || null == collMax) return sugg;
+    //double start = min(keyToTemperature(0), collMin);
+    //double end = max(collMax, keyToTemperature(size - 1));
+    double start = collMin;
+    double end = collMax;
+    double step = (end - start) / size;
+    //debugLog("$tag start: $start, end: $end, step: $step");
+    if (step <= 0) {
+      debugLog("$tag invalid step: $step");
+      return sugg;
+    }
+
+    Map<double, List<double>> crosses = {};
+    var collLen = collected.length;
+    List<double> prev, next;
+    double weightToAdd;
+    for (double current = start; current <= end; current += step) {
+      for (int i = 0; i < collLen - 1; i++) {
+        prev = collected[i];
+        next = collected[i + 1];
+        if (prev.length < 2 || next.length < 2) continue;
+        if ((prev[0] <= current && current < next[0]) || (next[0] <= current && current < prev[0])) {
+          double tempDiff = current - min(prev[0], next[0]);
+          //debugLog("$tag prev[0]: ${prev[0]}, tempDiff: $tempDiff");
+          if (0 == tempDiff) {
+            weightToAdd = (prev[1] + next[1]) / 2;
+            //debugLog("$tag tempDiff is 0");
+          } else {
+            double tempDist = (next[0] - prev[0]).abs();
+            double weightDist = (next[1] - prev[1]).abs();
+            weightToAdd = prev[1] + weightDist * (tempDiff / tempDist);
+            //debugLog("$tag tempDiff: $tempDiff, tempDist: $tempDist, weightDist: $weightDist");
+            //if (weightDist != 0)
+            //debugLog("$tag at ${prev[0]}˚C weightDist: ${weightDist}kg, next[1]: ${next[1]}, prev[1]: ${prev[1]}, weightToAdd: $weightToAdd");
+          }
+          if (crosses.containsKey(current))
+            crosses[current]?.add(weightToAdd);
+          else
+            crosses.addAll({
+              current: [weightToAdd]
+            });
+        }
+      }
+    }
+
+    // String crossStr = "";
+    // crosses.forEach((temp, weights) {
+    //   crossStr += "${temp.toStringAsFixed(2)}: ${weights.average.toStringAsFixed(2)} (${weights.length}), ";
+    // });
+    // debugLog("$tag crosses: $crossStr");
+
+    crosses.forEach((temp, weights) {
+      sugg.addAll({temp: weights.average});
     });
-    return i;
+
+    // String suggStr = "";
+    // sugg.forEach((temp, weight) {
+    //   suggStr += "${temp.toStringAsFixed(2)}: ${weight.toStringAsFixed(2)}, ";
+    // });
+    // debugLog("$tag sugg: $suggStr");
+
+    return sugg;
   }
 
-  int? get valuesMax {
-    int? i;
-    _values.forEach((v) {
-      if (null == i || null == v || i! < v) i = v;
-    });
-    return i;
-  }
-
-  TCSST statusType = TCSST.idle;
   String statusMessage = "";
-  void status(String? message, {TCSST? type}) {
+  void status(String? message) {
     // workaround for "setState() or markNeedsBuild() called during build"
     Future.delayed(Duration.zero, () {
       if (null != message) statusMessage = message;
-      if (null != type) statusType = type;
-      device.settings.notifyListeners();
-      debugLog("status $statusMessage $statusType");
+      setUpdated();
+      //debugLog("status $statusMessage");
     });
   }
 
   @override
   bool operator ==(other) {
-    debugLog("comparing $this to $other");
+    //debugLog("comparing $this to $other");
     return (other is TemperatureControlSettings) &&
         other.device == device &&
         other.enabled == enabled &&
@@ -661,7 +879,6 @@ class TemperatureControlSettings with Debug {
         other.keyResolution == keyResolution &&
         other.valueResolution == valueResolution &&
         other.values == values &&
-        other.statusType == statusType &&
         other.statusMessage == statusMessage;
   }
 
@@ -674,15 +891,5 @@ class TemperatureControlSettings with Debug {
       keyResolution.hashCode ^
       valueResolution.hashCode ^
       values.hashCode ^
-      statusMessage.hashCode ^
-      statusType.hashCode;
+      statusMessage.hashCode;
 }
-
-enum TCSettingsStatusType {
-  idle,
-  reading,
-  collecting,
-  writing,
-}
-
-typedef TCSST = TCSettingsStatusType;

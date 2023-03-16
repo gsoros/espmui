@@ -83,6 +83,9 @@ class Device with Debug {
   StreamSubscription<int>? _batteryLevelSubscription;
   ExtendedBool isCharging = ExtendedBool.Unknown;
 
+  int get defaultMtu => 23;
+  int get largeMtu => 512;
+
   Device(this.peripheral) {
     debugLog("construct");
     if (null != peripheral)
@@ -93,7 +96,7 @@ class Device with Debug {
       "battery": DeviceTileStream(
         label: "Battery",
         stream: battery?.defaultStream.map<String>((value) => "$value"),
-        initialData: battery?.lastValue.toString,
+        initialData: battery?.lastValueToString,
         units: "%",
         history: battery?.histories['charge'],
       ),
@@ -589,7 +592,7 @@ class HeartRateMonitor extends Device {
       "heartRate": DeviceTileStream(
         label: "Heart Rate",
         stream: heartRate?.defaultStream.map<String>((value) => "$value"),
-        initialData: heartRate?.lastValue.toString,
+        initialData: heartRate?.lastValueToString,
         units: "bpm",
         history: heartRate?.histories['measurement'],
       ),
