@@ -140,7 +140,7 @@ class ApiMessage with Debug {
   }
 
   void checkAttempts() {
-    if (maxAttempts <= (attempts ?? 0)) {
+    if (maxAttempts < (attempts ?? 0)) {
       logD("max attmpts reached: " + toString());
       resultCode = -1;
       resultStr = "ClientError";

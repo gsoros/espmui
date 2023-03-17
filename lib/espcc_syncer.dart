@@ -122,7 +122,7 @@ class ESPCCSyncer with Debug {
       expectValue: expect,
       minDelayMs: 1000,
       maxAgeMs: 3000,
-      maxAttempts: 3,
+      maxAttempts: 1,
     );
     if (null == reply || reply.length < 1) {
       logD("$tag empty reply for $request");
