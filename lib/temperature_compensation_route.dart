@@ -224,6 +224,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
   Widget fab() {
     if (!_fabVisible) return Container();
     return FloatingActionButton(
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       onPressed: () {
         logD("fab pressed");
         Navigator.push(
@@ -263,7 +264,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             Expanded(
-              flex: 5,
+              flex: 2,
               child: Text(" "),
             ),
             Expanded(
@@ -338,6 +339,10 @@ class _TCRouteState extends State<TCRoute> with Debug {
                   padding: EdgeInsets.all(0),
                 ),
               ),
+            ),
+            Expanded(
+              flex: 1,
+              child: Text(" "),
             ),
           ],
         );
