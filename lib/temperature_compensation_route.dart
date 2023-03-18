@@ -171,7 +171,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
               nameEditable: false,
               prefix: "TC ",
               onConnected: () async {
-                espm.settings.value.tc.status("waiting for init to complete");
+                // espm.settings.value.tc.status("waiting for init to complete"); // cannot call status() from build
                 int attempts = 0;
                 await Future.doWhile(() async {
                   await Future.delayed(Duration(milliseconds: 300));
@@ -192,17 +192,24 @@ class _TCRouteState extends State<TCRoute> with Debug {
           child: Stack(
             children: [
               chart(),
-              ValueListenableBuilder(
-                valueListenable: espm.settings.value.tc.statusMessage,
-                builder: (_, String m, __) {
-                  //logD(m);
-                  return Text(m);
-                },
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 0, 0),
+                child: status(),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget status() {
+    return ValueListenableBuilder(
+      valueListenable: espm.settings.value.tc.statusMessage,
+      builder: (_, String m, __) {
+        //logD(m);
+        return Text(m, style: TextStyle(color: Colors.white38));
+      },
     );
   }
 

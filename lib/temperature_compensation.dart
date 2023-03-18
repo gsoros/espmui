@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:espmui/util.dart';
 //import 'package:flutter/material.dart';
-import 'package:mutex/mutex.dart';
+//import 'package:mutex/mutex.dart';
 
 import 'api.dart';
 import 'espm.dart';
@@ -205,53 +205,48 @@ class TC with Debug {
 
   Future<bool> writeToDevice() async {
     String tag = "";
-    bool result = true;
-    bool done = false;
+    bool success = true;
     int? rc;
-    isWriting = true;
-
     if (suggested.length < 2) {
       status("Nothing to write");
-      isWriting = false;
       return false;
     }
     var sugg = Map.fromEntries(suggested.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
     if (sugg.length != size || size < 1) {
       status("Error: suggested table size is ${sugg.length}, saved size is $size");
-      isWriting = false;
       return false;
     }
+    isWriting = true;
+
     status("Requesting MTU");
     int mtu = await espm.requestMtu(espm.largeMtu) ?? espm.defaultMtu;
     if (mtu < 200) {
       logD("$tag mtu: $mtu");
       status("could not get MTU");
-      isWriting = false;
-      return false;
     }
-    int commandMaxLen = mtu - 10;
+    int commandMaxLen = mtu - 3;
     status("Writing TC");
-
     int newKeyOffset = sugg.entries.first.key.toInt();
     double newKeyResolution = (sugg.entries.last.key.toInt() - sugg.entries.first.key.toInt()).abs() / size;
     var suggValues = sugg.values.toList(growable: false);
     double newValueResolution = max(suggValues.max.abs(), suggValues.min.abs()) / (valueAllowedMax - 1);
     // logD("newValueResolution: $newValueResolution, suggValues.min: ${suggValues.min}, suggValues.max: ${suggValues.max}");
 
-    var tasks = <String, Map<String, String?>>{
-      "tc=table;size:$size;"
-          "keyOffset:$newKeyOffset;"
-          "keyRes:${newKeyResolution.toStringAsFixed(4)};"
-          "valueRes:${newValueResolution.toStringAsFixed(4)};": {
+    var tasks = <Map<String, String?>>[
+      {
+        "command": "tc=table;size:$size;"
+            "keyOffset:$newKeyOffset;"
+            "keyRes:${newKeyResolution.toStringAsFixed(4)};"
+            "valueRes:${newValueResolution.toStringAsFixed(4)};",
         "expect": "table;size:$size;",
         "msg": "writing table settings",
       },
-    };
+    ];
 
     String command = "", expect = "";
     int i = 0, page = 0;
     sugg.forEach((temp, weight) {
-      if (!result) return;
+      if (!success) return;
       if ("" == command) {
         command = "tc=valuesFrom:$i;set:";
         expect = "valuesFrom:$i;";
@@ -259,7 +254,7 @@ class TC with Debug {
       }
       int value = weight ~/ newValueResolution;
       if (value < valueAllowedMin || valueAllowedMax < value) {
-        result = false;
+        success = false;
         logD("$tag value out of range: $value, weight: $weight, newValueResolution: $newValueResolution");
         status("Error writing table, value $value out of range");
         return;
@@ -267,71 +262,61 @@ class TC with Debug {
       command += value.toString();
       if (i < size - 1) command += ",";
       if (i == size - 1 || commandMaxLen - 3 <= command.length) {
-        tasks.addAll({
-          command: {
+        tasks.addAll([
+          {
+            "command": command,
             "expect": expect,
             "msg": "writing table, page $page",
-          }
-        });
+          },
+        ]);
         command = "";
       }
       if (i == size - 1) return;
       i++;
     });
 
-    if (!result) {
+    if (!success) {
       isWriting = false;
-      return result;
+      return success;
     }
 
-    tasks.addAll({
-      "0": {
+    tasks.addAll([
+      {
         "mtu": "${espm.defaultMtu}",
         "msg": "restoring MTU",
+      },
+      {
+        "msg": "done writing to device",
+      },
+    ]);
+
+    for (var task in tasks) {
+      var msg = task["msg"];
+      if (null != msg) status(msg.capitalize());
+      if (!await espm.connected) {
+        status("Device disconnected");
+        success = false;
+        break;
       }
-    });
-
-    tasks.addAll({
-      "1": {"msg": "done writing to device"}
-    });
-
-    var mutex = Mutex();
-    tasks.forEach((command, params) async {
-      await mutex.protect(() async {
-        if (done) {
-          isWriting = false;
-          return;
+      var command = task["command"];
+      var expect = task["expect"];
+      if (null != command && 0 < command.length) {
+        rc = await espm.api.requestResultCode(command, expectValue: expect);
+        if (ApiResult.success != rc) {
+          status("Failed $msg");
+          logD("writeToDevice $command fail, rc: $rc");
+          success = false;
+          break;
         }
-        status(params["msg"]?.capitalize() ?? "");
-        if (1 < command.length) {
-          //logD("$tag not sending (len: ${command.length}) $command");
-          //rc = ApiResult.success;
-          rc = await espm.api.requestResultCode(command, expectValue: params["expect"]);
-          if (ApiResult.success != rc) {
-            status("Failed ${params["msg"]}");
-            logD("$tag $command fail, rc: $rc");
-            result = false;
-            done = true;
-          }
-          await Future.delayed(Duration(milliseconds: 300));
-          return;
-        }
-        if (params.containsKey("mtu")) {
-          espm.requestMtu(int.tryParse(params["mtu"] ?? "") ?? 23);
-        }
-        isWriting = false;
-        done = true;
-        logD("$tag success: $result");
-      });
-    });
-    return null ==
-            await Future.doWhile(() async {
-              logD("$tag waiting");
-              await Future.delayed(Duration(milliseconds: 300));
-              return !done;
-            })
-        ? result
-        : false;
+        await Future.delayed(Duration(milliseconds: 300));
+      }
+      if (task.containsKey("mtu")) {
+        await espm.requestMtu(int.tryParse(task["mtu"] ?? "") ?? espm.defaultMtu);
+      }
+    }
+    isWriting = false;
+    if (success) status("");
+    return success;
   }
 
   bool handleApiMessage(ApiMessage m) {
@@ -487,6 +472,7 @@ class TC with Debug {
       status("Tare failed");
       return;
     }
+    status("Collecting...");
     // Future.doWhile(() async {
     //   status("Collecting: ${collected.length}");
     //   await Future.delayed(Duration(seconds: 1));
@@ -501,7 +487,7 @@ class TC with Debug {
       int? rc = await espm.api.requestResultCode("tc=enabled:1", expectValue: "enabled:1");
       if (rc != ApiResult.success) {
         logE("rc: $rc");
-        status("Failed to ensable TC");
+        status("Failed to enable TC");
         return;
       }
     }
@@ -534,7 +520,13 @@ class TC with Debug {
     var collLen = collected.length;
     List<double> prev, next;
     double weightToAdd;
+    int numSteps = 0;
     for (double current = start; current <= end; current += step) {
+      if (size <= numSteps) {
+        //logD("size: $size <= numSteps: $numSteps but current: $current, step: $step, end: $end");
+        break;
+      }
+      numSteps++;
       for (int i = 0; i < collLen - 1; i++) {
         prev = collected[i];
         next = collected[i + 1];
