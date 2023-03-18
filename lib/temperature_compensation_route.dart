@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:espmui/util.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+// import 'package:page_transition/page_transition.dart';
 
 import 'ble.dart';
 import 'espm.dart';
@@ -31,6 +32,8 @@ class _TCRouteState extends State<TCRoute> with Debug {
   late StreamSubscription<double?>? temperatureSubscription;
   late StreamSubscription<double?>? weightSubscription;
   double? temperature, weight, lastTemperature, lastWeight;
+  bool _fabVisible = false;
+  Timer? _fabTimer;
 
   _TCRouteState(this.espm) {
     temperatureSubscription = espm.tempChar?.defaultStream.listen((value) {
@@ -39,6 +42,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
     weightSubscription = espm.weightScaleChar?.defaultStream.listen((value) {
       onWeightChange(value);
     });
+    espm.settings.value.tc.statusMessage.addListener(onStatusMessage);
   }
 
   void dispose() {
@@ -46,7 +50,15 @@ class _TCRouteState extends State<TCRoute> with Debug {
     temperatureSubscription = null;
     weightSubscription?.cancel();
     weightSubscription = null;
+    espm.settings.value.tc.statusMessage.removeListener(onStatusMessage);
     super.dispose();
+  }
+
+  void onStatusMessage() {
+    var msg = espm.settings.value.tc.statusMessage.value;
+    //logD("$msg");
+    if (0 == msg.length || !mounted) return;
+    snackbar(msg);
   }
 
   void onTempChange(double? value) {
@@ -81,44 +93,97 @@ class _TCRouteState extends State<TCRoute> with Debug {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: BleAdapterCheck(
-          DeviceAppBarTitle(
-            espm,
-            nameEditable: false,
-            prefix: "TC ",
-            onConnected: () async {
-              espm.settings.value.tc.status("waiting for init to complete");
-              int attempts = 0;
-              await Future.doWhile(() async {
-                await Future.delayed(Duration(milliseconds: 300));
-                //logD("attempt #$attempts checking if tc command is available...");
-                if (null != espm.api.commandCode("tc", logOnError: false)) return false;
-                attempts++;
-                return attempts < 50;
-              });
-              logD("${espm.name} init done, calling readFromDevice()");
-              espm.settings.value.tc.readFromDevice();
-            },
+    return GestureDetector(
+      onTapDown: showFab,
+      onVerticalDragDown: showFab,
+      child: Scaffold(
+        floatingActionButton: fab(),
+        appBar: AppBar(
+          title: BleAdapterCheck(
+            DeviceAppBarTitle(
+              espm,
+              nameEditable: false,
+              prefix: "TC ",
+              onConnected: () async {
+                espm.settings.value.tc.status("waiting for init to complete");
+                int attempts = 0;
+                await Future.doWhile(() async {
+                  await Future.delayed(Duration(milliseconds: 300));
+                  //logD("attempt #$attempts checking if tc command is available...");
+                  if (null != espm.api.commandCode("tc", logOnError: false)) return false;
+                  attempts++;
+                  return attempts < 50;
+                });
+                logD("${espm.name} init done, calling readFromDevice()");
+                espm.settings.value.tc.readFromDevice();
+              },
+            ),
+            ifDisabled: (state) => BleDisabled(state),
           ),
-          ifDisabled: (state) => BleDisabled(state),
         ),
-      ),
-      body: Container(
-        margin: EdgeInsets.all(6),
-        child: Column(
-          children: [
-            Expanded(child: chart()),
-            buttons(),
-            status(),
-          ],
+        body: Container(
+          margin: EdgeInsets.all(6),
+          child: chart(),
         ),
       ),
     );
   }
 
+  Future<void> showFab(dynamic _) async {
+    logD("showFab");
+    setState(() {
+      _fabVisible = true;
+    });
+    _fabTimer?.cancel();
+    _fabTimer = Timer(Duration(seconds: 3), () {
+      logD("hideFab");
+      if (mounted)
+        setState(() {
+          _fabVisible = false;
+        });
+    });
+  }
+
+  Widget fab() {
+    if (!_fabVisible) return Container();
+    return FloatingActionButton(
+      onPressed: () {
+        logD("fab pressed");
+        Navigator.push(
+          context,
+          HeroDialogRoute(
+            builder: (BuildContext context) {
+              return Center(
+                child: AlertDialog(
+                  title: Hero(tag: 'fab', child: Icon(Icons.settings)),
+                  contentPadding: EdgeInsets.fromLTRB(0, 20, 0, 0),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [buttons()],
+                  ),
+                  actions: <Widget>[
+                    TextButton(
+                      child: Text('Close'),
+                      onPressed: Navigator.of(context).pop,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+      child: Icon(
+        Icons.settings,
+        color: Colors.white,
+      ),
+      backgroundColor: Colors.red,
+      heroTag: "fab",
+    );
+  }
+
   Widget buttons() {
+    const Color disabledBg = Colors.black54;
     return ValueListenableBuilder(
       valueListenable: espm.settings,
       builder: (context, ESPMSettings settings, widget) {
@@ -138,7 +203,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
                           logD("read button onPressed success: $success");
                         },
                   backgroundColorEnabled: Colors.blue.shade900,
-                  backgroundColorDisabled: Colors.black54,
+                  backgroundColorDisabled: disabledBg,
                   padding: EdgeInsets.all(0),
                 ),
               ),
@@ -152,10 +217,13 @@ class _TCRouteState extends State<TCRoute> with Debug {
                       ? () {
                           tc.stopCollecting();
                         }
-                      : () {
-                          tc.startCollecting();
-                        },
+                      : tc.isReading
+                          ? null
+                          : () {
+                              tc.startCollecting();
+                            },
                   backgroundColorEnabled: tc.isCollecting ? Colors.red : Colors.green.shade900,
+                  backgroundColorDisabled: disabledBg,
                   padding: EdgeInsets.all(0),
                 ),
               ),
@@ -172,7 +240,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
                         }
                       : null,
                   backgroundColorEnabled: Colors.purple.shade900,
-                  backgroundColorDisabled: Colors.black54,
+                  backgroundColorDisabled: disabledBg,
                   padding: EdgeInsets.all(0),
                 ),
               ),
@@ -182,27 +250,18 @@ class _TCRouteState extends State<TCRoute> with Debug {
                 padding: const EdgeInsets.fromLTRB(3, 0, 0, 0),
                 child: EspmuiElevatedButton(
                   child: Text("Write"),
-                  onPressed: !tc.isCollecting && !tc.isWriting
+                  onPressed: !tc.isCollecting && !tc.isWriting && 1 < tc.suggested.length
                       ? () async {
                           if (await tc.writeToDevice()) tc.readFromDevice();
                         }
                       : null,
-                  backgroundColorDisabled: Colors.black54,
+                  backgroundColorDisabled: disabledBg,
                   padding: EdgeInsets.all(0),
                 ),
               ),
             ),
           ],
         );
-      },
-    );
-  }
-
-  Widget status() {
-    return ValueListenableBuilder(
-      valueListenable: espm.settings,
-      builder: (context, ESPMSettings settings, widget) {
-        return Text(settings.tc.statusMessage);
       },
     );
   }
@@ -269,7 +328,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
     if [handleBuiltInTouches] is true, [LineChart] shows a tooltip popup on top of the spots if touch occurs (or you can show it manually using, [LineChartData.showingTooltipIndicators]) and also it shows an indicator (contains a thicker line and larger dot on the targeted spot), You can define how this indicator looks like through [getTouchedSpotIndicator] callback, You can customize this tooltip using [touchTooltipData], indicator lines starts from position controlled by [getTouchLineStart] and ends at position controlled by [getTouchLineEnd]. If you need to have a distance threshold for handling touches, use [touchSpotThreshold].
     */
     return LineTouchData(
-      enabled: true,
+      enabled: false,
       handleBuiltInTouches: false,
       longPressDuration: Duration(milliseconds: 800),
       touchCallback: (event, response) {

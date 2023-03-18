@@ -30,7 +30,7 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
   Timer? _fabTimer;
 
   var _tileGrid = TileGrid();
-  var devices = DeviceList();
+  // var devices = DeviceList();
 
   @override
   void initState() {
@@ -38,7 +38,7 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
     super.initState();
   }
 
-  Future<void> _showFab(dynamic _) async {
+  Future<void> showFab(dynamic _) async {
     logD("showFab");
     setState(() {
       _fabVisible = true;
@@ -52,72 +52,75 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
     });
   }
 
+  Widget fab() {
+    if (!_fabVisible) return Container();
+    return FloatingActionButton(
+      onPressed: () {
+        logD("fab pressed");
+        Navigator.push(
+          context,
+          HeroDialogRoute(
+            builder: (BuildContext context) {
+              return Center(
+                child: AlertDialog(
+                  title: Hero(tag: 'fab', child: Icon(Icons.settings)),
+                  contentPadding: EdgeInsets.fromLTRB(0, 20, 0, 0),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              TileList().add(Tile());
+                              TileList().save();
+                            });
+                            Navigator.of(context).pop(); // close dialog
+                          },
+                          child: Text("Add tile")),
+                      SizedBox(width: 10, height: 20, child: Empty()),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // close dialog
+                          Navigator.push(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.rightToLeft,
+                              child: DeviceListRoute(),
+                            ),
+                          );
+                        },
+                        child: Text("Devices"),
+                      ),
+                    ],
+                  ),
+                  actions: <Widget>[
+                    TextButton(
+                      child: Text('Close'),
+                      onPressed: Navigator.of(context).pop,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+      child: Icon(
+        Icons.settings,
+        color: Colors.white,
+      ),
+      backgroundColor: Colors.red,
+      heroTag: "fab",
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: _showFab,
-      onVerticalDragDown: _showFab,
+      onTapDown: showFab,
+      onVerticalDragDown: showFab,
       child: Scaffold(
-        floatingActionButton: _fabVisible
-            ? FloatingActionButton(
-                onPressed: () {
-                  logD("fab pressed");
-                  Navigator.push(
-                    context,
-                    HeroDialogRoute(
-                      builder: (BuildContext context) {
-                        return Center(
-                          child: AlertDialog(
-                            title: Hero(tag: 'fab', child: Icon(Icons.settings)),
-                            contentPadding: EdgeInsets.fromLTRB(0, 20, 0, 0),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ElevatedButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        TileList().add(Tile());
-                                        TileList().save();
-                                      });
-                                      Navigator.of(context).pop(); // close dialog
-                                    },
-                                    child: Text("Add tile")),
-                                SizedBox(width: 10, height: 20, child: Empty()),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pop(); // close dialog
-                                    Navigator.push(
-                                      context,
-                                      PageTransition(
-                                        type: PageTransitionType.rightToLeft,
-                                        child: DeviceListRoute(),
-                                      ),
-                                    );
-                                  },
-                                  child: Text("Devices"),
-                                ),
-                              ],
-                            ),
-                            actions: <Widget>[
-                              TextButton(
-                                child: Text('Close'),
-                                onPressed: Navigator.of(context).pop,
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-                child: Icon(
-                  Icons.settings,
-                  color: Colors.white,
-                ),
-                backgroundColor: Colors.red,
-                heroTag: "fab",
-              )
-            : Container(),
+        floatingActionButton: fab(),
         body: SafeArea(
           child: _tileGrid,
         ),
@@ -658,39 +661,5 @@ class _TileGridState extends State<TileGrid> with Debug {
             },
           );
         });
-  }
-}
-
-class HeroDialogRoute<T> extends PageRoute<T> {
-  HeroDialogRoute({required this.builder}) : super();
-
-  final WidgetBuilder builder;
-
-  @override
-  bool get opaque => false;
-
-  @override
-  bool get barrierDismissible => true;
-
-  @override
-  Duration get transitionDuration => const Duration(milliseconds: 300);
-
-  @override
-  bool get maintainState => true;
-
-  @override
-  Color get barrierColor => Colors.black54;
-
-  @override
-  String? get barrierLabel => "barrierLabel";
-
-  @override
-  Widget buildTransitions(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) {
-    return FadeTransition(opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut), child: child);
-  }
-
-  @override
-  Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
-    return builder(context);
   }
 }

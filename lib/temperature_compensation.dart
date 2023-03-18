@@ -2,6 +2,7 @@ import 'dart:async';
 //import 'dart:developer' as dev;
 import 'dart:math';
 import 'package:collection/collection.dart';
+//import 'package:flutter/foundation.dart';
 
 import 'package:espmui/util.dart';
 //import 'package:flutter/material.dart';
@@ -71,7 +72,7 @@ class TC with Debug {
   }
 
   int? getValueAt(int key) {
-    if (size - 1 < key) return null;
+    if (size - 1 < key || key < 0) return null;
     return values[key];
   }
 
@@ -121,11 +122,17 @@ class TC with Debug {
 
   double valueToWeight(int value) => value * (_valueResolution ?? 1);
 
-  bool isReading = false;
+  bool _isReading = false;
+  bool get isReading => _isReading;
+  set isReading(bool value) {
+    _isReading = value;
+    espm.settings.notifyListeners();
+    status((value ? "Starting" : "Stopped") + " reading");
+  }
+
   Future<bool> readFromDevice() async {
     String tag = "";
     bool success = true;
-    bool done = false;
     int? rc;
     isReading = true;
     status("Requesting MTU");
@@ -135,65 +142,66 @@ class TC with Debug {
       status("could not get MTU");
     }
     status("Reading settings");
-    var mutex = Mutex();
-    <String, Map<String, String?>>{
-      "tc": {
+    var tasks = <Map<String, String?>>[
+      {
+        "command": "tc",
         "expect": "enabled:",
         "msg": "checking if tc is enabled",
       },
-      "tc=table": {
+      {
+        "command": "tc=table",
         "expect": "table;",
         "msg": "reading table settings",
       },
-      //"invalidCommand": {"expect": "impossibleReply", "msg": "debug triggering failure",},
-      "tc=valuesFrom:0": {
+      {
+        "command": "tc=valuesFrom:0",
         "expect": "valuesFrom:0;",
         "msg": "reading table values",
       },
-      "0": {
+      {
         "mtu": "${espm.defaultMtu}",
         "msg": "restoring MTU",
       },
-      "1": {"msg": "done reading from device"},
-    }.forEach((command, params) async {
-      await mutex.protect(() async {
-        if (done) {
-          isReading = false;
-          return;
+      {
+        "msg": "done reading from device",
+      },
+    ];
+    for (var task in tasks) {
+      var msg = task["msg"];
+      if (null != msg) status(msg.capitalize());
+      if (!await espm.connected) {
+        status("Device disconnected");
+        success = false;
+        break;
+      }
+      var command = task["command"];
+      var expect = task["expect"];
+      if (null != command && 0 < command.length) {
+        rc = await espm.api.requestResultCode(command, expectValue: expect);
+        if (ApiResult.success != rc) {
+          status("Failed $msg");
+          logD("readFromDevice $command fail, rc: $rc");
+          success = false;
+          break;
         }
-        status(params["msg"]?.capitalize());
-        if (1 < command.length) {
-          rc = await espm.api.requestResultCode(command, expectValue: params["expect"]);
-          if (ApiResult.success != rc) {
-            status("Failed ${params["msg"]}");
-            logD("readFromDevice $command fail, rc: $rc");
-            isReading = false;
-            success = false;
-            done = true;
-          }
-          await Future.delayed(Duration(milliseconds: 300));
-          return;
-        }
-        if (params.containsKey("mtu")) {
-          espm.requestMtu(int.tryParse(params["mtu"] ?? "") ?? espm.defaultMtu);
-        }
-        isReading = false;
-        done = true;
-        logD("readFromDevice success: $success");
-        status(success ? "" : null);
-      });
-    });
-    return null ==
-            await Future.doWhile(() async {
-              logD("readFromDevice waiting");
-              await Future.delayed(Duration(milliseconds: 300));
-              return !done;
-            })
-        ? success
-        : false;
+        await Future.delayed(Duration(milliseconds: 300));
+      }
+      if (task.containsKey("mtu")) {
+        await espm.requestMtu(int.tryParse(task["mtu"] ?? "") ?? espm.defaultMtu);
+      }
+    }
+    isReading = false;
+    return success;
   }
 
-  bool isWriting = false;
+  bool _isWriting = false;
+  bool get isWriting => _isWriting;
+  set isWriting(bool value) {
+    _isWriting = value;
+    espm.settings.notifyListeners();
+    status((value ? "Starting" : "Stopped") + " writing");
+  }
+
   Future<bool> writeToDevice() async {
     String tag = "";
     bool result = true;
@@ -201,6 +209,11 @@ class TC with Debug {
     int? rc;
     isWriting = true;
 
+    if (suggested.length < 2) {
+      status("Nothing to write");
+      isWriting = false;
+      return false;
+    }
     var sugg = Map.fromEntries(suggested.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
     if (sugg.length != size || size < 1) {
       status("Error: suggested table size is ${sugg.length}, saved size is $size");
@@ -288,7 +301,7 @@ class TC with Debug {
           isWriting = false;
           return;
         }
-        status(params["msg"]?.capitalize());
+        status(params["msg"]?.capitalize() ?? "");
         if (1 < command.length) {
           //logD("$tag not sending (len: ${command.length}) $command");
           //rc = ApiResult.success;
@@ -308,7 +321,6 @@ class TC with Debug {
         isWriting = false;
         done = true;
         logD("$tag success: $result");
-        status(result ? "" : null);
       });
     });
     return null ==
@@ -400,7 +412,7 @@ class TC with Debug {
     return true;
   }
 
-  List<List<double>> collected = [[]];
+  List<List<double>> collected = List.empty(growable: true);
 
   void addCollected(double temperature, double weight) {
     weight = (weight * 100).round() / 100; //reduce to 2 decimals
@@ -418,8 +430,8 @@ class TC with Debug {
     } else {
       collected.add([temperature, weight]);
       logD("addCollected($temperature, $weight)");
+      status("Collecting: ${collected.length}");
     }
-    status("Collecting: ${collected.length}");
   }
 
   double? get collectedMinTemp {
@@ -438,15 +450,23 @@ class TC with Debug {
     return d;
   }
 
-  bool isCollecting = false;
+  bool _isCollecting = false;
+  bool get isCollecting => _isCollecting;
+  set isCollecting(bool value) {
+    _isCollecting = value;
+    espm.settings.notifyListeners();
+    status((value ? "Starting" : "Stopped") + " collecting");
+  }
 
   ExtendedBool prevEnabled = ExtendedBool.Unknown;
   void startCollecting() async {
     if (isCollecting) return;
+    isCollecting = true;
     prevEnabled = enabled;
     status("Disabling TC");
     int? rc = await espm.api.requestResultCode("tc=enabled:0", expectValue: "enabled:0");
     if (rc != ApiResult.success) {
+      isCollecting = false;
       logE("rc: $rc");
       status("Failed to disable TC");
       return;
@@ -454,12 +474,11 @@ class TC with Debug {
     status("Sending tare");
     rc = await espm.api.requestResultCode("tare=0");
     if (rc != ApiResult.success) {
+      isCollecting = false;
       logE("rc: $rc");
       status("Tare failed");
       return;
     }
-    isCollecting = true;
-    status("Collecting: ${collected.length}");
     // Future.doWhile(() async {
     //   status("Collecting: ${collected.length}");
     //   await Future.delayed(Duration(seconds: 1));
@@ -565,19 +584,15 @@ class TC with Debug {
     return result;
   }
 
-  String statusMessage = "";
-  void status(String? message) {
-    // workaround for "setState() or markNeedsBuild() called during build"
-    Future.delayed(Duration.zero, () {
-      if (null != message) statusMessage = message;
-      setUpdated();
-      //logD("status $statusMessage");
-    });
+  var statusMessage = AlwaysNotifier<String>("");
+  void status(String message) {
+    //logD(message);
+    statusMessage.value = message;
   }
 
   @override
   bool operator ==(other) {
-    //logD("comparing $this to $other");
+    logD("comparing $this to $other");
     return (other is TC) &&
         other.espm == espm &&
         other.enabled == enabled &&
@@ -585,18 +600,10 @@ class TC with Debug {
         other.keyOffset == keyOffset &&
         other.keyResolution == keyResolution &&
         other.valueResolution == valueResolution &&
-        other.values == values &&
-        other.statusMessage == statusMessage;
+        other.values == values;
   }
 
   @override
   int get hashCode =>
-      espm.hashCode ^
-      enabled.hashCode ^
-      size.hashCode ^
-      keyOffset.hashCode ^
-      keyResolution.hashCode ^
-      valueResolution.hashCode ^
-      values.hashCode ^
-      statusMessage.hashCode;
+      espm.hashCode ^ enabled.hashCode ^ size.hashCode ^ keyOffset.hashCode ^ keyResolution.hashCode ^ valueResolution.hashCode ^ values.hashCode;
 }
