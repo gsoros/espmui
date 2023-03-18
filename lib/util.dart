@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/scheduler.dart';
 import 'package:espmui/main.dart';
 // import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -121,27 +122,32 @@ class EspmuiElevatedButton extends StatelessWidget {
 }
 
 void snackbar(String s, [BuildContext? context]) {
-  print("[Snackbar] message: $s");
+  Debug.log("snack: $s");
   ScaffoldMessengerState? sms;
-  try {
-    if (null != context)
-      sms = ScaffoldMessenger.of(context);
-    else
-      sms = scaffoldMessengerKey.currentState;
-    if (null == sms) throw ("ScaffoldMessengerState is null");
-  } catch (e) {
-    print("[Snackbar] error: $e");
-    return;
-  }
-  sms.removeCurrentSnackBar();
-  sms.showSnackBar(SnackBar(
-    backgroundColor: Colors.black45,
-    content: Text(
-      s,
-      textAlign: TextAlign.center,
-      style: const TextStyle(color: Colors.white),
-    ),
-  ));
+
+  SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+    try {
+      if (null != context)
+        sms = ScaffoldMessenger.of(context);
+      else
+        sms = scaffoldMessengerKey.currentState;
+      if (null == sms) throw ("ScaffoldMessengerState is null");
+    } catch (e) {
+      Debug.log("error: $e");
+      return;
+    }
+    sms?.removeCurrentSnackBar();
+    sms?.showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      margin: EdgeInsets.fromLTRB(50, 0, 50, 0),
+      backgroundColor: Colors.black45,
+      content: Text(
+        s,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.white),
+      ),
+    ));
+  });
 }
 
 double map(double x, double inMin, double inMax, double outMin, double outMax) {

@@ -2,7 +2,7 @@ import 'dart:async';
 //import 'dart:developer' as dev;
 import 'dart:math';
 import 'package:collection/collection.dart';
-//import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:espmui/util.dart';
 //import 'package:flutter/material.dart';
@@ -191,6 +191,7 @@ class TC with Debug {
       }
     }
     isReading = false;
+    if (success) status("");
     return success;
   }
 
@@ -408,7 +409,7 @@ class TC with Debug {
       logD("$tag requesting tc$exp");
       espm.api.requestResultCode("tc$exp", expectValue: exp);
     }
-
+    if (0 < updated) notify();
     return true;
   }
 
@@ -417,21 +418,28 @@ class TC with Debug {
   void addCollected(double temperature, double weight) {
     weight = (weight * 100).round() / 100; //reduce to 2 decimals
     double? updateTemp, updateWeight;
-    if (0 < collected.length && 0 < collected.last.length) {
-      if (collected.last[0] == temperature) {
+    if (0 < collected.length && 1 < collected.last.length) {
+      if (collected.last[0] == temperature && collected.last[1] != weight) {
+        logD("updated weight: ${collected.last[1]} -> $weight");
         updateWeight = (collected.last[1] + weight) / 2;
-      } else if (collected.last[1] == weight) {
+      } else if (collected.last[1] == weight && collected.last[0] != temperature) {
+        logD("updated temperature: ${collected.last[0]} -> $temperature");
         updateTemp = (collected.last[0] + temperature) / 2;
       }
     }
     if (null != updateTemp || null != updateWeight) {
       collected.last = [updateTemp ?? temperature, updateWeight ?? weight];
-      logD("addCollected($temperature, $weight) last value updated");
+      // logD("addCollected($temperature, $weight) last value updated");
     } else {
       collected.add([temperature, weight]);
       logD("addCollected($temperature, $weight)");
       status("Collecting: ${collected.length}");
     }
+    notify();
+  }
+
+  void notify() {
+    espm.settings.notifyListeners();
   }
 
   double? get collectedMinTemp {
@@ -584,7 +592,7 @@ class TC with Debug {
     return result;
   }
 
-  var statusMessage = AlwaysNotifier<String>("");
+  var statusMessage = ValueNotifier<String>("");
   void status(String message) {
     //logD(message);
     statusMessage.value = message;

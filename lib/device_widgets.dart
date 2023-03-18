@@ -2029,15 +2029,27 @@ class ConnectionStateIcon extends StatelessWidget {
 }
 
 class HeroDialogRoute<T> extends PageRoute<T> {
-  HeroDialogRoute({required this.builder}) : super();
+  late bool _opaque, _barrierDismissible;
+  late Color _barrierColor;
+
+  HeroDialogRoute({
+    required this.builder,
+    bool opaque = false,
+    bool barrierDismissible = true,
+    Color barrierColor = Colors.black54,
+  }) : super() {
+    _opaque = opaque;
+    _barrierDismissible = barrierDismissible;
+    _barrierColor = barrierColor;
+  }
 
   final WidgetBuilder builder;
 
   @override
-  bool get opaque => false;
+  bool get opaque => _opaque;
 
   @override
-  bool get barrierDismissible => true;
+  bool get barrierDismissible => _barrierDismissible;
 
   @override
   Duration get transitionDuration => const Duration(milliseconds: 300);
@@ -2046,7 +2058,7 @@ class HeroDialogRoute<T> extends PageRoute<T> {
   bool get maintainState => true;
 
   @override
-  Color get barrierColor => Colors.black54;
+  Color get barrierColor => _barrierColor;
 
   @override
   String? get barrierLabel => "barrierLabel";

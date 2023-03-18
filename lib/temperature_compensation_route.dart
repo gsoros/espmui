@@ -34,6 +34,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
   double? temperature, weight, lastTemperature, lastWeight;
   bool _fabVisible = false;
   Timer? _fabTimer;
+  late double minX, maxX, dataMinX, dataMaxX, lastMinX, lastMaxX;
 
   _TCRouteState(this.espm) {
     temperatureSubscription = espm.tempChar?.defaultStream.listen((value) {
@@ -42,7 +43,17 @@ class _TCRouteState extends State<TCRoute> with Debug {
     weightSubscription = espm.weightScaleChar?.defaultStream.listen((value) {
       onWeightChange(value);
     });
-    espm.settings.value.tc.statusMessage.addListener(onStatusMessage);
+  }
+
+  @override
+  void initState() {
+    logD("initState");
+    super.initState();
+    setDataRange(espm.settings.value.tc);
+    minX = dataMinX;
+    maxX = dataMaxX;
+    lastMinX = minX;
+    lastMaxX = maxX;
   }
 
   void dispose() {
@@ -50,15 +61,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
     temperatureSubscription = null;
     weightSubscription?.cancel();
     weightSubscription = null;
-    espm.settings.value.tc.statusMessage.removeListener(onStatusMessage);
     super.dispose();
-  }
-
-  void onStatusMessage() {
-    var msg = espm.settings.value.tc.statusMessage.value;
-    //logD("$msg");
-    if (0 == msg.length || !mounted) return;
-    snackbar(msg);
   }
 
   void onTempChange(double? value) {
@@ -93,9 +96,72 @@ class _TCRouteState extends State<TCRoute> with Debug {
 
   @override
   Widget build(BuildContext context) {
+    //logD("state build");
     return GestureDetector(
       onTapDown: showFab,
       onVerticalDragDown: showFab,
+      onDoubleTap: () {
+        logD("onDoubleTap");
+        setState(() {
+          if (minX == dataMinX && maxX == dataMaxX) {
+            //logD("zoomed out, zooming in");
+            var diff = (maxX - minX).abs() / 2.5;
+            minX += diff;
+            maxX -= diff;
+          } else {
+            //logD("zoomed in, zooming out");
+            minX = dataMinX;
+            maxX = dataMaxX;
+          }
+        });
+        //logD("$minX, $maxX");
+      },
+      onHorizontalDragStart: (details) {
+        lastMinX = minX;
+        lastMaxX = maxX;
+      },
+      onHorizontalDragUpdate: (details) {
+        var distance = details.primaryDelta ?? 0;
+        if (distance == 0) return;
+        //print("_ZoomableChartState build horizontalDistance: $horizontalDistance");
+        var lastDistance = (lastMaxX - lastMinX).abs();
+
+        setState(() {
+          minX -= lastDistance * 0.004 * distance;
+          maxX -= lastDistance * 0.004 * distance;
+
+          if (minX < dataMinX) {
+            minX = dataMinX;
+            maxX = minX + lastDistance;
+          }
+          if (maxX > dataMaxX) {
+            maxX = dataMaxX;
+            minX = maxX - lastDistance;
+          }
+          //print("_ZoomableChartState onHorizontalDragUpdate $minX, $maxX");
+        });
+      },
+      onScaleStart: (details) {
+        lastMinX = minX;
+        lastMaxX = maxX;
+        logD("onScaleStart");
+      },
+      onScaleUpdate: (details) {
+        const double minDistance = 2.0;
+        if (details.scale == 0) return;
+        var lastDistance = (lastMaxX - lastMinX).abs();
+        var newDistance = max(lastDistance / details.scale, minDistance);
+        var diff = newDistance - lastDistance;
+        var newMinX = lastMinX - diff;
+        var newMaxX = lastMaxX + diff;
+        //logD("onScaleUpdate $newMinX, $newMaxX");
+        if (minDistance < newMaxX - newMinX) {
+          setState(() {
+            minX = newMinX;
+            maxX = newMaxX;
+          });
+        }
+      },
       child: Scaffold(
         floatingActionButton: fab(),
         appBar: AppBar(
@@ -123,7 +189,18 @@ class _TCRouteState extends State<TCRoute> with Debug {
         ),
         body: Container(
           margin: EdgeInsets.all(6),
-          child: chart(),
+          child: Stack(
+            children: [
+              chart(),
+              ValueListenableBuilder(
+                valueListenable: espm.settings.value.tc.statusMessage,
+                builder: (_, String m, __) {
+                  //logD(m);
+                  return Text(m);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -152,22 +229,15 @@ class _TCRouteState extends State<TCRoute> with Debug {
         Navigator.push(
           context,
           HeroDialogRoute(
+            opaque: false,
+            barrierColor: Colors.transparent,
             builder: (BuildContext context) {
-              return Center(
-                child: AlertDialog(
-                  title: Hero(tag: 'fab', child: Icon(Icons.settings)),
-                  contentPadding: EdgeInsets.fromLTRB(0, 20, 0, 0),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [buttons()],
-                  ),
-                  actions: <Widget>[
-                    TextButton(
-                      child: Text('Close'),
-                      onPressed: Navigator.of(context).pop,
-                    ),
-                  ],
-                ),
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Hero(tag: 'fab', child: buttons()),
+                ],
               );
             },
           ),
@@ -188,12 +258,18 @@ class _TCRouteState extends State<TCRoute> with Debug {
       valueListenable: espm.settings,
       builder: (context, ESPMSettings settings, widget) {
         var tc = settings.tc;
-        return Row(
+        return Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             Expanded(
+              flex: 5,
+              child: Text(" "),
+            ),
+            Expanded(
+              flex: 1,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 0, 3, 0),
+                padding: const EdgeInsets.fromLTRB(0, 0, 0, 3),
                 child: EspmuiElevatedButton(
                   child: Text(tc.isReading ? "Reading" : "Read"),
                   onPressed: tc.isReading || tc.isCollecting
@@ -209,8 +285,9 @@ class _TCRouteState extends State<TCRoute> with Debug {
               ),
             ),
             Expanded(
+              flex: 1,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(3, 0, 3, 0),
+                padding: const EdgeInsets.fromLTRB(0, 3, 0, 3),
                 child: EspmuiElevatedButton(
                   child: Text(tc.isCollecting ? "Stop" : "Collect"),
                   onPressed: tc.isCollecting
@@ -229,8 +306,9 @@ class _TCRouteState extends State<TCRoute> with Debug {
               ),
             ),
             Expanded(
+              flex: 1,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(3, 0, 3, 0),
+                padding: const EdgeInsets.fromLTRB(0, 3, 0, 3),
                 child: EspmuiElevatedButton(
                   child: Text("Clear"),
                   onPressed: 0 < tc.collected.length && !tc.isCollecting
@@ -246,8 +324,9 @@ class _TCRouteState extends State<TCRoute> with Debug {
               ),
             ),
             Expanded(
+              flex: 1,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(3, 0, 0, 0),
+                padding: const EdgeInsets.fromLTRB(0, 3, 0, 0),
                 child: EspmuiElevatedButton(
                   child: Text("Write"),
                   onPressed: !tc.isCollecting && !tc.isWriting && 1 < tc.suggested.length
@@ -329,14 +408,14 @@ class _TCRouteState extends State<TCRoute> with Debug {
     */
     return LineTouchData(
       enabled: false,
-      handleBuiltInTouches: false,
-      longPressDuration: Duration(milliseconds: 800),
-      touchCallback: (event, response) {
-        if (!(event is FlLongPressStart)) return;
-        var data = response?.lineBarSpots;
-        if (null == data || data.length < 1) return;
-        logD("${data.firstWhere((e) => 2 == e.barIndex).spotIndex}");
-      },
+      // handleBuiltInTouches: false,
+      // longPressDuration: Duration(milliseconds: 800),
+      // touchCallback: (event, response) {
+      //   if (!(event is FlLongPressStart)) return;
+      //   var data = response?.lineBarSpots;
+      //   if (null == data || data.length < 1) return;
+      //   logD("${data.firstWhere((e) => 2 == e.barIndex).spotIndex}");
+      // },
     );
   }
 
@@ -379,140 +458,49 @@ class _TCRouteState extends State<TCRoute> with Debug {
     return data;
   }
 
+  void setDataRange(TC tc) {
+    int numValues = tc.size;
+    double savedMin = tc.keyToTemperature(0);
+    double savedMax = tc.keyToTemperature(0 < numValues ? numValues - 1 : 0);
+    double? collectedMin = tc.collectedMinTemp;
+    double? collectedMax = tc.collectedMaxTemp;
+    dataMinX = null == collectedMin ? savedMin : min(savedMin, collectedMin);
+    dataMaxX = null == collectedMax ? savedMax : max(savedMax, collectedMax);
+  }
+
+  void setVisibleRange() {
+    if (minX < dataMinX || dataMaxX < minX) minX = dataMinX;
+    if (maxX < dataMinX || dataMaxX < maxX) maxX = dataMaxX;
+  }
+
   Widget chart() {
     return ValueListenableBuilder(
       // key: _key,
       valueListenable: espm.settings,
       builder: (context, ESPMSettings settings, widget) {
         var tc = settings.tc;
-        //print("rebuilding chart size: ${tc.size}, keyOffset: ${tc.keyOffset}, keyResolution: ${tc.keyResolution}, valueResolution: ${tc.valueResolution}");
+        //logD("chart builder minX: $minX, maxX: $maxX");
         if (tc.size < 1) return Text("No chart data");
-        int numValues = tc.size;
-        double savedMin = tc.keyToTemperature(0);
-        double savedMax = tc.keyToTemperature(0 < numValues ? numValues - 1 : 0);
-        double? collectedMin = tc.collectedMinTemp;
-        double? collectedMax = tc.collectedMaxTemp;
-        double tempMin = null == collectedMin ? savedMin : min(savedMin, collectedMin);
-        double tempMax = null == collectedMax ? savedMax : max(savedMax, collectedMax);
-        //print("collectedMin: $collectedMin, collectedMax: $collectedMax, tempMin: $tempMin, tempMax: $tempMax, tc: ${tc.values}");
-        return ZoomableChart(
-          minX: tempMin,
-          maxX: tempMax,
-          builder: (minX, maxX) {
-            return LineChart(
-              LineChartData(
-                  clipData: FlClipData.none(),
-                  minX: minX,
-                  maxX: maxX,
-                  lineTouchData: touchData(tc),
-                  lineBarsData: chartData(tc),
-                  borderData: FlBorderData(show: false),
-                  titlesData: FlTitlesData(
-                      show: true,
-                      topTitles: AxisTitles(
-                        axisNameWidget: Text("Temperature (˚C)"),
-                      ),
-                      leftTitles: AxisTitles(
-                        axisNameWidget: Text("Compensation (kg)"),
-                      ))),
-            );
-          },
+        setDataRange(tc);
+        setVisibleRange();
+        return LineChart(
+          LineChartData(
+              clipData: FlClipData.none(),
+              minX: minX,
+              maxX: maxX,
+              lineTouchData: touchData(tc),
+              lineBarsData: chartData(tc),
+              borderData: FlBorderData(show: false),
+              titlesData: FlTitlesData(
+                  show: true,
+                  topTitles: AxisTitles(
+                    axisNameWidget: Text("Temperature (˚C)"),
+                  ),
+                  leftTitles: AxisTitles(
+                    axisNameWidget: Text("Compensation (kg)"),
+                  ))),
         );
       },
-    );
-  }
-}
-
-/// https://github.com/imaNNeo/fl_chart/issues/71#issuecomment-1414267612
-class ZoomableChart extends StatefulWidget {
-  final double minX, maxX;
-  final Widget Function(double, double) builder;
-
-  ZoomableChart({
-    super.key,
-    required this.minX,
-    required this.maxX,
-    required this.builder,
-  });
-
-  @override
-  State<ZoomableChart> createState() => _ZoomableChartState();
-}
-
-class _ZoomableChartState extends State<ZoomableChart> {
-  late double minX, maxX, lastMaxX, lastMinX;
-
-  @override
-  void initState() {
-    super.initState();
-    minX = widget.minX;
-    maxX = widget.maxX;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onDoubleTap: () {
-        setState(() {
-          if (minX == widget.minX && maxX == widget.maxX) {
-            var diff = (maxX - minX).abs() / 2.5;
-            minX += diff;
-            maxX -= diff;
-          } else {
-            minX = widget.minX;
-            maxX = widget.maxX;
-          }
-        });
-      },
-      onHorizontalDragStart: (details) {
-        lastMinX = minX;
-        lastMaxX = maxX;
-      },
-      onHorizontalDragUpdate: (details) {
-        var distance = details.primaryDelta ?? 0;
-        if (distance == 0) return;
-        //print("_ZoomableChartState build horizontalDistance: $horizontalDistance");
-        var lastDistance = (lastMaxX - lastMinX).abs();
-
-        setState(() {
-          minX -= lastDistance * 0.004 * distance;
-          maxX -= lastDistance * 0.004 * distance;
-
-          if (minX < widget.minX) {
-            minX = widget.minX;
-            maxX = minX + lastDistance;
-          }
-          if (maxX > widget.maxX) {
-            maxX = widget.maxX;
-            minX = maxX - lastDistance;
-          }
-          //print("_ZoomableChartState onHorizontalDragUpdate $minX, $maxX");
-        });
-      },
-      onScaleStart: (details) {
-        lastMinX = minX;
-        lastMaxX = maxX;
-        //print("_ZoomableChartState build onScaleStart");
-      },
-      onScaleUpdate: (details) {
-        const double minDistance = 2.0;
-        var scale = details.scale;
-        if (scale == 0) return;
-        var lastDistance = (lastMaxX - lastMinX).abs();
-        var newDistance = max(lastDistance / scale, minDistance);
-        var diff = newDistance - lastDistance;
-        setState(() {
-          final newMinX = lastMinX - diff;
-          final newMaxX = lastMaxX + diff;
-
-          if (minDistance < newMaxX - newMinX) {
-            minX = newMinX;
-            maxX = newMaxX;
-          }
-          //print("_ZoomableChartState build onScaleUpdate $minX, $maxX");
-        });
-      },
-      child: widget.builder(minX, maxX),
     );
   }
 }
