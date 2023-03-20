@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 
+import 'package:mutex/mutex.dart';
+
 import 'ble_characteristic.dart';
 import 'device.dart';
 import 'util.dart';
@@ -212,6 +214,7 @@ class Api with Debug {
   final _doneController = StreamController<ApiMessage>.broadcast();
   Stream<ApiMessage> get messageSuccessStream => _doneController.stream;
   final _queue = Queue<ApiMessage>();
+  final Mutex _queueMutex = Mutex();
   bool _running = false;
   Timer? _timer;
   final int queueDelayMs;
@@ -296,21 +299,26 @@ class Api with Debug {
     //String commandStr = commandStrWithValue.substring(0, eq);
     String value = commandWithValue.substring(eq + 1);
     int matches = 0;
-    for (ApiMessage m in _queue) {
-      if (m.commandCode == commandCode) {
-        if (m.expectValue != null) {
-          logD("expected: '${m.expectValue}' got '${value.substring(0, min(m.expectValue!.length, value.length))}'");
-          // no match if expected value is set and value does not begin with it
-          if (m.expectValue != value.substring(0, min(m.expectValue!.length, value.length))) continue;
+
+    _queueMutex.protect(() {
+      for (ApiMessage m in _queue) {
+        if (m.commandCode == commandCode) {
+          if (m.expectValue != null) {
+            logD("expected: '${m.expectValue}' got '${value.substring(0, min(m.expectValue!.length, value.length))}'");
+            // no match if expected value is set and value does not begin with it
+            if (m.expectValue != value.substring(0, min(m.expectValue!.length, value.length))) continue;
+          }
+          matches++;
+          m.resultCode = resultCode;
+          m.resultStr = resultStr;
+          m.value = value;
+          m.isDone = true;
+          // don't return on the first match, process all matching messages
         }
-        matches++;
-        m.resultCode = resultCode;
-        m.resultStr = resultStr;
-        m.value = value;
-        m.isDone = true;
-        // don't return on the first match, process all matching messages
       }
-    }
+      return Future.value(null);
+    });
+
     if (matches == 0) {
       // logD("_onNotify() No matching queued message for the reply $reply, generating new one");
       var cStr = commandStr(commandCode);
@@ -477,13 +485,18 @@ class Api with Debug {
       minDelayMs: minDelayMs,
       maxAgeMs: maxAgeMs,
     );
+
     // check queue for duplicate commands and remove them as this one will be newer
-    int before = _queue.length;
-    _queue.removeWhere((queued) => queued.command == message.command);
-    int removed = before - _queue.length;
-    if (removed > 0) logD("removed $removed duplicate messages");
-    _queue.add(message);
-    //logD("added to queue (length: ${_queue.length}): $message");
+    _queueMutex.protect(() {
+      int before = _queue.length;
+      _queue.removeWhere((queued) => queued.command == message.command);
+      int removed = before - _queue.length;
+      if (removed > 0) logD("removed $removed duplicate messages");
+      _queue.add(message);
+      //logD("added to queue (length: ${_queue.length}): $message");
+      return Future.value(null);
+    });
+
     _runQueue();
     return message;
   }
@@ -548,11 +561,18 @@ class Api with Debug {
   }
 
   bool queueContainsCommand({String? commandStr, int? command}) {
-    for (ApiMessage message in _queue)
-      if ((null != commandStr && message.commandStr == commandStr) //
-          ||
-          (null != command && message.commandCode == command)) return true;
-    return false;
+    bool result = false;
+    _queueMutex.protect(() {
+      for (ApiMessage message in _queue)
+        if ((null != commandStr && message.commandStr == commandStr) //
+            ||
+            (null != command && message.commandCode == command)) {
+          result = true;
+          break;
+        }
+      return Future.value(null);
+    });
+    return result;
   }
 
   void _runQueue() async {
@@ -560,59 +580,68 @@ class Api with Debug {
       //logD("_runQueue() already running");
       return;
     }
-    _running = true;
-    if (_queue.isEmpty) {
-      _stopQueueSchedule();
-      _running = false;
-      return;
-    }
-    //logD("queue run");
-    var message = _queue.removeFirst();
-    message.parseCommand();
-    message.checkAge();
-    message.checkAttempts();
-    int now = uts();
-    if (message.isDone == true) {
-      message.isDone = null;
-      _onDone(message);
-      message.destruct();
-    } else if (now < (message.lastSentAt ?? 0) + message.minDelayMs) {
-      //logD("${device.name} Api delaying $message");
-      _queue.addLast(message);
-    } else {
-      //logD("${device.name} Api sending $message");
-      if (!await device.ready()) {
-        logD("${device.name} Api _send() device not ready");
-      } else {
-        message.lastSentAt = now;
-        message.attempts = (message.attempts ?? 0) + 1;
-        String toWrite = "${message.commandCode}" + (null != message.arg ? "=" + message.arg! : "");
-        //logD("_send() $now attempt #${message.attempts} calling char.write($toWrite)");
-        characteristic?.write(toWrite);
+
+    _queueMutex.protect(() async {
+      _running = true;
+      if (_queue.isEmpty) {
+        _stopQueueSchedule();
+        _running = false;
+        return;
       }
-      _queue.addLast(message);
-    }
-    await Future.delayed(Duration(milliseconds: queueDelayMs));
-    if (_queue.isNotEmpty) _startQueueSchedule();
-    _running = false;
+      //logD("queue run");
+      var message = _queue.removeFirst();
+      message.parseCommand();
+      message.checkAge();
+      message.checkAttempts();
+      int now = uts();
+      if (message.isDone == true) {
+        message.isDone = null;
+        _onDone(message);
+        message.destruct();
+      } else if (now < (message.lastSentAt ?? 0) + message.minDelayMs) {
+        //logD("${device.name} Api delaying $message");
+        _queue.addLast(message);
+      } else {
+        //logD("${device.name} Api sending $message");
+        if (!await device.ready()) {
+          logD("${device.name} Api _send() device not ready");
+        } else {
+          message.lastSentAt = now;
+          message.attempts = (message.attempts ?? 0) + 1;
+          String toWrite = "${message.commandCode}" + (null != message.arg ? "=" + message.arg! : "");
+          //logD("_send() $now attempt #${message.attempts} calling char.write($toWrite)");
+          characteristic?.write(toWrite);
+        }
+        _queue.addLast(message);
+      }
+      await Future.delayed(Duration(milliseconds: queueDelayMs)).then((_) {
+        if (_queue.isNotEmpty) _startQueueSchedule();
+        _running = false;
+      });
+    });
   }
 
   void reset() {
     _stopQueueSchedule();
-    _queue.clear();
+    _queueMutex.protect(() async {
+      _queue.clear();
+    });
     commands.clear();
     commands.addAll(_initialCommands);
-    logD("${device.name} reset() commands: $commands");
+    //logD("${device.name} reset() commands: $commands");
   }
 
   Future<void> destruct() async {
     logD("destruct");
     _stopQueueSchedule();
     await _subscription?.cancel();
-    while (_queue.isNotEmpty) {
-      var message = _queue.removeFirst();
-      message.destruct();
-    }
+    _queueMutex.protect(() {
+      while (_queue.isNotEmpty) {
+        var message = _queue.removeFirst();
+        message.destruct();
+      }
+      return Future.value(null);
+    });
     _doneController.close();
   }
 }

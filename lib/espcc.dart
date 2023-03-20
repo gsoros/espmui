@@ -9,6 +9,7 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:sprintf/sprintf.dart';
 import 'package:listenable_stream/listenable_stream.dart';
 import 'package:intl/intl.dart';
+import 'package:mutex/mutex.dart';
 
 import 'device.dart';
 import 'api.dart';
@@ -254,6 +255,7 @@ class ESPCCFile with Debug {
   ExtendedBool remoteExists;
   ExtendedBool localExists;
   bool _generatingGpx = false;
+  Mutex _mutex = Mutex();
 
   /// flag for syncer queue
   bool cancelDownload = false;
@@ -307,43 +309,45 @@ class ESPCCFile with Debug {
       return 0;
     }
 
-    File? f = await getLocal();
-    if (null == f) {
-      logD("$tag could not get local file");
-      return 0;
-    }
-    if (!await f.exists()) {
-      try {
-        f = await f.create(recursive: true);
-      } catch (e) {
-        logE("$tag could not create ${await path}, error: $e");
+    return _mutex.protect<int>(() async {
+      File? f = await getLocal();
+      if (null == f) {
+        logD("$tag could not get local file");
         return 0;
       }
-    }
-    int sizeBefore = await f.length();
-    if (null != offset && sizeBefore != (offset <= 0 ? 0 : offset - 1)) {
-      logD("$tag local size is $sizeBefore but offset is $offset");
-      return 0;
-    }
-    if (null != data && 0 < data.length)
-      f = await f.writeAsString(
-        data,
-        mode: FileMode.append,
-        flush: true,
-      );
-    else if (null != byteData && 0 < byteData.length)
-      f = await f.writeAsBytes(
-        byteData.toList(growable: false),
-        mode: FileMode.append,
-        flush: true,
-      );
-    else {
-      logD("$tag need either data or byteData");
-      return 0;
-    }
-    await updateLocalStatus();
+      if (!await f.exists()) {
+        try {
+          f = await f.create(recursive: true);
+        } catch (e) {
+          logE("$tag could not create ${await path}, error: $e");
+          return 0;
+        }
+      }
+      int sizeBefore = await f.length();
+      if (null != offset && sizeBefore != (offset <= 0 ? 0 : offset - 1)) {
+        logD("$tag local size is $sizeBefore but offset is $offset");
+        return 0;
+      }
+      if (null != data && 0 < data.length)
+        f = await f.writeAsString(
+          data,
+          mode: FileMode.append,
+          flush: true,
+        );
+      else if (null != byteData && 0 < byteData.length)
+        f = await f.writeAsBytes(
+          byteData.toList(growable: false),
+          mode: FileMode.append,
+          flush: true,
+        );
+      else {
+        logD("$tag need either data or byteData");
+        return 0;
+      }
+      await updateLocalStatus();
 
-    return localSize - sizeBefore;
+      return localSize - sizeBefore;
+    });
   }
 
   /// any file with a dot in the name is treated as non-binary :)
@@ -428,14 +432,14 @@ class ESPCCFile with Debug {
         );
         logD("$tag header written");
       }
-      if (prevPoint.time != 0 && (point.time < prevPoint.time || prevPoint.time + 86400 < point.time)) {
-        // 1 day
-        logD("$tag invalid time ${point.time} ${point.timeAsIso8601}");
+      if (prevPoint.time != 0 && (point.time < prevPoint.time || prevPoint.time + 7 * 86400 < point.time)) {
+        // 7 days
+        logD("$tag point #$pointsWritten: invalid time ${point.time} ${point.timeAsIso8601}");
         cursor += toRead;
         continue;
       }
       if (!point.hasLocation) {
-        logD("$tag no location at point #$pointsWritten ${point.timeAsIso8601}");
+        logD("$tag point #$pointsWritten: no location at  ${point.timeAsIso8601}");
         if (prevPoint.hasLocation) {
           logD("$tag copying location from prev point");
           point.lat = prevPoint.lat;
@@ -526,7 +530,7 @@ class ESPCCFile with Debug {
           <power>%d</power>""";
     const String tpxFormat = """
 
-          <gpxtpx:TrackPointExtension>%s%s
+          <gpxtpx:TrackPointExtension>%s%s%s
           </gpxtpx:TrackPointExtension>""";
     const String hrFormat = """
 
@@ -534,8 +538,11 @@ class ESPCCFile with Debug {
     const String cadFormat = """
 
             <gpxtpx:cad>%d</gpxtpx:cad>""";
+    const String tempFormat = """
 
-    bool hasTpx = p.hasHeartrate || p.hasCadence;
+            <gpxtpx:atemp>%.1f</gpxtpx:atemp>""";
+
+    bool hasTpx = p.hasHeartrate || p.hasCadence || p.hasTemperature;
 
     final String s = sprintf(pointFormat, [
       p.hasLocation ? sprintf(locationFormat, [p.lat, p.lon]) : "",
@@ -548,6 +555,7 @@ class ESPCCFile with Debug {
                   ? sprintf(tpxFormat, [
                       p.hasHeartrate ? sprintf(hrFormat, [p.heartrate]) : "",
                       p.hasCadence ? sprintf(cadFormat, [p.cadence]) : "",
+                      p.hasTemperature ? sprintf(tempFormat, [p.temperature]) : "",
                     ])
                   : "",
             ])
@@ -1006,8 +1014,8 @@ class ESPCCDataPoint with Debug {
   set temperatureFlag(bool b) => _flags[0] |= b ? ESPCCDataPointFlags.temperature : ~ESPCCDataPointFlags.temperature;
   bool get hasTemperature {
     if (!temperatureFlag) return false;
-    int i = temperature;
-    return (-50 <= i && i < 70);
+    double f = temperature;
+    return (-50 <= f && f < 70);
   }
 
   bool get hasLap => 0 < _flags[0] & ESPCCDataPointFlags.lap;
@@ -1034,9 +1042,9 @@ class ESPCCDataPoint with Debug {
   int get heartrate => _heartrate.buffer.asByteData().getUint8(0);
   Uint8List get heartrateList => _heartrate;
   set heartrate(int i) => _heartrate.buffer.asByteData().setUint8(0, i);
-  int get temperature => _power.buffer.asByteData().getInt16(0, _endian);
+  double get temperature => _temperature.buffer.asByteData().getInt16(0, _endian) / 100;
   Uint8List get temperatureList => _temperature;
-  set temperature(int i) => _temperature.buffer.asByteData().setInt16(0, i, _endian);
+  set temperature(double f) => _temperature.buffer.asByteData().setInt16(0, (f * 100).toInt(), _endian);
 
   /// example: 2022-03-25T12:58:13Z
   String get timeAsIso8601 => DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true));
@@ -1083,7 +1091,7 @@ class ESPCCDataPoint with Debug {
         const byte power = 4;
         const byte cadence = 8;
         const byte heartrate = 16;
-        const byte temperature = 32;  // unused
+        const byte temperature = 32;  
         const byte lap = 64;          // unused
     } const Flags;
 */

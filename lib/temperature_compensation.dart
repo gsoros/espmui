@@ -224,7 +224,7 @@ class TC with Debug {
       logD("$tag mtu: $mtu");
       status("could not get MTU");
     }
-    int commandMaxLen = mtu - 3;
+    int commandMaxLen = min(mtu - 3, 220); // ATOLL_API_MSG_ARG_LENGTH = 239
     status("Writing TC");
     int newKeyOffset = sugg.entries.first.key.toInt();
     double newKeyResolution = (sugg.entries.last.key.toInt() - sugg.entries.first.key.toInt()).abs() / size;

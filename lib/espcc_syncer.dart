@@ -100,8 +100,7 @@ class ESPCCSyncer with Debug {
       if (ef.isRec) {
         String msg = "generating ${ef.name}-local.gpx";
         snackbar(msg);
-        await ef.generateGpx();
-        snackbar("done $msg");
+        ef.generateGpx().then((success) => snackbar((success ? "Done " : "Failed ") + msg));
       }
       _running = false;
       return;
