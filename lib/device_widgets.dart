@@ -1712,112 +1712,155 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
           ]),
           Divider(color: Colors.white38),
           Flexible(
-            child: Column(children: [
-              Row(children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
-                  child: Text("Vesc"),
-                ),
-              ]),
-              Row(children: [
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Number of Battery Cells",
-                  commandCode: device.api.commandCode("vesc"),
-                  commandArg: "battNumSeries",
-                  value: -1 == settings.vescBattNumSeries ? "" : settings.vescBattNumSeries.toString(),
-                  suffix: Text("in Series"),
-                  keyboardType: TextInputType.number,
-                ),
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Battery Capacity",
-                  commandCode: device.api.commandCode("vesc"),
-                  commandArg: "battCapacity",
-                  value: -1 == settings.vescBattCapacityWh ? "" : settings.vescBattCapacityWh.toString(),
-                  suffix: Text("Wh"),
-                  keyboardType: TextInputType.number,
-                ),
-              ]),
-              Row(children: [
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Max Power",
-                  commandCode: device.api.commandCode("vesc"),
-                  commandArg: "maxPower",
-                  value: -1 == settings.vescMaxPower ? "" : settings.vescMaxPower.toString(),
-                  suffix: Text("W"),
-                  keyboardType: TextInputType.number,
-                ),
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Min Current",
-                  commandCode: device.api.commandCode("vesc"),
-                  commandArg: "minCurrent",
-                  value: -1 == settings.vescMinCurrent ? "" : settings.vescMinCurrent.toString(),
-                  suffix: Text("A"),
-                  keyboardType: TextInputType.number,
-                ),
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Max Current",
-                  commandCode: device.api.commandCode("vesc"),
-                  commandArg: "maxCurrent",
-                  value: -1 == settings.vescMaxCurrent ? "" : settings.vescMaxCurrent.toString(),
-                  suffix: Text("A"),
-                  keyboardType: TextInputType.number,
-                ),
-              ]),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text("Ramp"),
-                Row(children: [
-                  ApiSettingSwitchWidget(
-                    api: device.api,
-                    commandCode: device.api.commandCode("vesc"),
-                    commandArg: "rampUp",
-                    value: settings.vescRampUp,
-                  ),
-                  Text("Up"),
+            child: ExpansionTile(
+              title: Text("Vesc"),
+              tilePadding: EdgeInsets.only(left: 0),
+              childrenPadding: EdgeInsets.only(top: 10),
+              textColor: Colors.white,
+              iconColor: Colors.white,
+              children: [
+                Column(children: [
+                  Row(children: [
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Number of Battery Cells",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "BNS",
+                      value: -1 == settings.vescBattNumSeries ? "" : settings.vescBattNumSeries.toString(),
+                      suffix: Text("in Series"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Battery Capacity",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "BC",
+                      value: -1 == settings.vescBattCapacityWh ? "" : settings.vescBattCapacityWh.toString(),
+                      suffix: Text("Wh"),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ]),
+                  Row(children: [
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Max Power",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "MP",
+                      value: -1 == settings.vescMaxPower ? "" : settings.vescMaxPower.toString(),
+                      suffix: Text("W"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Min Current",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "MiC",
+                      value: -1 == settings.vescMinCurrent ? "" : settings.vescMinCurrent.toString(),
+                      suffix: Text("A"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Max Current",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "MaC",
+                      value: -1 == settings.vescMaxCurrent ? "" : settings.vescMaxCurrent.toString(),
+                      suffix: Text("A"),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ]),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Text("Ramp"),
+                    Row(children: [
+                      ApiSettingSwitchWidget(
+                        api: device.api,
+                        commandCode: device.api.commandCode("vesc"),
+                        commandArg: "RU",
+                        value: settings.vescRampUp,
+                      ),
+                      Text("Up"),
+                    ]),
+                    Row(children: [
+                      ApiSettingSwitchWidget(
+                        api: device.api,
+                        commandCode: device.api.commandCode("vesc"),
+                        commandArg: "RD",
+                        value: settings.vescRampDown,
+                      ),
+                      Text("Down"),
+                    ]),
+                  ]),
+                  Row(children: [
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Diff",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "RMCD",
+                      value: -1 == settings.vescRampMinCurrentDiff ? "" : settings.vescRampMinCurrentDiff.toString(),
+                      suffix: Text("A"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Steps",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "RNS",
+                      value: -1 == settings.vescRampNumSteps ? "" : settings.vescRampNumSteps.toString(),
+                      keyboardType: TextInputType.number,
+                    ),
+                    ApiSettingInputWidget(
+                      api: device.api,
+                      name: "Time",
+                      commandCode: device.api.commandCode("vesc"),
+                      commandArg: "RT",
+                      value: -1 == settings.vescRampTime ? "" : settings.vescRampTime.toString(),
+                      suffix: Text("ms"),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ]),
+                  Row(
+                    children: [
+                      ApiSettingInputWidget(
+                        api: device.api,
+                        name: "Mot Warn",
+                        commandCode: device.api.commandCode("vesc"),
+                        commandArg: "TMW",
+                        value: -1 == settings.vescTempMotorWarning ? "" : settings.vescTempMotorWarning.toString(),
+                        suffix: Text("˚C"),
+                        keyboardType: TextInputType.number,
+                      ),
+                      ApiSettingInputWidget(
+                        api: device.api,
+                        name: "Mot Limit",
+                        commandCode: device.api.commandCode("vesc"),
+                        commandArg: "TML",
+                        value: -1 == settings.vescTempMotorLimit ? "" : settings.vescTempMotorLimit.toString(),
+                        suffix: Text("˚C"),
+                        keyboardType: TextInputType.number,
+                      ),
+                      ApiSettingInputWidget(
+                        api: device.api,
+                        name: "ESC Warn",
+                        commandCode: device.api.commandCode("vesc"),
+                        commandArg: "TEW",
+                        value: -1 == settings.vescTempEscWarning ? "" : settings.vescTempEscWarning.toString(),
+                        suffix: Text("˚C"),
+                        keyboardType: TextInputType.number,
+                      ),
+                      ApiSettingInputWidget(
+                        api: device.api,
+                        name: "ESC Limit",
+                        commandCode: device.api.commandCode("vesc"),
+                        commandArg: "TEL",
+                        value: -1 == settings.vescTempEscLimit ? "" : settings.vescTempEscLimit.toString(),
+                        suffix: Text("˚C"),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ],
+                  )
                 ]),
-                Row(children: [
-                  ApiSettingSwitchWidget(
-                    api: device.api,
-                    commandCode: device.api.commandCode("vesc"),
-                    commandArg: "rampDown",
-                    value: settings.vescRampDown,
-                  ),
-                  Text("Down"),
-                ]),
-              ]),
-              Row(children: [
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Diff",
-                  commandCode: device.api.commandCode("vesc"),
-                  commandArg: "rampMinCurrentDiff",
-                  value: -1 == settings.vescRampMinCurrentDiff ? "" : settings.vescRampMinCurrentDiff.toString(),
-                  suffix: Text("A"),
-                  keyboardType: TextInputType.number,
-                ),
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Steps",
-                  commandCode: device.api.commandCode("vesc"),
-                  commandArg: "rampNumSteps",
-                  value: -1 == settings.vescRampNumSteps ? "" : settings.vescRampNumSteps.toString(),
-                  keyboardType: TextInputType.number,
-                ),
-                ApiSettingInputWidget(
-                  api: device.api,
-                  name: "Time",
-                  commandCode: device.api.commandCode("vesc"),
-                  commandArg: "rampTime",
-                  value: -1 == settings.vescRampTime ? "" : settings.vescRampTime.toString(),
-                  suffix: Text("ms"),
-                  keyboardType: TextInputType.number,
-                ),
-              ]),
-            ]),
+              ],
+            ),
           ),
           Divider(color: Colors.white38),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -1866,13 +1909,18 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
       },
     );
 
-    return ExpansionTile(title: Text("Settings"), textColor: Colors.white, iconColor: Colors.white, children: [
-      Column(mainAxisSize: MainAxisSize.min, children: [
-        frame(apiWifiSettings),
-        frame(deviceSettings),
-        frame(ApiInterfaceWidget(device.api)),
-      ])
-    ]);
+    return ExpansionTile(
+      title: Text("Settings"),
+      textColor: Colors.white,
+      iconColor: Colors.white,
+      children: [
+        Column(mainAxisSize: MainAxisSize.min, children: [
+          frame(apiWifiSettings),
+          frame(deviceSettings),
+          frame(ApiInterfaceWidget(device.api)),
+        ])
+      ],
+    );
   }
 }
 

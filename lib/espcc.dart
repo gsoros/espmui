@@ -653,6 +653,10 @@ class ESPCCSettings with Debug {
   double vescRampMinCurrentDiff = -1;
   int vescRampNumSteps = -1;
   int vescRampTime = -1;
+  int vescTempMotorWarning = -1;
+  int vescTempMotorLimit = -1;
+  int vescTempEscWarning = -1;
+  int vescTempEscLimit = -1;
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
@@ -751,35 +755,47 @@ class ESPCCSettings with Debug {
           return;
         }
         switch (pair[0]) {
-          case "battNumSeries":
+          case "BNS":
             vescBattNumSeries = int.tryParse(pair[1]) ?? vescBattNumSeries;
             break;
-          case "battCapacity":
+          case "BC":
             vescBattCapacityWh = double.tryParse(pair[1]) ?? vescBattCapacityWh;
             break;
-          case "maxPower":
+          case "MP":
             vescMaxPower = int.tryParse(pair[1]) ?? vescMaxPower;
             break;
-          case "minCurrent":
+          case "MiC":
             vescMinCurrent = double.tryParse(pair[1]) ?? vescMinCurrent;
             break;
-          case "maxCurrent":
+          case "MaC":
             vescMaxCurrent = double.tryParse(pair[1]) ?? vescMaxCurrent;
             break;
-          case "rampUp":
+          case "RU":
             vescRampUp = ExtendedBool.fromString(pair[1]);
             break;
-          case "rampDown":
+          case "RD":
             vescRampDown = ExtendedBool.fromString(pair[1]);
             break;
-          case "rampMinCurrentDiff":
+          case "RMCD":
             vescRampMinCurrentDiff = double.tryParse(pair[1]) ?? vescRampMinCurrentDiff;
             break;
-          case "rampNumSteps":
+          case "RNS":
             vescRampNumSteps = int.tryParse(pair[1]) ?? vescRampNumSteps;
             break;
-          case "rampTime":
+          case "RT":
             vescRampTime = int.tryParse(pair[1]) ?? vescRampTime;
+            break;
+          case "TMW":
+            vescTempMotorWarning = int.tryParse(pair[1]) ?? vescTempMotorWarning;
+            break;
+          case "TML":
+            vescTempMotorLimit = int.tryParse(pair[1]) ?? vescTempMotorLimit;
+            break;
+          case "TEW":
+            vescTempEscWarning = int.tryParse(pair[1]) ?? vescTempEscWarning;
+            break;
+          case "TEL":
+            vescTempEscLimit = int.tryParse(pair[1]) ?? vescTempEscLimit;
             break;
           default:
             logD("$tag unknown name: token: $token, name: ${pair[0]}, value: ${pair[1]}");
