@@ -1241,7 +1241,7 @@ class EspccPeersEditorWidget extends StatelessWidget with Debug {
                       //device.settings.value.scanning = true;
                       device.settings.value.scanResults = [];
                       device.settings.notifyListeners();
-                      device.api.sendCommand("scan=10");
+                      device.api.sendCommand("peers=scan:10");
                     },
             ),
           ]);
@@ -1564,10 +1564,10 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
       }
       if (null != device?.api) {
         if ("add" == action) {
-          command = "addPeer=$peer";
+          command = "peers=add:$peer";
           commandIcon = Icons.link;
         } else if ("delete" == action) {
-          command = "deletePeer=${parts[0]}";
+          command = "peers=delete:${parts[0]}";
           commandIcon = Icons.link_off;
         }
       }

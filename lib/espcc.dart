@@ -662,8 +662,14 @@ class ESPCCSettings with Debug {
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
     String tag = "";
     //logD("$tag $message");
+    String? valueS = message.valueAsString;
 
-    if ("peers" == message.commandStr) {
+    if ("peers" == message.commandStr &&
+        valueS != null &&
+        !valueS.startsWith("scan:") &&
+        !valueS.startsWith("scanResult:") &&
+        !valueS.startsWith("add:") &&
+        !valueS.startsWith("delete:")) {
       String? v = message.valueAsString;
       if (null == v) return false;
       List<String> tokens = v.split("|");
@@ -718,18 +724,18 @@ class ESPCCSettings with Debug {
       return true;
     }
 
-    if ("scanResult" == message.commandStr) {
-      String? result = message.valueAsString;
+    if ("peers" == message.commandStr && message.valueAsString != null && message.valueAsString!.startsWith("scanResult:")) {
+      String result = message.valueAsString!.substring("scanResult:".length);
       logD("$tag scanResult: received $result");
-      if (null == result) return false;
+      if (0 == result.length) return false;
       if (scanResults.contains(result)) return false;
       scanResults.add(result);
       return true;
     }
 
-    if ("scan" == message.commandStr) {
-      int? timeout = message.valueAsInt;
-      logD("$tag scan: received scan=$timeout");
+    if ("peers" == message.commandStr && message.valueAsString != null && message.valueAsString!.startsWith("scan:")) {
+      int? timeout = int.tryParse(message.valueAsString!.substring("scan:".length));
+      logD("$tag peers=scan:$timeout");
       scanning = null != timeout && 0 < timeout;
       return true;
     }
