@@ -1509,7 +1509,9 @@ class DeviceIcon extends StatelessWidget {
       id = Icons.smartphone;
     else if ("HRM" == type)
       id = Icons.favorite;
-    else if ("Vesc" == type) id = Icons.electric_bike;
+    else if ("Vesc" == type)
+      id = Icons.electric_bike;
+    else if ("BMS" == type) id = Icons.battery_std;
     return id;
   }
 }
@@ -1561,6 +1563,24 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
       } else if (parts[2] == "V") {
         /* VESC */
         iconType = "Vesc";
+      } else if (parts[2] == "B") {
+        /* JkBms */
+        iconType = "BMS";
+                if ("add" == action) {
+          passcodeEntry = SettingInputWidget(
+            name: "Passcode",
+            keyboardType: TextInputType.number,
+            textController: device?.settings.value.getController(peer: peer),
+          );
+          commandProcessor = (command, passcodeEntry) {
+            if (null == command) return command;
+            String? value = passcodeEntry?.getValue();
+            logD("commandProcessor: value=$value");
+            if (null == value) return command;
+            command += ",${int.tryParse(value)}";
+            return command;
+          };
+        }
       }
       if (null != device?.api) {
         if ("add" == action) {
