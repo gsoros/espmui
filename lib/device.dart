@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import 'espm.dart';
 import 'espcc.dart';
+import 'homeauto.dart';
 import 'ble_constants.dart';
 import 'ble.dart';
 import 'ble_characteristic.dart';
@@ -116,6 +117,9 @@ class Device with Debug {
     }
     if (uuids.contains(BleConstants.ESPCC_API_SERVICE_UUID)) {
       return ESPCC(scanResult.peripheral);
+    }
+    if (uuids.contains(BleConstants.HOMEAUTO_API_SERVICE_UUID)) {
+      return HomeAuto(scanResult.peripheral);
     }
     if (uuids.contains(BleConstants.CYCLING_POWER_SERVICE_UUID)) {
       return PowerMeter(scanResult.peripheral);

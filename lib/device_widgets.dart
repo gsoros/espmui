@@ -1511,7 +1511,9 @@ class DeviceIcon extends StatelessWidget {
       id = Icons.favorite;
     else if ("Vesc" == type)
       id = Icons.electric_bike;
-    else if ("BMS" == type) id = Icons.battery_std;
+    else if ("BMS" == type)
+      id = Icons.battery_std;
+    else if ("HomeAuto" == type) id = Icons.control_point;
     return id;
   }
 }
@@ -1566,7 +1568,7 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
       } else if (parts[2] == "B") {
         /* JkBms */
         iconType = "BMS";
-                if ("add" == action) {
+        if ("add" == action) {
           passcodeEntry = SettingInputWidget(
             name: "Passcode",
             keyboardType: TextInputType.number,

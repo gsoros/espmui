@@ -92,6 +92,7 @@ class Scanner with Debug {
           uuids: [
             BleConstants.ESPM_API_SERVICE_UUID,
             BleConstants.ESPCC_API_SERVICE_UUID,
+            BleConstants.HOMEAUTO_API_SERVICE_UUID,
             BleConstants.CYCLING_POWER_SERVICE_UUID,
             BleConstants.HEART_RATE_SERVICE_UUID,
           ],

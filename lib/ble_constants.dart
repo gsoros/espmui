@@ -16,6 +16,7 @@ class BleConstants {
 
   static const ESPM_API_SERVICE_UUID = "55bebab5-1857-4b14-a07b-d4879edad159";
   static const ESPCC_API_SERVICE_UUID = "f2d59f15-1fb3-4b22-b8cc-b554debb2720";
+  static const HOMEAUTO_API_SERVICE_UUID = "8e4a5858-9cb9-43d3-9ca5-3abd6cfd2696";
 
   static const API_RXCHAR_UUID = "da34811a-03c0-4efe-a266-ed014e181b65";
   static const API_TXCHAR_UUID = "422ecb2a-be77-43f2-bf79-f0a62d31fab7";

@@ -18,6 +18,7 @@ import 'ble_constants.dart';
 import 'device.dart';
 import 'espm.dart';
 import 'espcc.dart';
+import 'homeauto.dart';
 
 abstract class BleCharacteristic<T> with Debug {
   Device device;
@@ -547,6 +548,11 @@ class EspccApiCharacteristic extends ApiCharacteristic {
     }
     return super.onNotify(value);
   }
+}
+
+class HomeAutoApiCharacteristic extends ApiCharacteristic {
+  HomeAuto get device => super.device as HomeAuto;
+  HomeAutoApiCharacteristic(Device device) : super(device, serviceUUID: BleConstants.HOMEAUTO_API_SERVICE_UUID);
 }
 
 class ApiLogCharacteristic extends BleCharacteristic<String> {
