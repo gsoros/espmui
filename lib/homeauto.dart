@@ -28,9 +28,7 @@ class HomeAuto extends Device {
   //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
   StreamSubscription<ApiMessage>? _apiSubsciption;
   //Stream<HomeAutoSettings>? _settingsStream;
-  Map<String, HomeAutoSwitch> switches = {};
-  StreamSubscription<Map<String, HomeAutoSwitch>>? _switchesSubsciption;
-  Stream<Map<String, HomeAutoSwitch>>? _switchesStream;
+  final switches = AlwaysNotifier<Map<String, HomeAutoSwitch>>({});
 
   @override
   int get defaultMtu => 512;
@@ -57,7 +55,7 @@ class HomeAuto extends Device {
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    //String tag = "";
+    String tag = "handleApiMessageSuccess";
     //logD("$tag $message");
 
     if (await wifiSettings.value.handleApiMessageSuccess(message)) {
@@ -71,7 +69,31 @@ class HomeAuto extends Device {
     }
 
     if ("switch" == message.command) {
-      logD("todo parse and stream switch=${message.valueAsString}");
+      logD("parsing switch=${message.valueAsString}");
+      List<String>? sws = message.valueAsString?.split(';');
+      sws?.forEach((s) {
+        List<String> parts = s.split(':');
+        if (2 != parts.length) return;
+        List<String> tokens = parts[1].split(',');
+        if (6 != tokens.length) return;
+        var sw = HomeAutoSwitch(
+          mode: HomeAutoSwitchMode.fromString(tokens[0]),
+          state: HomeAutoSwitchState.fromString(tokens[1]),
+          voltageOn: double.tryParse(tokens[2]),
+          voltageOff: double.tryParse(tokens[3]),
+          socOn: int.tryParse(tokens[4]),
+          socOff: int.tryParse(tokens[5]),
+        );
+        if (!switches.value.containsKey(parts[0])) {
+          logI("$tag adding ${parts[0]}: $sw");
+          switches.value.addAll({parts[0]: sw});
+          return;
+        }
+        if (switches.value[parts[0]] != sw) {
+          logI("$tag updating ${parts[0]}: $sw");
+          switches.value[parts[0]] = sw;
+        }
+      });
       return true;
     }
 
@@ -84,7 +106,6 @@ class HomeAuto extends Device {
   Future<void> dispose() async {
     logD("$name dispose");
     _apiSubsciption?.cancel();
-    _switchesSubsciption?.cancel();
     super.dispose();
   }
 
@@ -224,6 +245,33 @@ class HomeAutoSwitch {
   double? voltageOff;
   int? socOn;
   int? socOff;
+
+  HomeAutoSwitch({this.mode, this.state, this.voltageOn, this.voltageOff, this.socOn, this.socOff});
+
+  @override
+  bool operator ==(other) {
+    return (other is HomeAutoSwitch) &&
+        other.mode == mode &&
+        other.state == state &&
+        other.voltageOn == voltageOn &&
+        other.voltageOff == voltageOff &&
+        other.socOn == socOn &&
+        other.socOff == socOff;
+  }
+
+  @override
+  int get hashCode => mode.hashCode ^ state.hashCode ^ voltageOn.hashCode ^ voltageOff.hashCode ^ socOn.hashCode ^ socOff.hashCode;
+
+  String toString() {
+    return "${describeIdentity(this)} ("
+        "mode: $mode, "
+        "state: $state, "
+        "vOn: $voltageOn, "
+        "vOff: $voltageOff, "
+        "sOn: $socOn, "
+        "sOff: $socOff"
+        ")";
+  }
 }
 
 class HomeAutoSwitchMode {
@@ -231,11 +279,25 @@ class HomeAutoSwitchMode {
   static const int On = 1;
   static const int Voltage = 2;
   static const int Soc = 3;
+
+  static int? fromString(String s) {
+    if ('off' == s) return Off;
+    if ('on' == s) return On;
+    if ('voltage' == s) return Voltage;
+    if ('soc' == s) return Soc;
+    return null;
+  }
 }
 
 class HomeAutoSwitchState {
   static const int Off = 0;
   static const int On = 1;
+
+  static int? fromString(String s) {
+    if ('off' == s) return Off;
+    if ('on' == s) return On;
+    return null;
+  }
 }
 
 /*

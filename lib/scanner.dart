@@ -87,6 +87,7 @@ class Scanner with Debug {
     );
     streamSendIfNotClosed(_scanningController, true);
     var manager = await (ble.manager);
+    logD("starting scan");
     _scanResultSubscription = manager
         .startPeripheralScan(
           uuids: [
@@ -101,7 +102,7 @@ class Scanner with Debug {
         .listen(
           (result) {
             // devices.addFromScanResult(result);
-            //logD("Device found: ${result.advertisementData.localName} ${result.peripheral.identifier}");
+            logD("Device found: ${result.advertisementData.localName} ${result.peripheral.identifier}");
             streamSendIfNotClosed(_resultController, result);
           },
           onError: (e) => bleError(runtimeType.toString(), "scanResultSubscription", e),
