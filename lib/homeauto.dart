@@ -28,6 +28,9 @@ class HomeAuto extends Device {
   //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
   StreamSubscription<ApiMessage>? _apiSubsciption;
   //Stream<HomeAutoSettings>? _settingsStream;
+  Map<String, HomeAutoSwitch> switches = {};
+  StreamSubscription<Map<String, HomeAutoSwitch>>? _switchesSubsciption;
+  Stream<Map<String, HomeAutoSwitch>>? _switchesStream;
 
   @override
   int get defaultMtu => 512;
@@ -67,6 +70,11 @@ class HomeAuto extends Device {
       return true;
     }
 
+    if ("switch" == message.command) {
+      logD("todo parse and stream switch=${message.valueAsString}");
+      return true;
+    }
+
     //snackbar("${message.info} ${message.command}");
     logD("unhandled api response: $message");
 
@@ -76,6 +84,7 @@ class HomeAuto extends Device {
   Future<void> dispose() async {
     logD("$name dispose");
     _apiSubsciption?.cancel();
+    _switchesSubsciption?.cancel();
     super.dispose();
   }
 
@@ -206,6 +215,27 @@ class HomeAutoSettings with Debug {
       value.dispose();
     });
   }
+}
+
+class HomeAutoSwitch {
+  int? mode;
+  int? state;
+  double? voltageOn;
+  double? voltageOff;
+  int? socOn;
+  int? socOff;
+}
+
+class HomeAutoSwitchMode {
+  static const int Off = 0;
+  static const int On = 1;
+  static const int Voltage = 2;
+  static const int Soc = 3;
+}
+
+class HomeAutoSwitchState {
+  static const int Off = 0;
+  static const int On = 1;
 }
 
 /*
