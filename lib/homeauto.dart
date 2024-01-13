@@ -31,6 +31,9 @@ class HomeAuto extends Device {
   StreamSubscription<ApiMessage>? _apiSubsciption;
   //Stream<HomeAutoSettings>? _settingsStream;
 
+  final switchesTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get switchesTileStream => switchesTileStreamController.stream;
+
   @override
   int get defaultMtu => 512;
 
@@ -52,11 +55,19 @@ class HomeAuto extends Device {
     api = Api(this, queueDelayMs: 50);
     _apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
     //_settingsStream = settings.toValueStream().asBroadcastStream();
+
+    tileStreams.addAll({
+      "switches": DeviceTileStream(
+        label: "Switches",
+        stream: switchesTileStream,
+        initialData: () => Text('...'),
+      )
+    });
   }
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    String tag = "handleApiMessageSuccess";
+    //String tag = "handleApiMessageSuccess";
     //logD("$tag $message");
 
     if (await wifiSettings.value.handleApiMessageSuccess(message)) {
@@ -90,15 +101,8 @@ class HomeAuto extends Device {
           socOn: int.tryParse(tokens[4]),
           socOff: int.tryParse(tokens[5]),
         );
-        if (!settings.value.switches.containsKey(parts[0])) {
-          logI("$tag adding ${parts[0]}: $sw");
-          settings.value.switches.addAll({parts[0]: sw});
-          return;
-        }
-        if (settings.value.switches[parts[0]] != sw) {
-          logI("$tag updating ${parts[0]}: $sw");
-          settings.value.switches[parts[0]] = sw;
-        }
+        settings.value.switches.set(parts[0], sw);
+        switchesTileStreamController.sink.add(settings.value.switches.asTile);
       });
       return true;
     }
@@ -112,6 +116,7 @@ class HomeAuto extends Device {
   Future<void> dispose() async {
     logD("$name dispose");
     _apiSubsciption?.cancel();
+    switchesTileStreamController.close();
     super.dispose();
   }
 
@@ -167,7 +172,7 @@ class HomeAuto extends Device {
 
 class HomeAutoSettings with Debug {
   bool otaMode = false;
-  Map<String, HomeAutoSwitch> switches = {};
+  final switches = HomeAutoSwitches();
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
@@ -232,6 +237,25 @@ class HomeAutoSwitch {
         "sOn: $socOn, "
         "sOff: $socOff"
         ")";
+  }
+}
+
+class HomeAutoSwitches {
+  Map<String, HomeAutoSwitch> values = {};
+
+  void set(String name, HomeAutoSwitch value) {
+    if (values.containsKey(name))
+      values[name] = value;
+    else
+      values.addAll({name: value});
+  }
+
+  Widget get asTile {
+    String ret = '';
+    values.forEach((key, value) {
+      ret += "$key: " + HomeAutoSwitchMode.asString(value.mode) + ' ' + HomeAutoSwitchState.asString(value.state) + "\r\n";
+    });
+    return Text(ret);
   }
 }
 

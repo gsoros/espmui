@@ -58,8 +58,8 @@ class ESPCC extends Device {
     tileStreams.addAll({
       "recording": DeviceTileStream(
         label: "Recording status",
-        stream: _settingsStream?.map<String>((value) => ESPCCRecordingState.getString(value.recording)),
-        initialData: () => ESPCCRecordingState.getString(settings.value.recording),
+        stream: _settingsStream?.map<Widget>((value) => Text(ESPCCRecordingState.getString(value.recording))),
+        initialData: () => Text(ESPCCRecordingState.getString(settings.value.recording)),
         units: "",
       ),
     });

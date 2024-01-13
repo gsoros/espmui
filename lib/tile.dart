@@ -127,14 +127,12 @@ class Tile extends StatelessWidget with Debug {
     //logD("build device: ${device?.name ?? 'null'} dl.l: ${DeviceList().devices.length}");
 
     Widget getValue() {
-      return StreamBuilder<String>(
+      return StreamBuilder<Widget>(
         stream: stream?.stream,
         initialData: stream?.initialData != null ? stream?.initialData!() : null,
         builder: (_, snapshot) {
-          String s = " ";
-          if (snapshot.hasData && (null != snapshot.data)) s = snapshot.data.toString();
-          if (s.length < 1) s = " ";
-          return Text(s);
+          if (!snapshot.hasData || (null == snapshot.data)) return Text(' ');
+          return snapshot.data!;
         },
       );
     }
@@ -156,7 +154,7 @@ class Tile extends StatelessWidget with Debug {
       if (0 == history) return Empty();
       CharacteristicHistory? charHistory = DeviceList().byIdentifier(this.device)?.tileStreams[this.stream]?.history;
       if (null == charHistory) return Empty();
-      return StreamBuilder<String>(
+      return StreamBuilder<Widget>(
         stream: stream?.stream,
         initialData: stream?.initialData != null ? stream?.initialData!() : null,
         builder: (_, snapshot) {

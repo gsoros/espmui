@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 //import 'package:mutex/mutex.dart';
+import 'package:flutter/material.dart';
 
 import 'device.dart';
 import 'api.dart';
@@ -55,13 +56,13 @@ class ESPM extends PowerMeter {
     tileStreams.addAll({
       "scale": DeviceTileStream(
         label: "Weight Scale",
-        stream: weightScaleChar?.defaultStream.map<String>((value) {
+        stream: weightScaleChar?.defaultStream.map<Widget>((value) {
           String s = value?.toStringAsFixed(2) ?? " ";
           if (s.length > 6) s = s.substring(0, 6);
           if (s == "-0.00") s = "0.00";
-          return s;
+          return Text(s);
         }),
-        initialData: weightScaleChar?.lastValueToString,
+        initialData: () => Text(weightScaleChar?.lastValueToString() ?? ' '),
         units: "kg",
         history: weightScaleChar?.histories['measurement'],
       ),
@@ -69,12 +70,12 @@ class ESPM extends PowerMeter {
     tileStreams.addAll({
       "temp": DeviceTileStream(
         label: "Temperature",
-        stream: tempChar?.defaultStream.map<String>((value) {
+        stream: tempChar?.defaultStream.map<Widget>((value) {
           String s = value?.toStringAsFixed(1) ?? " ";
           if (s.length > 6) s = s.substring(0, 6);
-          return s;
+          return Text(s);
         }),
-        initialData: tempChar?.lastValueToString,
+        initialData: () => Text(tempChar?.lastValueToString() ?? ' '),
         units: "˚C",
         history: tempChar?.histories['measurement'],
       ),

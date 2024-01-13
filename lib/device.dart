@@ -96,8 +96,8 @@ class Device with Debug {
     tileStreams.addAll({
       "battery": DeviceTileStream(
         label: "Battery",
-        stream: battery?.defaultStream.map<String>((value) => "$value"),
-        initialData: battery?.lastValueToString,
+        stream: battery?.defaultStream.map<Widget>((value) => Text(value.toString())),
+        initialData: () => Text(battery?.lastValueToString() ?? ' '),
         units: "%",
         history: battery?.histories['charge'],
       ),
@@ -159,6 +159,8 @@ class Device with Debug {
       device = ESPM(peripheral);
     else if ("ESPCC" == type)
       device = ESPCC(peripheral);
+    else if ("HomeAuto" == type)
+      device = HomeAuto(peripheral);
     else if ("PowerMeter" == type)
       device = PowerMeter(peripheral);
     else if ("HeartRateMonitor" == type)
@@ -532,8 +534,8 @@ class PowerMeter extends Device {
     tileStreams.addAll({
       "power": DeviceTileStream(
         label: "Power",
-        stream: power?.powerStream.map<String>((value) => "$value"),
-        initialData: power?.lastPower.toString,
+        stream: power?.powerStream.map<Widget>((value) => Text(value.toString())),
+        initialData: () => Text(power?.lastPower.toString() ?? ' '),
         units: "W",
         history: power?.histories['power'],
       ),
@@ -541,8 +543,8 @@ class PowerMeter extends Device {
     tileStreams.addAll({
       "cadence": DeviceTileStream(
         label: "Cadence",
-        stream: power?.cadenceStream.map<String>((value) => "$value"),
-        initialData: power?.lastCadence.toString,
+        stream: power?.cadenceStream.map<Widget>((value) => Text(value.toString())),
+        initialData: () => Text(power?.lastCadence.toString() ?? ' '),
         units: "rpm",
         history: power?.histories['cadence'],
       ),
@@ -597,8 +599,8 @@ class HeartRateMonitor extends Device {
     tileStreams.addAll({
       "heartRate": DeviceTileStream(
         label: "Heart Rate",
-        stream: heartRate?.defaultStream.map<String>((value) => "$value"),
-        initialData: heartRate?.lastValueToString,
+        stream: heartRate?.defaultStream.map<Widget>((value) => Text(value.toString())),
+        initialData: () => Text(heartRate?.lastValueToString() ?? ' '),
         units: "bpm",
         history: heartRate?.histories['measurement'],
       ),
@@ -771,16 +773,16 @@ class PeerSettings with Debug {
 
 class DeviceTileStream {
   String label;
-  Stream<String>? stream;
-  String Function()? initialData;
-  String units;
+  Stream<Widget>? stream;
+  Widget Function()? initialData;
+  String? units;
   CharacteristicHistory? history;
 
   DeviceTileStream({
     required this.label,
     required this.stream,
     required this.initialData,
-    required this.units,
+    this.units,
     this.history,
   });
 }
