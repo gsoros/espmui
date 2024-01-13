@@ -27,6 +27,7 @@ class ESPCC extends Device {
   late ESPCCSyncer syncer;
   final settings = AlwaysNotifier<ESPCCSettings>(ESPCCSettings());
   final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
+  final peerSettings = AlwaysNotifier<PeerSettings>(PeerSettings());
   final files = AlwaysNotifier<ESPCCFileList>(ESPCCFileList());
   //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
   StreamSubscription<ApiMessage>? _apiSubsciption;
@@ -95,6 +96,11 @@ class ESPCC extends Device {
 
     if (await settings.value.handleApiMessageSuccess(message)) {
       settings.notifyListeners();
+      return true;
+    }
+
+    if (await peerSettings.value.handleApiMessageSuccess(message)) {
+      peerSettings.notifyListeners();
       return true;
     }
 
@@ -634,11 +640,8 @@ class ESPCCFile with Debug {
 }
 
 class ESPCCSettings with Debug {
-  List<String> peers = [];
   Map<int, int> touchThres = {};
   Map<int, int> touchRead = {};
-  List<String> scanResults = [];
-  bool scanning = false;
   bool touchEnabled = true;
   bool otaMode = false;
   int recording = ESPCCRecordingState.UNKNOWN;
@@ -662,26 +665,7 @@ class ESPCCSettings with Debug {
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
     String tag = "";
     //logD("$tag $message");
-    String? valueS = message.valueAsString;
-
-    if ("peers" == message.commandStr &&
-        valueS != null &&
-        !valueS.startsWith("scan:") &&
-        !valueS.startsWith("scanResult:") &&
-        !valueS.startsWith("add:") &&
-        !valueS.startsWith("delete:")) {
-      String? v = message.valueAsString;
-      if (null == v) return false;
-      List<String> tokens = v.split("|");
-      List<String> values = [];
-      tokens.forEach((token) {
-        if (token.length < 1) return;
-        values.add(token);
-      });
-      logD("$tag peers=$values");
-      peers = values;
-      return true;
-    }
+    //String? valueS = message.valueAsString;
 
     if ("touch" == message.commandStr) {
       String? v = message.valueAsString;
@@ -721,22 +705,6 @@ class ESPCCSettings with Debug {
           logD("$tag touchEnabled=$touchEnabled");
         }
       }
-      return true;
-    }
-
-    if ("peers" == message.commandStr && message.valueAsString != null && message.valueAsString!.startsWith("scanResult:")) {
-      String result = message.valueAsString!.substring("scanResult:".length);
-      logD("$tag scanResult: received $result");
-      if (0 == result.length) return false;
-      if (scanResults.contains(result)) return false;
-      scanResults.add(result);
-      return true;
-    }
-
-    if ("peers" == message.commandStr && message.valueAsString != null && message.valueAsString!.startsWith("scan:")) {
-      int? timeout = int.tryParse(message.valueAsString!.substring("scan:".length));
-      logD("$tag peers=scan:$timeout");
-      scanning = null != timeout && 0 < timeout;
       return true;
     }
 
@@ -825,9 +793,7 @@ class ESPCCSettings with Debug {
   @override
   bool operator ==(other) {
     return (other is ESPCCSettings) &&
-        other.peers == peers &&
         other.touchThres == touchThres &&
-        other.scanning == scanning &&
         other.touchEnabled == touchEnabled &&
         other.otaMode == otaMode &&
         other.recording == recording &&
@@ -845,9 +811,7 @@ class ESPCCSettings with Debug {
 
   @override
   int get hashCode =>
-      peers.hashCode ^
       touchThres.hashCode ^
-      scanning.hashCode ^
       touchEnabled.hashCode ^
       otaMode.hashCode ^
       recording.hashCode ^
@@ -864,9 +828,7 @@ class ESPCCSettings with Debug {
 
   String toString() {
     return "${describeIdentity(this)} ("
-        "peers: $peers, "
         "touchThres: $touchThres, "
-        "scanning: $scanning, "
         "touchEnabled: $touchEnabled, "
         "otaMode: $otaMode, "
         "recording: $recording, "
@@ -881,18 +843,6 @@ class ESPCCSettings with Debug {
         "vescRampNumSteps: $vescRampNumSteps, "
         "vescRampTime: $vescRampTime"
         ")";
-  }
-
-  TextEditingController? getController({String? peer, String? initialValue}) {
-    if (null == peer || peer.length <= 0) return null;
-    if (null == peerPasskeyEditingControllers[peer]) peerPasskeyEditingControllers[peer] = TextEditingController(text: initialValue);
-    return peerPasskeyEditingControllers[peer];
-  }
-
-  void dispose() {
-    peerPasskeyEditingControllers.forEach((_, value) {
-      value.dispose();
-    });
   }
 }
 

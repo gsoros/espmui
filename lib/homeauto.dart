@@ -1,4 +1,5 @@
 import 'dart:async';
+//import 'dart:html';
 //import 'dart:io';
 //import 'dart:math';
 // import 'dart:typed_data';
@@ -25,10 +26,10 @@ class HomeAuto extends Device {
   late Api api;
   final settings = AlwaysNotifier<HomeAutoSettings>(HomeAutoSettings());
   final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
+  final peerSettings = AlwaysNotifier<PeerSettings>(PeerSettings());
   //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
   StreamSubscription<ApiMessage>? _apiSubsciption;
   //Stream<HomeAutoSettings>? _settingsStream;
-  final switches = AlwaysNotifier<Map<String, HomeAutoSwitch>>({});
 
   @override
   int get defaultMtu => 512;
@@ -68,9 +69,14 @@ class HomeAuto extends Device {
       return true;
     }
 
+    if (await peerSettings.value.handleApiMessageSuccess(message)) {
+      peerSettings.notifyListeners();
+      return true;
+    }
+
     if ("switch" == message.command) {
       logD("parsing switch=${message.valueAsString}");
-      List<String>? sws = message.valueAsString?.split(';');
+      List<String>? sws = message.valueAsString?.split('|');
       sws?.forEach((s) {
         List<String> parts = s.split(':');
         if (2 != parts.length) return;
@@ -84,14 +90,14 @@ class HomeAuto extends Device {
           socOn: int.tryParse(tokens[4]),
           socOff: int.tryParse(tokens[5]),
         );
-        if (!switches.value.containsKey(parts[0])) {
+        if (!settings.value.switches.containsKey(parts[0])) {
           logI("$tag adding ${parts[0]}: $sw");
-          switches.value.addAll({parts[0]: sw});
+          settings.value.switches.addAll({parts[0]: sw});
           return;
         }
-        if (switches.value[parts[0]] != sw) {
+        if (settings.value.switches[parts[0]] != sw) {
           logI("$tag updating ${parts[0]}: $sw");
-          switches.value[parts[0]] = sw;
+          settings.value.switches[parts[0]] = sw;
         }
       });
       return true;
@@ -126,8 +132,11 @@ class HomeAuto extends Device {
 
     settings.value = HomeAutoSettings();
     settings.notifyListeners();
+    logD("switches: " + settings.value.switches.toString());
     wifiSettings.value = WifiSettings();
     wifiSettings.notifyListeners();
+    peerSettings.value = PeerSettings();
+    peerSettings.notifyListeners();
     api.reset();
     await super.onDisconnected();
   }
@@ -149,55 +158,22 @@ class HomeAuto extends Device {
 
   @override
   IconData get iconData => DeviceIcon("HomeAuto").data();
+
+  @override
+  void onCommandAdded(String command) {
+    if ("switch" == command) api.sendCommand("switch=all");
+  }
 }
 
 class HomeAutoSettings with Debug {
-  List<String> peers = [];
-  List<String> scanResults = [];
-  bool scanning = false;
   bool otaMode = false;
-  Map<String, TextEditingController> peerPasskeyEditingControllers = {};
+  Map<String, HomeAutoSwitch> switches = {};
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    String tag = "";
+    //String tag = "";
     //logD("$tag $message");
-    String? valueS = message.valueAsString;
-
-    if ("peers" == message.commandStr &&
-        valueS != null &&
-        !valueS.startsWith("scan:") &&
-        !valueS.startsWith("scanResult:") &&
-        !valueS.startsWith("add:") &&
-        !valueS.startsWith("delete:")) {
-      String? v = message.valueAsString;
-      if (null == v) return false;
-      List<String> tokens = v.split("|");
-      List<String> values = [];
-      tokens.forEach((token) {
-        if (token.length < 1) return;
-        values.add(token);
-      });
-      logD("$tag peers=$values");
-      peers = values;
-      return true;
-    }
-
-    if ("peers" == message.commandStr && message.valueAsString != null && message.valueAsString!.startsWith("scanResult:")) {
-      String result = message.valueAsString!.substring("scanResult:".length);
-      logD("$tag scanResult: received $result");
-      if (0 == result.length) return false;
-      if (scanResults.contains(result)) return false;
-      scanResults.add(result);
-      return true;
-    }
-
-    if ("peers" == message.commandStr && message.valueAsString != null && message.valueAsString!.startsWith("scan:")) {
-      int? timeout = int.tryParse(message.valueAsString!.substring("scan:".length));
-      logD("$tag peers=scan:$timeout");
-      scanning = null != timeout && 0 < timeout;
-      return true;
-    }
+    //String? valueS = message.valueAsString;
 
     if ("system" == message.commandStr) {
       if ("ota" == message.valueAsString) {
@@ -212,29 +188,14 @@ class HomeAutoSettings with Debug {
 
   @override
   bool operator ==(other) {
-    return (other is HomeAutoSettings) && other.peers == peers && other.scanning == scanning && other.otaMode == otaMode;
+    return (other is HomeAutoSettings) && other.otaMode == otaMode && other.switches == switches;
   }
 
   @override
-  int get hashCode => peers.hashCode ^ scanning.hashCode ^ otaMode.hashCode;
+  int get hashCode => otaMode.hashCode ^ switches.hashCode;
+
   String toString() {
-    return "${describeIdentity(this)} ("
-        "peers: $peers, "
-        "scanning: $scanning, "
-        "otaMode: $otaMode, "
-        ")";
-  }
-
-  TextEditingController? getController({String? peer, String? initialValue}) {
-    if (null == peer || peer.length <= 0) return null;
-    if (null == peerPasskeyEditingControllers[peer]) peerPasskeyEditingControllers[peer] = TextEditingController(text: initialValue);
-    return peerPasskeyEditingControllers[peer];
-  }
-
-  void dispose() {
-    peerPasskeyEditingControllers.forEach((_, value) {
-      value.dispose();
-    });
+    return "${describeIdentity(this)} (otaMode: $otaMode, sitches: $switches)";
   }
 }
 
@@ -264,8 +225,8 @@ class HomeAutoSwitch {
 
   String toString() {
     return "${describeIdentity(this)} ("
-        "mode: $mode, "
-        "state: $state, "
+        "mode: ${HomeAutoSwitchMode.asString(mode)}, "
+        "state: ${HomeAutoSwitchState.asString(state)}, "
         "vOn: $voltageOn, "
         "vOff: $voltageOff, "
         "sOn: $socOn, "
@@ -287,6 +248,14 @@ class HomeAutoSwitchMode {
     if ('soc' == s) return Soc;
     return null;
   }
+
+  static String asString(int? v) {
+    if (Off == v) return "off";
+    if (On == v) return "on";
+    if (Voltage == v) return "voltage";
+    if (Soc == v) return "soc";
+    return "unknown";
+  }
 }
 
 class HomeAutoSwitchState {
@@ -297,6 +266,12 @@ class HomeAutoSwitchState {
     if ('off' == s) return Off;
     if ('on' == s) return On;
     return null;
+  }
+
+  static String asString(int? v) {
+    if (Off == v) return "off";
+    if (On == v) return "on";
+    return "unknown";
   }
 }
 

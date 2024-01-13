@@ -390,6 +390,7 @@ class Api with Debug {
         } else {
           logD("$tag adding command $command ($code)");
           commands.addAll({code: command});
+          device.onCommandAdded(command);
         }
 
         if (null == value) {

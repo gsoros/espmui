@@ -239,7 +239,7 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
   void _appendToHistory() {
     super._appendToHistory();
     var history = histories['charge'];
-    if (null != lastValue || null != history) history!.append(lastValue!);
+    if (null != lastValue && null != history) history.append(lastValue!);
   }
 
   @override

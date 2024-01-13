@@ -42,8 +42,8 @@ class AlwaysNotifier<T> extends ValueNotifier<T> with Debug {
 
   @override
   set value(T newValue) {
-    //debugLog('AlwaysNotifier set value: $newValue');
-    if (super.value == value) notifyListeners();
+    //logD('AlwaysNotifier set value: $newValue');
+    if (value == newValue) notifyListeners();
     super.value = newValue;
   }
 

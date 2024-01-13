@@ -1219,8 +1219,8 @@ class EspccPeersEditorWidget extends StatelessWidget with Debug {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ESPCCSettings>(
-        valueListenable: device.settings,
+    return ValueListenableBuilder<PeerSettings>(
+        valueListenable: device.peerSettings,
         builder: (_, settings, __) {
           return Column(children: [
             EspccPeersListWidget(
@@ -1238,9 +1238,9 @@ class EspccPeersEditorWidget extends StatelessWidget with Debug {
               onPressed: settings.scanning
                   ? null
                   : () {
-                      //device.settings.value.scanning = true;
-                      device.settings.value.scanResults = [];
-                      device.settings.notifyListeners();
+                      //device.peerSettings.value.scanning = true;
+                      device.peerSettings.value.scanResults = [];
+                      device.peerSettings.notifyListeners();
                       device.api.sendCommand("peers=scan:10");
                     },
             ),
@@ -1545,7 +1545,7 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
           passcodeEntry = SettingInputWidget(
             name: "Passcode",
             keyboardType: TextInputType.number,
-            textController: device?.settings.value.getController(peer: peer),
+            textController: device?.peerSettings.value.getController(peer: peer),
           );
           commandProcessor = (command, passcodeEntry) {
             if (null == command) return command;
@@ -1572,7 +1572,7 @@ class EspccPeersListWidget extends StatelessWidget with Debug {
           passcodeEntry = SettingInputWidget(
             name: "Passcode",
             keyboardType: TextInputType.number,
-            textController: device?.settings.value.getController(peer: peer),
+            textController: device?.peerSettings.value.getController(peer: peer),
           );
           commandProcessor = (command, passcodeEntry) {
             if (null == command) return command;
@@ -1666,6 +1666,13 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
       );
     }
 
+    final peers = ValueListenableBuilder<PeerSettings>(
+      valueListenable: device.peerSettings,
+      builder: (_, settings, __) {
+        return EspccPeersListWidget(peers: settings.peers);
+      },
+    );
+
     final deviceSettings = ValueListenableBuilder<ESPCCSettings>(
       valueListenable: device.settings,
       builder: (_, settings, __) {
@@ -1690,7 +1697,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
             Flexible(
               child: Column(children: [
                 Row(children: [Text("Peers")]),
-                EspccPeersListWidget(peers: settings.peers),
+                peers,
               ]),
             ),
             EspmuiElevatedButton(

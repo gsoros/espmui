@@ -518,6 +518,8 @@ class Device with Debug {
       onlyAlertOnce: true,
     );
   }
+
+  void onCommandAdded(String command) {}
 }
 
 class PowerMeter extends Device {
@@ -689,6 +691,81 @@ class WifiSettings with Debug {
         "staEnabled: $staEnabled, "
         "staSSID: $staSSID, "
         "staPassword: $staPassword)";
+  }
+}
+
+class PeerSettings with Debug {
+  List<String> peers = [];
+  List<String> scanResults = [];
+  bool scanning = false;
+  Map<String, TextEditingController> peerPasskeyEditingControllers = {};
+
+  /// returns true if the message does not need any further handling
+  Future<bool> handleApiMessageSuccess(ApiMessage message) async {
+    String tag = "PeerSettings.handleApiMessageSuccess";
+    //logD("$tag $message");
+    String? valueS = message.valueAsString;
+
+    if ("peers" == message.commandStr &&
+        valueS != null &&
+        !valueS.startsWith("scan:") &&
+        !valueS.startsWith("scanResult:") &&
+        !valueS.startsWith("add:") &&
+        !valueS.startsWith("delete:")) {
+      String? v = message.valueAsString;
+      if (null == v) return false;
+      List<String> tokens = v.split("|");
+      List<String> values = [];
+      tokens.forEach((token) {
+        if (token.length < 1) return;
+        values.add(token);
+      });
+      logD("$tag peers=$values");
+      peers = values;
+      return true;
+    }
+
+    if ("peers" == message.commandStr && message.valueAsString != null && message.valueAsString!.startsWith("scanResult:")) {
+      String result = message.valueAsString!.substring("scanResult:".length);
+      logD("$tag scanResult: received $result");
+      if (0 == result.length) return false;
+      if (scanResults.contains(result)) return false;
+      scanResults.add(result);
+      return true;
+    }
+
+    if ("peers" == message.commandStr && message.valueAsString != null && message.valueAsString!.startsWith("scan:")) {
+      int? timeout = int.tryParse(message.valueAsString!.substring("scan:".length));
+      logD("$tag peers=scan:$timeout");
+      scanning = null != timeout && 0 < timeout;
+      return true;
+    }
+
+    return false;
+  }
+
+  @override
+  bool operator ==(other) {
+    return (other is PeerSettings) && other.peers == peers;
+  }
+
+  @override
+  int get hashCode => peers.hashCode;
+
+  String toString() {
+    return "${describeIdentity(this)} (peers: $peers)";
+  }
+
+  TextEditingController? getController({String? peer, String? initialValue}) {
+    if (null == peer || peer.length <= 0) return null;
+    if (null == peerPasskeyEditingControllers[peer]) peerPasskeyEditingControllers[peer] = TextEditingController(text: initialValue);
+    return peerPasskeyEditingControllers[peer];
+  }
+
+  void dispose() {
+    peerPasskeyEditingControllers.forEach((_, value) {
+      value.dispose();
+    });
   }
 }
 
