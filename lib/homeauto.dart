@@ -92,14 +92,19 @@ class HomeAuto extends Device {
         List<String> parts = s.split(':');
         if (2 != parts.length) return;
         List<String> tokens = parts[1].split(',');
-        if (6 != tokens.length) return;
+        if (8 != tokens.length) {
+          logE("invalid switch: $s");
+          return;
+        }
         var sw = HomeAutoSwitch(
           mode: HomeAutoSwitchMode.fromString(tokens[0]),
           state: HomeAutoSwitchState.fromString(tokens[1]),
-          voltageOn: double.tryParse(tokens[2]),
-          voltageOff: double.tryParse(tokens[3]),
+          bvOn: double.tryParse(tokens[2]),
+          bvOff: double.tryParse(tokens[3]),
           socOn: int.tryParse(tokens[4]),
           socOff: int.tryParse(tokens[5]),
+          cvmOn: double.tryParse(tokens[6]),
+          cvmOff: double.tryParse(tokens[7]),
         );
         settings.value.switches.set(parts[0], sw);
         switchesTileStreamController.sink.add(settings.value.switches.asTile);
@@ -207,35 +212,50 @@ class HomeAutoSettings with Debug {
 class HomeAutoSwitch {
   int? mode;
   int? state;
-  double? voltageOn;
-  double? voltageOff;
+  double? bvOn;
+  double? bvOff;
   int? socOn;
   int? socOff;
+  double? cvmOn;
+  double? cvmOff;
 
-  HomeAutoSwitch({this.mode, this.state, this.voltageOn, this.voltageOff, this.socOn, this.socOff});
+  HomeAutoSwitch({
+    this.mode,
+    this.state,
+    this.bvOn,
+    this.bvOff,
+    this.socOn,
+    this.socOff,
+    this.cvmOn,
+    this.cvmOff,
+  });
 
   @override
   bool operator ==(other) {
     return (other is HomeAutoSwitch) &&
         other.mode == mode &&
         other.state == state &&
-        other.voltageOn == voltageOn &&
-        other.voltageOff == voltageOff &&
+        other.bvOn == bvOn &&
+        other.bvOff == bvOff &&
         other.socOn == socOn &&
-        other.socOff == socOff;
+        other.socOff == socOff &&
+        other.cvmOn == cvmOn &&
+        other.cvmOff == cvmOff;
   }
 
   @override
-  int get hashCode => mode.hashCode ^ state.hashCode ^ voltageOn.hashCode ^ voltageOff.hashCode ^ socOn.hashCode ^ socOff.hashCode;
+  int get hashCode => mode.hashCode ^ state.hashCode ^ bvOn.hashCode ^ bvOff.hashCode ^ socOn.hashCode ^ socOff.hashCode ^ cvmOn.hashCode ^ cvmOff.hashCode;
 
   String toString() {
     return "${describeIdentity(this)} ("
         "mode: ${HomeAutoSwitchMode.asString(mode)}, "
         "state: ${HomeAutoSwitchState.asString(state)}, "
-        "vOn: $voltageOn, "
-        "vOff: $voltageOff, "
-        "sOn: $socOn, "
-        "sOff: $socOff"
+        "bvOn: $bvOn, "
+        "bvOff: $bvOff, "
+        "socOn: $socOn, "
+        "socOff: $socOff, "
+        "cvmOn: $cvmOn, "
+        "cvmOff: $cvmOff"
         ")";
   }
 }
@@ -262,22 +282,25 @@ class HomeAutoSwitches {
 class HomeAutoSwitchMode {
   static const int Off = 0;
   static const int On = 1;
-  static const int Voltage = 2;
+  static const int BatteryVoltage = 2;
   static const int Soc = 3;
+  static const int CellVoltageMax = 4;
 
   static int? fromString(String s) {
     if ('off' == s) return Off;
     if ('on' == s) return On;
-    if ('voltage' == s) return Voltage;
+    if ('bv' == s) return BatteryVoltage;
     if ('soc' == s) return Soc;
+    if ('cvm' == s) return CellVoltageMax;
     return null;
   }
 
   static String asString(int? v) {
     if (Off == v) return "off";
     if (On == v) return "on";
-    if (Voltage == v) return "voltage";
+    if (BatteryVoltage == v) return "bv";
     if (Soc == v) return "soc";
+    if (CellVoltageMax == v) return "cvm";
     return "unknown";
   }
 }
