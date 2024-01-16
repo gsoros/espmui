@@ -22,15 +22,10 @@ import 'device_widgets.dart';
 import 'util.dart';
 import 'debug.dart';
 
-class ESPCC extends Device {
-  late Api api;
+class ESPCC extends DeviceWithApiWifiPeers {
   late ESPCCSyncer syncer;
   final settings = AlwaysNotifier<ESPCCSettings>(ESPCCSettings());
-  final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
-  final peerSettings = AlwaysNotifier<PeerSettings>(PeerSettings());
   final files = AlwaysNotifier<ESPCCFileList>(ESPCCFileList());
-  //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
-  StreamSubscription<ApiMessage>? _apiSubsciption;
   Stream<ESPCCSettings>? _settingsStream;
 
   @override
@@ -44,23 +39,21 @@ class ESPCC extends Device {
       'api': CharacteristicListItem(
         EspccApiCharacteristic(this),
       ),
-    });
-    characteristics.addAll({
       'apiLog': CharacteristicListItem(
         ApiLogCharacteristic(this, BleConstants.ESPCC_API_SERVICE_UUID),
         subscribeOnConnect: saveLog.value,
       ),
     });
     api = Api(this, queueDelayMs: 50);
+    apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
+
     syncer = ESPCCSyncer(this);
-    _apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
     _settingsStream = settings.toValueStream().asBroadcastStream();
     tileStreams.addAll({
       "recording": DeviceTileStream(
         label: "Recording status",
         stream: _settingsStream?.map<Widget>((value) => Text(ESPCCRecordingState.getString(value.recording))),
         initialData: () => Text(ESPCCRecordingState.getString(settings.value.recording)),
-        units: "",
       ),
     });
     tileActions.addAll({
@@ -85,22 +78,13 @@ class ESPCC extends Device {
   }
 
   /// returns true if the message does not need any further handling
+  @override
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
     String tag = "";
     //logD("$tag $message");
 
-    if (await wifiSettings.value.handleApiMessageSuccess(message)) {
-      wifiSettings.notifyListeners();
-      return true;
-    }
-
     if (await settings.value.handleApiMessageSuccess(message)) {
       settings.notifyListeners();
-      return true;
-    }
-
-    if (await peerSettings.value.handleApiMessageSuccess(message)) {
-      peerSettings.notifyListeners();
       return true;
     }
 
@@ -182,15 +166,10 @@ class ESPCC extends Device {
       return true;
     }
 
-    //snackbar("${message.info} ${message.command}");
-    logD("unhandled api response: $message");
-
-    return false;
+    return super.handleApiMessageSuccess(message);
   }
 
   Future<void> dispose() async {
-    logD("$name dispose");
-    _apiSubsciption?.cancel();
     super.dispose();
   }
 
@@ -204,18 +183,10 @@ class ESPCC extends Device {
 
   Future<void> onDisconnected() async {
     logD("$name onDisconnected()");
-    // if (await connected) {
-    //   logD("but $name is connected");
-    //   return;
-    // }
-
     settings.value = ESPCCSettings();
     settings.notifyListeners();
-    wifiSettings.value = WifiSettings();
-    wifiSettings.notifyListeners();
     files.value = ESPCCFileList();
     files.notifyListeners();
-    api.reset();
     await super.onDisconnected();
   }
 

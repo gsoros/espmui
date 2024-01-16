@@ -23,9 +23,13 @@ import 'debug.dart';
 
 /*
 Device: Battery
-  ├─ PowerMeter: Power(, Cadence)
-  │    └─ ESPM: Api, WeightScale, Hall, Temp
-  ├─ ESPCC: Api, Rec
+  │   │
+  │   DeviceWithApi: Api
+  │       ├─ PowerMeter: Power(, Cadence)
+  │       │    └─ ESPM: WeightScale, Hall, Temp
+  │       └─ DeviceWithApiWifiPeers
+  │            ├─ ESPCC: Rec
+  │            └─ Homeauto
   ├─ HeartrateMonitor: Heartrate
   ├─ TODO CadenceSensor: Cadence
   └─ TODO SpeedSensor: Speed
@@ -524,7 +528,66 @@ class Device with Debug {
   void onCommandAdded(String command) {}
 }
 
-class PowerMeter extends Device {
+class DeviceWithApi extends Device {
+  late Api api;
+  StreamSubscription<ApiMessage>? apiSubsciption;
+  ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
+
+  DeviceWithApi(super.peripheral);
+
+  /// returns true if the message does not need any further handling
+  Future<bool> handleApiMessageSuccess(ApiMessage message) async {
+    logD("DeviceWithApi.handleApiMessageSuccess() unhandled: $message");
+    return true;
+  }
+
+  Future<void> onDisconnected() async {
+    api.reset();
+    await super.onDisconnected();
+  }
+
+  Future<void> dispose() async {
+    logD("$name dispose");
+    apiSubsciption?.cancel();
+    super.dispose();
+  }
+}
+
+class DeviceWithApiWifiPeers extends DeviceWithApi {
+  final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
+  final peerSettings = AlwaysNotifier<PeerSettings>(PeerSettings());
+
+  DeviceWithApiWifiPeers(super.peripheral);
+
+  /// returns true if the message does not need any further handling
+  Future<bool> handleApiMessageSuccess(ApiMessage message) async {
+    if (await wifiSettings.value.handleApiMessageSuccess(message)) {
+      wifiSettings.notifyListeners();
+      return true;
+    }
+
+    if (await peerSettings.value.handleApiMessageSuccess(message)) {
+      peerSettings.notifyListeners();
+      return true;
+    }
+
+    return super.handleApiMessageSuccess(message);
+  }
+
+  Future<void> onDisconnected() async {
+    logD("$name onDisconnected()");
+    wifiSettings.value = WifiSettings();
+    wifiSettings.notifyListeners();
+    await super.onDisconnected();
+  }
+
+  Future<void> dispose() async {
+    logD("$name dispose");
+    super.dispose();
+  }
+}
+
+class PowerMeter extends DeviceWithApi {
   PowerCharacteristic? get power => characteristic("power") as PowerCharacteristic?;
 
   PowerMeter(Peripheral peripheral) : super(peripheral) {
@@ -722,7 +785,7 @@ class PeerSettings with Debug {
         if (token.length < 1) return;
         values.add(token);
       });
-      logD("$tag peers=$values");
+      //logD("$tag peers=$values");
       peers = values;
       return true;
     }

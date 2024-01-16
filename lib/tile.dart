@@ -131,7 +131,8 @@ class Tile extends StatelessWidget with Debug {
         stream: stream?.stream,
         initialData: stream?.initialData != null ? stream?.initialData!() : null,
         builder: (_, snapshot) {
-          if (!snapshot.hasData || (null == snapshot.data)) return Text(' ');
+          if (!snapshot.hasData || (null == snapshot.data) || ('Text("")' == snapshot.data.toString())) return Empty();
+          logD('snapshot.data: ' + snapshot.data.toString());
           return snapshot.data!;
         },
       );

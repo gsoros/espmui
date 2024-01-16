@@ -98,7 +98,7 @@ class ApiMessage with Debug {
     if (this.minDelayMs > 10000) this.minDelayMs = 10000;
     var maxAttemtsTotalTime = this.maxAttempts * this.minDelayMs;
     if (this.maxAgeMs < maxAttemtsTotalTime) this.maxAgeMs = maxAttemtsTotalTime + this.minDelayMs;
-    logD("Created $this");
+    //logD("Created $this");
   }
 
   /// Attempts to create commandCode and commandStr from command
@@ -238,6 +238,7 @@ class Api with Debug {
 
   Api(this.device, {this.queueDelayMs = 100}) {
     commands.addAll(_initialCommands);
+    if (null == characteristic) logE('ApiCharacteristic is NULL');
     _subscription = characteristic?.defaultStream.listen((reply) => _onNotify(reply));
   }
 
@@ -254,7 +255,7 @@ class Api with Debug {
     _timer = null;
   }
 
-  /// format: resultCode[:resultStr];commandCode[]:commandStr][=[value]]
+  /// format: resultCode[:resultStr];commandCode[:commandStr][=[value]]
   void _onNotify(String reply) {
     String tag = device.name ?? "unknown device";
     //logD("$tag $reply");
@@ -352,7 +353,7 @@ class Api with Debug {
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
     String tag = "${device.name}";
-    //logD("$tag handleApiMessageSuccess $message");
+    //logD("$tag Api.handleApiMessageSuccess() $message");
 
     if ("init" == message.commandStr) {
       if (null == message.value) {
@@ -409,7 +410,7 @@ class Api with Debug {
           _onDone(m);
         }
       });
-      device.requestMtu(device.defaultMtu);
+      // device.requestMtu(device.defaultMtu);
       return true;
     }
 

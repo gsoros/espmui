@@ -18,13 +18,10 @@ import 'util.dart';
 import 'debug.dart';
 
 class ESPM extends PowerMeter {
-  late Api api;
   final weightServiceMode = ValueNotifier<int>(ESPMWeightServiceMode.UNKNOWN);
   final hallEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
   late final AlwaysNotifier<ESPMSettings> settings;
   final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
-  //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
-  StreamSubscription<ApiMessage>? _apiSubsciption;
 
   WeightScaleCharacteristic? get weightScaleChar => characteristic("weightScale") as WeightScaleCharacteristic?;
   HallCharacteristic? get hallChar => characteristic("hall") as HallCharacteristic?;
@@ -49,10 +46,8 @@ class ESPM extends PowerMeter {
         subscribeOnConnect: true,
       ),
     });
-    api = Api(this);
-    //api.commands = {1: "config"};
-    // listen to api message done events
-    _apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
+    api = Api(this, queueDelayMs: 50);
+    apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
     tileStreams.addAll({
       "scale": DeviceTileStream(
         label: "Weight Scale",
@@ -92,6 +87,7 @@ class ESPM extends PowerMeter {
   }
 
   /// returns true if the message does not need any further handling
+  @override
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
     //logD("handleApiDoneMessage $message");
 
@@ -122,12 +118,11 @@ class ESPM extends PowerMeter {
       return true;
     }
 
-    return false;
+    return super.handleApiMessageSuccess(message);
   }
 
   Future<void> dispose() async {
     logD("$name dispose");
-    _apiSubsciption?.cancel();
     super.dispose();
   }
 
@@ -139,7 +134,6 @@ class ESPM extends PowerMeter {
   }
 
   Future<void> onDisconnected() async {
-    //logD("_onDisconnected()");
     _resetInit();
     await super.onDisconnected();
   }
@@ -172,7 +166,6 @@ class ESPM extends PowerMeter {
     settings.value = ESPMSettings(this, tc: settings.value.tc); // preserve collected values
     //logD("_resetInit tc.isCollecting: ${settings.value.tc.isCollecting}");
     settings.notifyListeners();
-    api.reset();
   }
 
   @override

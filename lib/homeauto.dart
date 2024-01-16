@@ -22,13 +22,8 @@ import 'device_widgets.dart';
 import 'util.dart';
 import 'debug.dart';
 
-class HomeAuto extends Device {
-  late Api api;
+class HomeAuto extends DeviceWithApiWifiPeers {
   final settings = AlwaysNotifier<HomeAutoSettings>(HomeAutoSettings());
-  final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
-  final peerSettings = AlwaysNotifier<PeerSettings>(PeerSettings());
-  //ApiCharacteristic? get apiChar => characteristic("api") as ApiCharacteristic?;
-  StreamSubscription<ApiMessage>? _apiSubsciption;
   //Stream<HomeAutoSettings>? _settingsStream;
 
   final switchesTileStreamController = StreamController<Widget>.broadcast();
@@ -45,22 +40,20 @@ class HomeAuto extends Device {
       'api': CharacteristicListItem(
         HomeAutoApiCharacteristic(this),
       ),
-    });
-    characteristics.addAll({
       'apiLog': CharacteristicListItem(
         ApiLogCharacteristic(this, BleConstants.HOMEAUTO_API_SERVICE_UUID),
         subscribeOnConnect: saveLog.value,
-      ),
+      )
     });
+
     api = Api(this, queueDelayMs: 50);
-    _apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
-    //_settingsStream = settings.toValueStream().asBroadcastStream();
+    apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
 
     tileStreams.addAll({
       "switches": DeviceTileStream(
         label: "Switches",
         stream: switchesTileStream,
-        initialData: () => Text('...'),
+        initialData: () => settings.value.switches.asTile,
       )
     });
   }
@@ -77,11 +70,6 @@ class HomeAuto extends Device {
 
     if (await settings.value.handleApiMessageSuccess(message)) {
       settings.notifyListeners();
-      return true;
-    }
-
-    if (await peerSettings.value.handleApiMessageSuccess(message)) {
-      peerSettings.notifyListeners();
       return true;
     }
 
@@ -112,15 +100,22 @@ class HomeAuto extends Device {
       return true;
     }
 
-    //snackbar("${message.info} ${message.command}");
-    logD("unhandled api response: $message");
+    if ("ep" == message.command) {
+      logD("parsing ep=${message.arg}");
+      List<String>? tokens = message.valueAsString?.split(',');
+      tokens?.forEach((s) {
+        List<String> kv = s.split(':');
+        if (2 != kv.length) return;
+        logD('ep: ' + kv[0] + ' = ' + kv[1]);
+      });
+      return true;
+    }
 
-    return false;
+    return super.handleApiMessageSuccess(message);
   }
 
   Future<void> dispose() async {
     logD("$name dispose");
-    _apiSubsciption?.cancel();
     switchesTileStreamController.close();
     super.dispose();
   }
@@ -129,7 +124,9 @@ class HomeAuto extends Device {
     logD("_onConnected()");
     // api char can use values longer than 20 bytes
     await requestMtu(512);
+    logD("calling super.onConnected()");
     await super.onConnected();
+    logD("calling _requestInit()");
     _requestInit();
   }
 
@@ -147,7 +144,6 @@ class HomeAuto extends Device {
     wifiSettings.notifyListeners();
     peerSettings.value = PeerSettings();
     peerSettings.notifyListeners();
-    api.reset();
     await super.onDisconnected();
   }
 
@@ -163,7 +159,12 @@ class HomeAuto extends Device {
       minDelayMs: 10000,
       maxAttempts: 3,
     );
-    //await Future.delayed(Duration(milliseconds: 250));
+    await Future.delayed(Duration(seconds: 2));
+    await api.request<String>(
+      "ep=dump",
+      minDelayMs: 10000,
+      maxAttempts: 3,
+    );
   }
 
   @override
@@ -178,6 +179,10 @@ class HomeAuto extends Device {
 class HomeAutoSettings with Debug {
   bool otaMode = false;
   final switches = HomeAutoSwitches();
+
+  HomeAutoSettings() {
+    logD('construct');
+  }
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
@@ -209,7 +214,7 @@ class HomeAutoSettings with Debug {
   }
 }
 
-class HomeAutoSwitch {
+class HomeAutoSwitch with Debug {
   int? mode;
   int? state;
   double? bvOn;
@@ -260,10 +265,15 @@ class HomeAutoSwitch {
   }
 }
 
-class HomeAutoSwitches {
+class HomeAutoSwitches with Debug {
   Map<String, HomeAutoSwitch> values = {};
 
+  HomeAutoSwitches() {
+    logD("construct");
+  }
+
   void set(String name, HomeAutoSwitch value) {
+    logD("set $name $value");
     if (values.containsKey(name))
       values[name] = value;
     else
@@ -275,7 +285,17 @@ class HomeAutoSwitches {
     values.forEach((key, value) {
       ret += "$key: " + HomeAutoSwitchMode.asString(value.mode) + ' ' + HomeAutoSwitchState.asString(value.state) + "\r\n";
     });
+    if ('' == ret) ret = ' ';
     return Text(ret);
+  }
+
+  String toString() {
+    String sws = '';
+    values.forEach((key, value) {
+      if (0 < sws.length) sws += ', ';
+      sws += "$key ($value)";
+    });
+    return "${describeIdentity(this)} ($sws)";
   }
 }
 

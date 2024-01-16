@@ -12,6 +12,7 @@ import 'api.dart';
 import 'device.dart';
 import 'espm.dart';
 import 'espcc.dart';
+import 'homeauto.dart';
 import 'temperature_compensation_route.dart';
 
 import 'util.dart';
@@ -1213,9 +1214,9 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
   }
 }
 
-class EspccPeersEditorWidget extends StatelessWidget with Debug {
-  final ESPCC device;
-  EspccPeersEditorWidget(this.device);
+class PeersEditorWidget extends StatelessWidget with Debug {
+  final DeviceWithApiWifiPeers device;
+  PeersEditorWidget(this.device);
 
   @override
   Widget build(BuildContext context) {
@@ -1223,12 +1224,12 @@ class EspccPeersEditorWidget extends StatelessWidget with Debug {
         valueListenable: device.peerSettings,
         builder: (_, settings, __) {
           return Column(children: [
-            EspccPeersListWidget(
+            PeersListWidget(
               peers: settings.peers,
               action: "delete",
               device: device,
             ),
-            EspccPeersListWidget(
+            PeersListWidget(
               peers: settings.scanResults.where((element) => settings.peers.contains(element) ? false : true).toList(),
               action: "add",
               device: device,
@@ -1518,12 +1519,12 @@ class DeviceIcon extends StatelessWidget {
   }
 }
 
-class EspccPeersListWidget extends StatelessWidget with Debug {
+class PeersListWidget extends StatelessWidget with Debug {
   final List<String> peers;
   final String action;
-  final ESPCC? device;
+  final DeviceWithApiWifiPeers? device;
 
-  EspccPeersListWidget({required this.peers, this.action = "none", this.device});
+  PeersListWidget({required this.peers, this.action = "none", this.device});
 
   @override
   Widget build(BuildContext context) {
@@ -1669,7 +1670,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
     final peers = ValueListenableBuilder<PeerSettings>(
       valueListenable: device.peerSettings,
       builder: (_, settings, __) {
-        return EspccPeersListWidget(peers: settings.peers);
+        return PeersListWidget(peers: settings.peers);
       },
     );
 
@@ -1704,7 +1705,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
               onPressed: () {
                 dialog(
                   title: Text("Peers"),
-                  body: EspccPeersEditorWidget(device),
+                  body: PeersEditorWidget(device),
                 );
               },
               child: Icon(Icons.edit),
@@ -1891,6 +1892,134 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
               ],
             ),
           ),
+          Divider(color: Colors.white38),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            EspmuiElevatedButton(
+              backgroundColorEnabled: Colors.blue.shade900,
+              onPressed: settings.otaMode
+                  ? null
+                  : () async {
+                      int? code = await device.api.requestResultCode("system=ota");
+                      if (1 == code) {
+                        device.settings.value.otaMode = true;
+                        device.settings.notifyListeners();
+                        snackbar("Waiting for OTA update, reboot to cancel", context);
+                      } else
+                        snackbar("Failed to enter OTA mode", context);
+                    },
+              child: Row(children: [
+                Icon(Icons.system_update),
+                Text("OTA"),
+              ]),
+            ),
+            EspmuiElevatedButton(
+              backgroundColorEnabled: Colors.yellow.shade900,
+              onPressed: () async {
+                int? code = await device.api.requestResultCode("system=reboot");
+                if (code == ApiResult.success) {
+                  // snackbar("Rebooting", context);
+                  // device.disconnect();
+                  // await Future.delayed(Duration(seconds: 2));
+                  // device.connect();
+                } else
+                  snackbar("Failed to reboot", context);
+              },
+              child: Row(children: [
+                Icon(Icons.restart_alt),
+                Text("Reboot"),
+              ]),
+            ),
+          ]),
+        ];
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widgets,
+        );
+      },
+    );
+
+    return ExpansionTile(
+      title: Text("Settings"),
+      textColor: Colors.white,
+      iconColor: Colors.white,
+      children: [
+        Column(mainAxisSize: MainAxisSize.min, children: [
+          frame(apiWifiSettings),
+          frame(deviceSettings),
+          frame(ApiInterfaceWidget(device.api)),
+        ])
+      ],
+    );
+  }
+}
+
+class HomeAutoSettingsWidget extends StatelessWidget with Debug {
+  final HomeAuto device;
+
+  HomeAutoSettingsWidget(this.device);
+
+  @override
+  Widget build(BuildContext context) {
+    Widget frame(Widget child) {
+      return Container(
+        padding: EdgeInsets.all(5),
+        margin: EdgeInsets.only(bottom: 15),
+        decoration: BoxDecoration(
+            //color: Colors.white10,
+            border: Border.all(width: 1, color: Colors.white12),
+            borderRadius: BorderRadius.circular(5)),
+        child: child,
+      );
+    }
+
+    final apiWifiSettings = ApiWifiSettingsWidget(device.api, device.wifiSettings);
+
+    Future<void> dialog({required Widget title, required Widget body, bool scrollable = true}) async {
+      return showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            scrollable: scrollable,
+            title: title,
+            content: Container(
+              child: Column(children: [
+                body,
+              ]),
+            ),
+          );
+        },
+      );
+    }
+
+    final peers = ValueListenableBuilder<PeerSettings>(
+      valueListenable: device.peerSettings,
+      builder: (_, settings, __) {
+        return PeersListWidget(peers: settings.peers);
+      },
+    );
+
+    final deviceSettings = ValueListenableBuilder<HomeAutoSettings>(
+      valueListenable: device.settings,
+      builder: (_, settings, __) {
+        var widgets = <Widget>[
+          Row(children: [
+            Flexible(
+              child: Column(children: [
+                Row(children: [Text("Peers")]),
+                peers,
+              ]),
+            ),
+            EspmuiElevatedButton(
+              onPressed: () {
+                dialog(
+                  title: Text("Peers"),
+                  body: PeersEditorWidget(device),
+                );
+              },
+              child: Icon(Icons.edit),
+            ),
+          ]),
           Divider(color: Colors.white38),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             EspmuiElevatedButton(

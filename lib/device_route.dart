@@ -13,6 +13,7 @@ import 'device_list.dart';
 import 'device_widgets.dart';
 import 'espm.dart';
 import 'espcc.dart';
+import 'homeauto.dart';
 import 'tile.dart';
 
 class DeviceRoute extends StatefulWidget with Debug {
@@ -27,6 +28,7 @@ class DeviceRoute extends StatefulWidget with Debug {
     logD("createState()");
     if (device is ESPM) return ESPMRouteState(device as ESPM);
     if (device is ESPCC) return ESPCCRouteState(device as ESPCC);
+    if (device is HomeAuto) return HomeAutoRouteState(device as HomeAuto);
     if (device is PowerMeter) return PowerMeterRouteState(device as PowerMeter);
     if (device is HeartRateMonitor) return HeartRateMonitorRouteState(device as HeartRateMonitor);
     return DeviceRouteState(device);
@@ -264,6 +266,23 @@ class ESPCCRouteState extends DeviceRouteState {
       ..addAll([
         StaggeredGridItem(
           value: EspccSettingsWidget(espcc),
+          colSpan: 6,
+        ),
+      ]);
+  }
+}
+
+class HomeAutoRouteState extends DeviceRouteState {
+  HomeAuto homeAuto;
+
+  HomeAutoRouteState(this.homeAuto) : super(homeAuto);
+
+  @override
+  _devicePropertyItems() {
+    return super._devicePropertyItems()
+      ..addAll([
+        StaggeredGridItem(
+          value: HomeAutoSettingsWidget(homeAuto),
           colSpan: 6,
         ),
       ]);
