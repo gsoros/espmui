@@ -22,7 +22,7 @@ import 'device_widgets.dart';
 import 'util.dart';
 import 'debug.dart';
 
-class ESPCC extends DeviceWithApiWifiPeers {
+class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
   late ESPCCSyncer syncer;
   final settings = AlwaysNotifier<ESPCCSettings>(ESPCCSettings());
   final files = AlwaysNotifier<ESPCCFileList>(ESPCCFileList());
@@ -35,17 +35,11 @@ class ESPCC extends DeviceWithApiWifiPeers {
   int get largeMtu => 512;
 
   ESPCC(Peripheral peripheral) : super(peripheral) {
-    characteristics.addAll({
-      'api': CharacteristicListItem(
-        EspccApiCharacteristic(this),
-      ),
-      'apiLog': CharacteristicListItem(
-        ApiLogCharacteristic(this, BleConstants.ESPCC_API_SERVICE_UUID),
-        subscribeOnConnect: saveLog.value,
-      ),
-    });
-    api = Api(this, queueDelayMs: 50);
-    apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
+    deviceWithApiConstruct(
+      characteristic: EspccApiCharacteristic(this),
+      handler: handleApiMessageSuccess,
+      serviceUuid: BleConstants.ESPCC_API_SERVICE_UUID,
+    );
 
     syncer = ESPCCSyncer(this);
     _settingsStream = settings.toValueStream().asBroadcastStream();
@@ -78,10 +72,12 @@ class ESPCC extends DeviceWithApiWifiPeers {
   }
 
   /// returns true if the message does not need any further handling
-  @override
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
     String tag = "";
     //logD("$tag $message");
+
+    if (await wifiHandleApiMessageSuccess(message)) return true;
+    if (await peerHandleApiMessageSuccess(message)) return true;
 
     if (await settings.value.handleApiMessageSuccess(message)) {
       settings.notifyListeners();
@@ -166,10 +162,15 @@ class ESPCC extends DeviceWithApiWifiPeers {
       return true;
     }
 
-    return super.handleApiMessageSuccess(message);
+    logD("unhandled: $message");
+    return false;
   }
 
   Future<void> dispose() async {
+    logD("$name dispose");
+    await apiDispose();
+    await wifiDispose();
+    await peerDispose();
     super.dispose();
   }
 
@@ -187,6 +188,9 @@ class ESPCC extends DeviceWithApiWifiPeers {
     settings.notifyListeners();
     files.value = ESPCCFileList();
     files.notifyListeners();
+    await apiOnDisconnected();
+    await wifiOnDisconnected();
+    await peerOnDisconnected();
     await super.onDisconnected();
   }
 

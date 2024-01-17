@@ -1215,7 +1215,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
 }
 
 class PeersEditorWidget extends StatelessWidget with Debug {
-  final DeviceWithApiWifiPeers device;
+  final DeviceWithPeers device;
   PeersEditorWidget(this.device);
 
   @override
@@ -1242,7 +1242,7 @@ class PeersEditorWidget extends StatelessWidget with Debug {
                       //device.peerSettings.value.scanning = true;
                       device.peerSettings.value.scanResults = [];
                       device.peerSettings.notifyListeners();
-                      device.api.sendCommand("peers=scan:10");
+                      (device as DeviceWithApi).api.sendCommand("peers=scan:10");
                     },
             ),
           ]);
@@ -1522,9 +1522,9 @@ class DeviceIcon extends StatelessWidget {
 class PeersListWidget extends StatelessWidget with Debug {
   final List<String> peers;
   final String action;
-  final DeviceWithApiWifiPeers? device;
+  final DeviceWithPeers device;
 
-  PeersListWidget({required this.peers, this.action = "none", this.device});
+  PeersListWidget({required this.peers, this.action = "none", required this.device});
 
   @override
   Widget build(BuildContext context) {
@@ -1546,7 +1546,7 @@ class PeersListWidget extends StatelessWidget with Debug {
           passcodeEntry = SettingInputWidget(
             name: "Passcode",
             keyboardType: TextInputType.number,
-            textController: device?.peerSettings.value.getController(peer: peer),
+            textController: device.peerSettings.value.getController(peer: peer),
           );
           commandProcessor = (command, passcodeEntry) {
             if (null == command) return command;
@@ -1573,7 +1573,7 @@ class PeersListWidget extends StatelessWidget with Debug {
           passcodeEntry = SettingInputWidget(
             name: "Passcode",
             keyboardType: TextInputType.number,
-            textController: device?.peerSettings.value.getController(peer: peer),
+            textController: device.peerSettings.value.getController(peer: peer),
           );
           commandProcessor = (command, passcodeEntry) {
             if (null == command) return command;
@@ -1585,14 +1585,12 @@ class PeersListWidget extends StatelessWidget with Debug {
           };
         }
       }
-      if (null != device?.api) {
-        if ("add" == action) {
-          command = "peers=add:$peer";
-          commandIcon = Icons.link;
-        } else if ("delete" == action) {
-          command = "peers=delete:${parts[0]}";
-          commandIcon = Icons.link_off;
-        }
+      if ("add" == action) {
+        command = "peers=add:$peer";
+        commandIcon = Icons.link;
+      } else if ("delete" == action) {
+        command = "peers=delete:${parts[0]}";
+        commandIcon = Icons.link_off;
       }
       var button = null == command
           ? Empty()
@@ -1600,8 +1598,8 @@ class PeersListWidget extends StatelessWidget with Debug {
               child: Icon(commandIcon),
               onPressed: () {
                 if (null != commandProcessor) command = commandProcessor(command, passcodeEntry);
-                device?.api.sendCommand(command!);
-                device?.api.sendCommand("peers");
+                (device as DeviceWithApi).api.sendCommand(command!);
+                (device as DeviceWithApi).api.sendCommand("peers");
               },
             );
       list.children.add(
@@ -1670,7 +1668,7 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
     final peers = ValueListenableBuilder<PeerSettings>(
       valueListenable: device.peerSettings,
       builder: (_, settings, __) {
-        return PeersListWidget(peers: settings.peers);
+        return PeersListWidget(peers: settings.peers, device: device);
       },
     );
 
@@ -1995,7 +1993,7 @@ class HomeAutoSettingsWidget extends StatelessWidget with Debug {
     final peers = ValueListenableBuilder<PeerSettings>(
       valueListenable: device.peerSettings,
       builder: (_, settings, __) {
-        return PeersListWidget(peers: settings.peers);
+        return PeersListWidget(peers: settings.peers, device: device);
       },
     );
 

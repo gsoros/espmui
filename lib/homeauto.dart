@@ -22,7 +22,7 @@ import 'device_widgets.dart';
 import 'util.dart';
 import 'debug.dart';
 
-class HomeAuto extends DeviceWithApiWifiPeers {
+class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
   final settings = AlwaysNotifier<HomeAutoSettings>(HomeAutoSettings());
   //Stream<HomeAutoSettings>? _settingsStream;
 
@@ -36,18 +36,11 @@ class HomeAuto extends DeviceWithApiWifiPeers {
   int get largeMtu => 512;
 
   HomeAuto(Peripheral peripheral) : super(peripheral) {
-    characteristics.addAll({
-      'api': CharacteristicListItem(
-        HomeAutoApiCharacteristic(this),
-      ),
-      'apiLog': CharacteristicListItem(
-        ApiLogCharacteristic(this, BleConstants.HOMEAUTO_API_SERVICE_UUID),
-        subscribeOnConnect: saveLog.value,
-      )
-    });
-
-    api = Api(this, queueDelayMs: 50);
-    apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
+    deviceWithApiConstruct(
+      characteristic: HomeAutoApiCharacteristic(this),
+      handler: handleApiMessageSuccess,
+      serviceUuid: BleConstants.HOMEAUTO_API_SERVICE_UUID,
+    );
 
     tileStreams.addAll({
       "switches": DeviceTileStream(
@@ -63,10 +56,8 @@ class HomeAuto extends DeviceWithApiWifiPeers {
     //String tag = "handleApiMessageSuccess";
     //logD("$tag $message");
 
-    if (await wifiSettings.value.handleApiMessageSuccess(message)) {
-      wifiSettings.notifyListeners();
-      return true;
-    }
+    if (await wifiHandleApiMessageSuccess(message)) return true;
+    if (await peerHandleApiMessageSuccess(message)) return true;
 
     if (await settings.value.handleApiMessageSuccess(message)) {
       settings.notifyListeners();
@@ -111,12 +102,16 @@ class HomeAuto extends DeviceWithApiWifiPeers {
       return true;
     }
 
-    return super.handleApiMessageSuccess(message);
+    logD("unhandled: $message");
+    return false;
   }
 
   Future<void> dispose() async {
     logD("$name dispose");
     switchesTileStreamController.close();
+    await apiDispose();
+    await wifiDispose();
+    await peerDispose();
     super.dispose();
   }
 
@@ -140,10 +135,9 @@ class HomeAuto extends DeviceWithApiWifiPeers {
     settings.value = HomeAutoSettings();
     settings.notifyListeners();
     logD("switches: " + settings.value.switches.toString());
-    wifiSettings.value = WifiSettings();
-    wifiSettings.notifyListeners();
-    peerSettings.value = PeerSettings();
-    peerSettings.notifyListeners();
+    await apiOnDisconnected();
+    await wifiOnDisconnected();
+    await peerOnDisconnected();
     await super.onDisconnected();
   }
 

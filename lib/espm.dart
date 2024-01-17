@@ -10,29 +10,30 @@ import 'package:flutter/material.dart';
 
 import 'device.dart';
 import 'api.dart';
-//import 'ble.dart';
+import 'ble_constants.dart';
 import 'ble_characteristic.dart';
 import 'temperature_compensation.dart';
 
 import 'util.dart';
 import 'debug.dart';
 
-class ESPM extends PowerMeter {
+class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
   final weightServiceMode = ValueNotifier<int>(ESPMWeightServiceMode.UNKNOWN);
   final hallEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
   late final AlwaysNotifier<ESPMSettings> settings;
-  final wifiSettings = AlwaysNotifier<WifiSettings>(WifiSettings());
 
   WeightScaleCharacteristic? get weightScaleChar => characteristic("weightScale") as WeightScaleCharacteristic?;
   HallCharacteristic? get hallChar => characteristic("hall") as HallCharacteristic?;
   TemperatureCharacteristic? get tempChar => characteristic("temp") as TemperatureCharacteristic?;
 
   ESPM(Peripheral peripheral) : super(peripheral) {
+    deviceWithApiConstruct(
+      characteristic: EspmApiCharacteristic(this),
+      handler: handleApiMessageSuccess,
+      serviceUuid: BleConstants.ESPM_API_SERVICE_UUID,
+    );
     settings = AlwaysNotifier<ESPMSettings>(ESPMSettings(this));
     characteristics.addAll({
-      'api': CharacteristicListItem(
-        EspmApiCharacteristic(this),
-      ),
       'weightScale': CharacteristicListItem(
         WeightScaleCharacteristic(this),
         subscribeOnConnect: false,
@@ -46,8 +47,6 @@ class ESPM extends PowerMeter {
         subscribeOnConnect: true,
       ),
     });
-    api = Api(this, queueDelayMs: 50);
-    apiSubsciption = api.messageSuccessStream.listen((m) => handleApiMessageSuccess(m));
     tileStreams.addAll({
       "scale": DeviceTileStream(
         label: "Weight Scale",
@@ -87,14 +86,10 @@ class ESPM extends PowerMeter {
   }
 
   /// returns true if the message does not need any further handling
-  @override
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
     //logD("handleApiDoneMessage $message");
 
-    if (await wifiSettings.value.handleApiMessageSuccess(message)) {
-      wifiSettings.notifyListeners();
-      return true;
-    }
+    if (await wifiHandleApiMessageSuccess(message)) return true;
 
     if (await settings.value.handleApiMessageSuccess(message)) {
       settings.notifyListeners();
@@ -118,11 +113,14 @@ class ESPM extends PowerMeter {
       return true;
     }
 
-    return super.handleApiMessageSuccess(message);
+    logD("unhandled: $message");
+    return false;
   }
 
   Future<void> dispose() async {
     logD("$name dispose");
+    await apiDispose();
+    await wifiDispose();
     super.dispose();
   }
 
@@ -135,6 +133,8 @@ class ESPM extends PowerMeter {
 
   Future<void> onDisconnected() async {
     _resetInit();
+    await apiOnDisconnected();
+    await wifiOnDisconnected();
     await super.onDisconnected();
   }
 
@@ -161,8 +161,6 @@ class ESPM extends PowerMeter {
 
   void _resetInit() {
     weightServiceMode.value = ESPMWeightServiceMode.UNKNOWN;
-    wifiSettings.value = WifiSettings();
-    wifiSettings.notifyListeners();
     settings.value = ESPMSettings(this, tc: settings.value.tc); // preserve collected values
     //logD("_resetInit tc.isCollecting: ${settings.value.tc.isCollecting}");
     settings.notifyListeners();
