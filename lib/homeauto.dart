@@ -23,7 +23,7 @@ import 'util.dart';
 import 'debug.dart';
 
 class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
-  final settings = AlwaysNotifier<HomeAutoSettings>(HomeAutoSettings());
+  late final AlwaysNotifier<HomeAutoSettings> settings;
   //Stream<HomeAutoSettings>? _settingsStream;
 
   final switchesTileStreamController = StreamController<Widget>.broadcast();
@@ -36,6 +36,8 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
   int get largeMtu => 512;
 
   HomeAuto(Peripheral peripheral) : super(peripheral) {
+    settings = AlwaysNotifier<HomeAutoSettings>(HomeAutoSettings(switchesTileStreamController));
+
     deviceWithApiConstruct(
       characteristic: HomeAutoApiCharacteristic(this),
       handler: handleApiMessageSuccess,
@@ -61,44 +63,6 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
 
     if (await settings.value.handleApiMessageSuccess(message)) {
       settings.notifyListeners();
-      return true;
-    }
-
-    if ("switch" == message.command) {
-      logD("parsing switch=${message.valueAsString}");
-      List<String>? sws = message.valueAsString?.split('|');
-      sws?.forEach((s) {
-        List<String> parts = s.split(':');
-        if (2 != parts.length) return;
-        List<String> tokens = parts[1].split(',');
-        if (8 != tokens.length) {
-          logE("invalid switch: $s");
-          return;
-        }
-        var sw = HomeAutoSwitch(
-          mode: HomeAutoSwitchMode.fromString(tokens[0]),
-          state: HomeAutoSwitchState.fromString(tokens[1]),
-          bvOn: double.tryParse(tokens[2]),
-          bvOff: double.tryParse(tokens[3]),
-          socOn: int.tryParse(tokens[4]),
-          socOff: int.tryParse(tokens[5]),
-          cvmOn: double.tryParse(tokens[6]),
-          cvmOff: double.tryParse(tokens[7]),
-        );
-        settings.value.switches.set(parts[0], sw);
-        switchesTileStreamController.sink.add(settings.value.switches.asTile);
-      });
-      return true;
-    }
-
-    if ("ep" == message.command) {
-      logD("parsing ep=${message.arg}");
-      List<String>? tokens = message.valueAsString?.split(',');
-      tokens?.forEach((s) {
-        List<String> kv = s.split(':');
-        if (2 != kv.length) return;
-        logD('ep: ' + kv[0] + ' = ' + kv[1]);
-      });
       return true;
     }
 
@@ -132,9 +96,9 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
     //   return;
     // }
 
-    settings.value = HomeAutoSettings();
+    settings.value = HomeAutoSettings(switchesTileStreamController);
     settings.notifyListeners();
-    logD("switches: " + settings.value.switches.toString());
+    //logD("switches: " + settings.value.switches.toString());
     await apiOnDisconnected();
     await wifiOnDisconnected();
     await peerOnDisconnected();
@@ -173,8 +137,10 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
 class HomeAutoSettings with Debug {
   bool otaMode = false;
   final switches = HomeAutoSwitches();
+  StreamController<Widget> switchesTileStreamController;
+  final epever = EpeverSettings();
 
-  HomeAutoSettings() {
+  HomeAutoSettings(this.switchesTileStreamController) {
     logD('construct');
   }
 
@@ -192,6 +158,45 @@ class HomeAutoSettings with Debug {
       return false;
     }
 
+    if ("switch" == message.command) {
+      logD("parsing switch=${message.valueAsString}");
+      List<String>? sws = message.valueAsString?.split('|');
+      sws?.forEach((s) {
+        List<String> parts = s.split(':');
+        if (2 != parts.length) return;
+        List<String> tokens = parts[1].split(',');
+        if (8 != tokens.length) {
+          logE("invalid switch: $s");
+          return;
+        }
+        var sw = HomeAutoSwitch(
+          mode: HomeAutoSwitchMode.fromString(tokens[0]),
+          state: HomeAutoSwitchState.fromString(tokens[1]),
+          bvOn: double.tryParse(tokens[2]),
+          bvOff: double.tryParse(tokens[3]),
+          socOn: int.tryParse(tokens[4]),
+          socOff: int.tryParse(tokens[5]),
+          cvmOn: double.tryParse(tokens[6]),
+          cvmOff: double.tryParse(tokens[7]),
+        );
+        switches.set(parts[0], sw);
+        switchesTileStreamController.sink.add(switches.asTile);
+      });
+      return true;
+    }
+
+    if ("ep" == message.command) {
+      logD("parsing ep=${message.arg}");
+      List<String>? tokens = message.valueAsString?.split(',');
+      tokens?.forEach((s) {
+        List<String> kv = s.split(':');
+        if (2 != kv.length) return;
+        logD('ep: ' + kv[0] + ' = ' + kv[1]);
+        epever.set(kv[0], kv[1]);
+      });
+      return true;
+    }
+
     return false;
   }
 
@@ -205,6 +210,61 @@ class HomeAutoSettings with Debug {
 
   String toString() {
     return "${describeIdentity(this)} (otaMode: $otaMode, sitches: $switches)";
+  }
+}
+
+class EpeverSetting<T> {
+  String name;
+  Type type;
+  T? value;
+
+  EpeverSetting(this.name, this.type, [this.value]);
+
+  @override
+  String toString() => "$name: $type($value)";
+}
+
+class EpeverSettings with Debug {
+  Map<String, EpeverSetting> values = {};
+
+  EpeverSettings() {
+    add<int>('cs', 'Number of cells');
+    add<int>('typ', 'Battery type');
+    add<int>('cap', 'Capacity');
+    add<double>('tc', 'Temp coeff.');
+    add<double>('cl', 'Charging limit');
+    add<double>('hvd', 'High voltage disconnect');
+    add<double>('ovr', 'Overvoltage reconnect');
+    add<double>('eqv', 'Eq voltage');
+    add<double>('bv', 'Boost voltage');
+    add<double>('fv', 'Float voltage');
+    add<double>('brv', 'Boost reconnect voltage');
+    add<double>('lvr', 'Low voltage reconnect');
+    add<double>('uvr', 'Undervoltage recover');
+    add<double>('uvw', 'Undervoltage warning');
+    add<double>('lvd', 'Low voltage disconnect');
+    add<double>('dl', 'Discharge limit');
+    add<int>('eqd', 'Eq duration');
+    add<int>('bd', 'Boost duration');
+  }
+
+  void add<T>(String arg, String name) {
+    values[arg] = EpeverSetting<T>(name, T);
+  }
+
+  void set(String arg, String value) {
+    if (null == values[arg]) {
+      logD("$arg not found");
+      return;
+    }
+    if (int == values[arg]!.type) {
+      values[arg]!.value = int.tryParse(value);
+    } else if (double == values[arg]!.type) {
+      values[arg]!.value = double.tryParse(value);
+    } else {
+      logE("unhandled type: ${values[arg]!.type}");
+    }
+    logD("$arg: ${values[arg]}");
   }
 }
 
