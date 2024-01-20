@@ -224,6 +224,7 @@ class Tile extends StatelessWidget with Debug {
                   ),
                   Align(
                     child: FittedBox(
+                      fit: BoxFit.contain,
                       child: DefaultTextStyle.merge(
                         style: TextStyle(
                           color: textColor,

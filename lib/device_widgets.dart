@@ -855,7 +855,7 @@ class ApiSettingSwitchWidget extends StatelessWidget with Debug {
 class EspmuiDropdownWidget extends StatelessWidget with Debug {
   final String? value;
   final List<DropdownMenuItem<String>>? items;
-  final String? name;
+  final Widget? label;
   final void Function(String?)? onChanged;
 
   /// Creates a dropdown button.
@@ -865,7 +865,7 @@ class EspmuiDropdownWidget extends StatelessWidget with Debug {
   EspmuiDropdownWidget({
     required this.value,
     required this.items,
-    this.name,
+    this.label,
     this.onChanged,
   });
 
@@ -899,12 +899,12 @@ class EspmuiDropdownWidget extends StatelessWidget with Debug {
       );
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 10, 0, 0),
-      child: (name == null)
+      child: (label == null)
           ? dropdown
           : Row(children: [
               Expanded(
                 flex: 5,
-                child: Text(name!),
+                child: label!,
               ),
               Expanded(
                 flex: 5,
@@ -927,13 +927,13 @@ class ApiSettingDropdownWidget extends EspmuiDropdownWidget {
     required this.command,
     required String? value,
     required List<DropdownMenuItem<String>>? items,
-    String? name,
+    Widget? label,
     String? commandArg,
     void Function(String?)? onChanged,
   }) : super(
           value: value,
           items: items,
-          name: name,
+          label: label,
           onChanged: (String? value) async {
             if (null == command) return;
             if (onChanged != null) onChanged(value);
@@ -942,7 +942,7 @@ class ApiSettingDropdownWidget extends EspmuiDropdownWidget {
               "$command=$commandArg${value ?? value.toString()}",
               minDelayMs: 2000,
             );
-            if (name != null) snackbar("$name ${value ?? value.toString()} ${result == ApiResult.success ? "success" : " failure"}");
+            if (label != null) snackbar("$label ${value ?? value.toString()} ${result == ApiResult.success ? "success" : " failure"}");
             print("[ApiSettingDropdown] api.requestResultCode($command): $result");
           },
         );
@@ -1015,7 +1015,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             keyboardType: TextInputType.number,
           ),
           ApiSettingDropdownWidget(
-            name: "Negative Torque Method",
+            label: Text('Negative Torque Method'),
             api: device.api,
             command: device.api.commandCode("ntm", logOnError: false),
             value: settings.negativeTorqueMethod.toString(),
@@ -1036,7 +1036,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                     .toList(),
           ),
           ApiSettingDropdownWidget(
-            name: "Motion Detection Method",
+            label: Text('Motion Detection Method'),
             api: device.api,
             command: device.api.commandCode("mdm", logOnError: false),
             value: settings.motionDetectionMethod.toString(),
@@ -1997,7 +1997,7 @@ class EpeverSettingsWidget extends StatelessWidget with Debug {
           api: api,
           command: api.commandCode('ep'),
           commandArg: arg,
-          name: 'Battery type',
+          label: Text('Battery type'),
           value: setting.value.toString(),
           items: [
             DropdownMenuItem(value: '0', child: Text('User')),
@@ -2054,6 +2054,84 @@ class EpeverSettingsWidget extends StatelessWidget with Debug {
   }
 }
 
+class SwitchesSettingsWidget extends StatelessWidget with Debug {
+  final Api api;
+  final HomeAutoSwitches switches;
+  SwitchesSettingsWidget(this.switches, this.api);
+
+  @override
+  Widget build(BuildContext context) {
+    List<Widget> widgets = [];
+
+    List<DropdownMenuItem<String>> modes = [];
+    HomeAutoSwitchModes.values.forEach((_, mode) {
+      modes.add(DropdownMenuItem(value: mode.name, child: Text(mode.label)));
+    });
+
+    switches.values.forEach((name, sw) {
+      if (0 < widgets.length) widgets.add(Divider(color: Colors.white38));
+
+      if (null == sw.mode) {
+        widgets.add(Text(name));
+        return;
+      }
+      widgets.add(Flexible(
+        child: ApiSettingDropdownWidget(
+          api: api,
+          command: api.commandCode('switch'),
+          commandArg: name,
+          label: Row(children: [sw.stateIcon(size: 25), Text(name)]),
+          value: sw.mode?.name,
+          items: modes,
+        ),
+      ));
+
+      if (null == sw.mode?.unit) return;
+      widgets.addAll({
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+                flex: 5,
+                child: ApiSettingInputWidget(
+                  api: api,
+                  commandCode: api.commandCode('switch'),
+                  commandArg: name,
+                  name: 'On above',
+                  value: sw.onValue().toString(),
+                  suffix: null == sw.mode?.unit ? null : Text(sw.mode!.unit!),
+                  keyboardType: TextInputType.number,
+                  transformInput: (input) {
+                    return (sw.mode?.name ?? 'NO_MODE') + ',' + input + ',' + sw.offValue().toString();
+                  },
+                )),
+            Flexible(
+                flex: 5,
+                child: ApiSettingInputWidget(
+                  api: api,
+                  commandCode: api.commandCode('switch'),
+                  commandArg: name,
+                  name: 'Off below',
+                  value: sw.offValue().toString(),
+                  suffix: null == sw.mode?.unit ? null : Text(sw.mode!.unit!),
+                  keyboardType: TextInputType.number,
+                  transformInput: (input) {
+                    return (sw.mode?.name ?? 'NO_MODE') + ',' + sw.onValue().toString() + ',' + input;
+                  },
+                )),
+          ],
+        ),
+      });
+    });
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
+  }
+}
+
 class HomeAutoSettingsWidget extends StatelessWidget with Debug {
   final HomeAuto device;
 
@@ -2062,14 +2140,16 @@ class HomeAutoSettingsWidget extends StatelessWidget with Debug {
   @override
   Widget build(BuildContext context) {
     Widget frame(Widget child) {
-      return Container(
-        padding: EdgeInsets.all(5),
-        margin: EdgeInsets.only(bottom: 15),
-        decoration: BoxDecoration(
-            //color: Colors.white10,
-            border: Border.all(width: 1, color: Colors.white12),
-            borderRadius: BorderRadius.circular(5)),
-        child: child,
+      return Flexible(
+        child: Container(
+          padding: EdgeInsets.all(5),
+          margin: EdgeInsets.only(bottom: 15),
+          decoration: BoxDecoration(
+              //color: Colors.white10,
+              border: Border.all(width: 1, color: Colors.white12),
+              borderRadius: BorderRadius.circular(5)),
+          child: child,
+        ),
       );
     }
 
@@ -2103,7 +2183,12 @@ class HomeAutoSettingsWidget extends StatelessWidget with Debug {
       valueListenable: device.settings,
       builder: (_, settings, __) {
         var widgets = <Widget>[
-          ExpansionTile(title: Text('Switches'), children: []),
+          ExpansionTile(title: Text('Switches'), children: [
+            SwitchesSettingsWidget(
+              settings.switches,
+              device.api,
+            ),
+          ]),
           Divider(color: Colors.white38),
           ExpansionTile(title: Text('Charger'), children: [
             SizedBox(width: 1, height: 5),
@@ -2113,7 +2198,7 @@ class HomeAutoSettingsWidget extends StatelessWidget with Debug {
             )
           ]),
           Divider(color: Colors.white38),
-          ExpansionTile(title: Text('BMS'), children: []),
+          ExpansionTile(title: Text('BMS'), children: [Text('not implemented')]),
           Divider(color: Colors.white38),
           ExpansionTile(title: Text('Peers'), children: [
             Row(
@@ -2236,22 +2321,26 @@ class ApiWifiSettingsWidget extends StatelessWidget {
           if (settings.apEnabled == ExtendedBool.True)
             widgets.add(
               Row(children: [
-                ApiSettingInputWidget(
-                  api: api,
-                  name: "SSID",
-                  commandCode: api.commandCode("was"),
-                  value: settings.apSSID,
-                  enabled: settings.apEnabled == ExtendedBool.True ? true : false,
-                ),
+                Flexible(
+                    flex: 5,
+                    child: ApiSettingInputWidget(
+                      api: api,
+                      name: "SSID",
+                      commandCode: api.commandCode("was"),
+                      value: settings.apSSID,
+                      enabled: settings.apEnabled == ExtendedBool.True ? true : false,
+                    )),
                 Empty(),
-                ApiSettingInputWidget(
-                  api: api,
-                  name: "Password",
-                  commandCode: api.commandCode("wap"),
-                  value: "",
-                  isPassword: true,
-                  enabled: settings.apEnabled == ExtendedBool.True ? true : false,
-                ),
+                Flexible(
+                    flex: 5,
+                    child: ApiSettingInputWidget(
+                      api: api,
+                      name: "Password",
+                      commandCode: api.commandCode("wap"),
+                      value: "",
+                      isPassword: true,
+                      enabled: settings.apEnabled == ExtendedBool.True ? true : false,
+                    )),
               ]),
             );
         }
@@ -2271,22 +2360,26 @@ class ApiWifiSettingsWidget extends StatelessWidget {
           if (settings.staEnabled == ExtendedBool.True) {
             widgets.add(
               Row(children: [
-                ApiSettingInputWidget(
-                  api: api,
-                  name: "SSID",
-                  commandCode: api.commandCode("wss"),
-                  value: settings.staSSID,
-                  enabled: settings.staEnabled == ExtendedBool.True ? true : false,
-                ),
+                Flexible(
+                    flex: 5,
+                    child: ApiSettingInputWidget(
+                      api: api,
+                      name: "SSID",
+                      commandCode: api.commandCode("wss"),
+                      value: settings.staSSID,
+                      enabled: settings.staEnabled == ExtendedBool.True ? true : false,
+                    )),
                 Empty(),
-                ApiSettingInputWidget(
-                  api: api,
-                  name: "Password",
-                  commandCode: api.commandCode("wsp"),
-                  value: "",
-                  isPassword: true,
-                  enabled: settings.staEnabled == ExtendedBool.True ? true : false,
-                ),
+                Flexible(
+                    flex: 5,
+                    child: ApiSettingInputWidget(
+                      api: api,
+                      name: "Password",
+                      commandCode: api.commandCode("wsp"),
+                      value: "",
+                      isPassword: true,
+                      enabled: settings.staEnabled == ExtendedBool.True ? true : false,
+                    )),
               ]),
             );
           }

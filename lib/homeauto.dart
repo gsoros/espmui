@@ -4,8 +4,8 @@ import 'dart:async';
 //import 'dart:math';
 // import 'dart:typed_data';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 //import 'package:sprintf/sprintf.dart';
 //import 'package:listenable_stream/listenable_stream.dart';
@@ -91,14 +91,8 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
 
   Future<void> onDisconnected() async {
     logD("$name onDisconnected()");
-    // if (await connected) {
-    //   logD("but $name is connected");
-    //   return;
-    // }
-
-    settings.value = HomeAutoSettings(switchesTileStreamController);
+    await settings.value.onDisconnected();
     settings.notifyListeners();
-    //logD("switches: " + settings.value.switches.toString());
     await apiOnDisconnected();
     await wifiOnDisconnected();
     await peerOnDisconnected();
@@ -200,6 +194,12 @@ class HomeAutoSettings with Debug {
     return false;
   }
 
+  Future<void> onDisconnected() async {
+    otaMode = false;
+    await switches.onDisconnected();
+    await epever.onDisconnected();
+  }
+
   @override
   bool operator ==(other) {
     return (other is HomeAutoSettings) && other.otaMode == otaMode && other.switches == switches;
@@ -241,6 +241,10 @@ class EpeverSetting<T> {
 
   @override
   String toString() => "$name: $type($value)";
+
+  Future<void> onDisconnected() async {
+    value = null;
+  }
 }
 
 class EpeverSettings with Debug {
@@ -287,11 +291,17 @@ class EpeverSettings with Debug {
     }
     logD("$arg: ${values[arg]}");
   }
+
+  Future<void> onDisconnected() async {
+    values.forEach((arg, s) async {
+      await s.onDisconnected();
+    });
+  }
 }
 
 class HomeAutoSwitch with Debug {
-  int? mode;
-  int? state;
+  HomeAutoSwitchMode? mode;
+  HomeAutoSwitchState? state;
   double? bvOn;
   double? bvOff;
   int? socOn;
@@ -309,6 +319,28 @@ class HomeAutoSwitch with Debug {
     this.cvmOn,
     this.cvmOff,
   });
+
+  Widget stateIcon({double? size}) => Icon(
+        size: size,
+        Icons.circle,
+        color: state == HomeAutoSwitchStates.byId(0)
+            ? Colors.red
+            : state == HomeAutoSwitchStates.byId(1)
+                ? Colors.green
+                : Colors.grey,
+      );
+
+  dynamic onValue() {
+    if (HomeAutoSwitchModes.byName('bv') == mode) return bvOn;
+    if (HomeAutoSwitchModes.byName('soc') == mode) return socOn;
+    if (HomeAutoSwitchModes.byName('cvm') == mode) return cvmOn;
+  }
+
+  dynamic offValue() {
+    if (HomeAutoSwitchModes.byName('bv') == mode) return bvOff;
+    if (HomeAutoSwitchModes.byName('soc') == mode) return socOff;
+    if (HomeAutoSwitchModes.byName('cvm') == mode) return cvmOff;
+  }
 
   @override
   bool operator ==(other) {
@@ -328,8 +360,8 @@ class HomeAutoSwitch with Debug {
 
   String toString() {
     return "${describeIdentity(this)} ("
-        "mode: ${HomeAutoSwitchMode.asString(mode)}, "
-        "state: ${HomeAutoSwitchState.asString(state)}, "
+        "mode: ${mode?.name ?? 'unknown'}, "
+        "state: ${state?.label.toLowerCase() ?? 'unknown'}, "
         "bvOn: $bvOn, "
         "bvOff: $bvOff, "
         "socOn: $socOn, "
@@ -338,10 +370,23 @@ class HomeAutoSwitch with Debug {
         "cvmOff: $cvmOff"
         ")";
   }
+
+  Future<void> onDisconnected() async {
+    mode = null;
+    state = null;
+    bvOn = null;
+    bvOff = null;
+    socOn = null;
+    socOff = null;
+    cvmOn = null;
+    cvmOff = null;
+  }
 }
 
 class HomeAutoSwitches with Debug {
   Map<String, HomeAutoSwitch> values = {};
+  var modes = HomeAutoSwitchModes();
+  var states = HomeAutoSwitchStates();
 
   HomeAutoSwitches() {
     logD("construct");
@@ -356,12 +401,31 @@ class HomeAutoSwitches with Debug {
   }
 
   Widget get asTile {
-    String ret = '';
-    values.forEach((key, value) {
-      ret += "$key: " + HomeAutoSwitchMode.asString(value.mode) + ' ' + HomeAutoSwitchState.asString(value.state) + "\r\n";
+    List<Widget> widgets = [];
+    values.forEach((name, sw) {
+      widgets.add(Flexible(
+          child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(flex: 2, child: sw.stateIcon(size: 100)),
+          Flexible(flex: 8, child: Text("$name: ${sw.mode?.name}")),
+        ],
+      )));
     });
-    if ('' == ret) ret = ' ';
+    if (widgets.length < 1) return Empty();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
+
+    /*
+    String ret = '';
+    values.forEach((name, sw) {
+      ret += "$name: ${sw.mode?.name}\r\n";
+    });
     return Text(ret);
+    */
   }
 
   String toString() {
@@ -372,48 +436,82 @@ class HomeAutoSwitches with Debug {
     });
     return "${describeIdentity(this)} ($sws)";
   }
+
+  Future<void> onDisconnected() async {
+    values.forEach((name, sw) async {
+      await sw.onDisconnected();
+    });
+  }
 }
 
 class HomeAutoSwitchMode {
-  static const int Off = 0;
-  static const int On = 1;
-  static const int BatteryVoltage = 2;
-  static const int Soc = 3;
-  static const int CellVoltageMax = 4;
+  String name;
+  String label;
+  String? unit;
+  HomeAutoSwitchMode(this.name, this.label, {this.unit});
 
-  static int? fromString(String s) {
-    if ('off' == s) return Off;
-    if ('on' == s) return On;
-    if ('bv' == s) return BatteryVoltage;
-    if ('soc' == s) return Soc;
-    if ('cvm' == s) return CellVoltageMax;
-    return null;
+  @override
+  bool operator ==(other) {
+    if (other is HomeAutoSwitchMode) return other.name == name && other.label == label && other.unit == unit;
+    if (other is String) return other == name;
+    return false;
   }
 
-  static String asString(int? v) {
-    if (Off == v) return "off";
-    if (On == v) return "on";
-    if (BatteryVoltage == v) return "bv";
-    if (Soc == v) return "soc";
-    if (CellVoltageMax == v) return "cvm";
-    return "unknown";
-  }
+  @override
+  int get hashCode => name.hashCode ^ label.hashCode ^ unit.hashCode;
+
+  static HomeAutoSwitchMode? fromString(String name) => HomeAutoSwitchModes.byName(name);
+
+  String toString() => "${describeIdentity(this)} $name: $label";
+}
+
+class HomeAutoSwitchModes {
+  static final Map<String, HomeAutoSwitchMode> values = {
+    'off': HomeAutoSwitchMode('off', 'Off'),
+    'on': HomeAutoSwitchMode('on', 'On'),
+    'bv': HomeAutoSwitchMode('bv', 'Battery voltage', unit: 'V'),
+    'soc': HomeAutoSwitchMode('soc', 'State of charge', unit: '%'),
+    'cvm': HomeAutoSwitchMode('cvm', 'Highest cell voltage', unit: 'Vpc'),
+  };
+
+  static HomeAutoSwitchMode? byName(String name) => values[name];
 }
 
 class HomeAutoSwitchState {
-  static const int Off = 0;
-  static const int On = 1;
+  int id;
+  String label;
 
-  static int? fromString(String s) {
-    if ('off' == s) return Off;
-    if ('on' == s) return On;
-    return null;
+  HomeAutoSwitchState(this.id, this.label);
+
+  @override
+  bool operator ==(other) {
+    if (other is HomeAutoSwitchState) return other.id == id && other.label == label;
+    if (other is int) return other == id;
+    return false;
   }
 
-  static String asString(int? v) {
-    if (Off == v) return "off";
-    if (On == v) return "on";
-    return "unknown";
+  @override
+  int get hashCode => id.hashCode ^ label.hashCode;
+
+  static HomeAutoSwitchState? fromString(String label) => HomeAutoSwitchStates.fromLabel(label);
+
+  String toString() => "${describeIdentity(this)} $label ($id)";
+}
+
+class HomeAutoSwitchStates {
+  static final Map<int, HomeAutoSwitchState> values = {
+    0: HomeAutoSwitchState(0, 'Off'),
+    1: HomeAutoSwitchState(1, 'On'),
+  };
+
+  static HomeAutoSwitchState? byId(int id) => values[id];
+
+  static HomeAutoSwitchState? fromIdString(String id) => values[int.tryParse(id)];
+
+  static HomeAutoSwitchState? fromLabel(String s) {
+    var matches = values.values.where((hass) => hass.label.toLowerCase() == s.toLowerCase());
+    if (matches.length == 1) return matches.first;
+    return null;
   }
 }
 
