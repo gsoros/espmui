@@ -214,11 +214,30 @@ class HomeAutoSettings with Debug {
 }
 
 class EpeverSetting<T> {
+  String arg;
   String name;
   Type type;
   T? value;
 
-  EpeverSetting(this.name, this.type, [this.value]);
+  EpeverSetting(this.arg, this.name, this.type, [this.value]);
+
+  String get unit {
+    switch (arg) {
+      case 'cs':
+        return 'in series';
+      case 'typ':
+        return '0: USER, 1: SLA, 2: GEL, 3: FLD';
+      case 'cap':
+        return 'Ah';
+      case 'tc':
+        return 'mV/℃/2V';
+      case 'eqd':
+      case 'bd':
+        return 'minutes';
+      default:
+    }
+    return 'V';
+  }
 
   @override
   String toString() => "$name: $type($value)";
@@ -249,8 +268,10 @@ class EpeverSettings with Debug {
   }
 
   void add<T>(String arg, String name) {
-    values[arg] = EpeverSetting<T>(name, T);
+    values[arg] = EpeverSetting<T>(arg, name, T);
   }
+
+  EpeverSetting? get(String arg) => values[arg];
 
   void set(String arg, String value) {
     if (null == values[arg]) {

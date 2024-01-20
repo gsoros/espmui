@@ -692,27 +692,24 @@ class SettingInputWidget extends StatelessWidget with Debug {
   @override
   Widget build(BuildContext context) {
     //logD("SettingInputWidget build() value: $value");
-    return Flexible(
-      fit: FlexFit.loose,
-      child: TextField(
-        keyboardType: keyboardType,
-        obscureText: isPassword,
-        enableSuggestions: false,
-        autocorrect: false,
-        enabled: enabled,
-        controller: textController ?? TextEditingController(text: value),
-        decoration: InputDecoration(
-          labelText: name,
-          suffix: suffix,
-          isDense: true,
-          filled: true,
-          fillColor: Colors.white10,
-          enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.white24),
-          ),
+    return TextField(
+      keyboardType: keyboardType,
+      obscureText: isPassword,
+      enableSuggestions: false,
+      autocorrect: false,
+      enabled: enabled,
+      controller: textController ?? TextEditingController(text: value),
+      decoration: InputDecoration(
+        labelText: name,
+        suffix: suffix,
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white10,
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.white24),
         ),
-        onSubmitted: _onSubmitted(context),
       ),
+      onSubmitted: _onSubmitted(context),
     );
   }
 }
@@ -931,6 +928,7 @@ class ApiSettingDropdownWidget extends EspmuiDropdownWidget {
     required String? value,
     required List<DropdownMenuItem<String>>? items,
     String? name,
+    String? commandArg,
     void Function(String?)? onChanged,
   }) : super(
           value: value,
@@ -939,8 +937,9 @@ class ApiSettingDropdownWidget extends EspmuiDropdownWidget {
           onChanged: (String? value) async {
             if (null == command) return;
             if (onChanged != null) onChanged(value);
+            commandArg = null == commandArg ? '' : commandArg! + ':';
             final result = await api.requestResultCode(
-              "$command=${value ?? value.toString()}",
+              "$command=$commandArg${value ?? value.toString()}",
               minDelayMs: 2000,
             );
             if (name != null) snackbar("$name ${value ?? value.toString()} ${result == ApiResult.success ? "success" : " failure"}");
@@ -1747,146 +1746,176 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
               textColor: Colors.white,
               iconColor: Colors.white,
               children: [
-                Column(children: [
-                  Row(children: [
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Number of Battery Cells",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "BNS",
-                      value: -1 == settings.vescBattNumSeries ? "" : settings.vescBattNumSeries.toString(),
-                      suffix: Text("in Series"),
-                      keyboardType: TextInputType.number,
-                    ),
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Battery Capacity",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "BC",
-                      value: -1 == settings.vescBattCapacityWh ? "" : settings.vescBattCapacityWh.toString(),
-                      suffix: Text("Wh"),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ]),
-                  Row(children: [
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Max Power",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "MP",
-                      value: -1 == settings.vescMaxPower ? "" : settings.vescMaxPower.toString(),
-                      suffix: Text("W"),
-                      keyboardType: TextInputType.number,
-                    ),
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Min Current",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "MiC",
-                      value: -1 == settings.vescMinCurrent ? "" : settings.vescMinCurrent.toString(),
-                      suffix: Text("A"),
-                      keyboardType: TextInputType.number,
-                    ),
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Max Current",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "MaC",
-                      value: -1 == settings.vescMaxCurrent ? "" : settings.vescMaxCurrent.toString(),
-                      suffix: Text("A"),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ]),
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Text("Ramp"),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Row(children: [
-                      ApiSettingSwitchWidget(
-                        api: device.api,
-                        commandCode: device.api.commandCode("vesc"),
-                        commandArg: "RU",
-                        value: settings.vescRampUp,
-                      ),
-                      Text("Up"),
+                      Flexible(
+                          flex: 5,
+                          child: ApiSettingInputWidget(
+                            api: device.api,
+                            name: "Number of Battery Cells",
+                            commandCode: device.api.commandCode("vesc"),
+                            commandArg: "BNS",
+                            value: -1 == settings.vescBattNumSeries ? "" : settings.vescBattNumSeries.toString(),
+                            suffix: Text("in Series"),
+                            keyboardType: TextInputType.number,
+                          )),
+                      Flexible(
+                          flex: 5,
+                          child: ApiSettingInputWidget(
+                            api: device.api,
+                            name: "Battery Capacity",
+                            commandCode: device.api.commandCode("vesc"),
+                            commandArg: "BC",
+                            value: -1 == settings.vescBattCapacityWh ? "" : settings.vescBattCapacityWh.toString(),
+                            suffix: Text("Wh"),
+                            keyboardType: TextInputType.number,
+                          )),
                     ]),
                     Row(children: [
-                      ApiSettingSwitchWidget(
-                        api: device.api,
-                        commandCode: device.api.commandCode("vesc"),
-                        commandArg: "RD",
-                        value: settings.vescRampDown,
-                      ),
-                      Text("Down"),
+                      Flexible(
+                          flex: 3,
+                          child: ApiSettingInputWidget(
+                            api: device.api,
+                            name: "Max Power",
+                            commandCode: device.api.commandCode("vesc"),
+                            commandArg: "MP",
+                            value: -1 == settings.vescMaxPower ? "" : settings.vescMaxPower.toString(),
+                            suffix: Text("W"),
+                            keyboardType: TextInputType.number,
+                          )),
+                      Flexible(
+                          flex: 4,
+                          child: ApiSettingInputWidget(
+                            api: device.api,
+                            name: "Min Current",
+                            commandCode: device.api.commandCode("vesc"),
+                            commandArg: "MiC",
+                            value: -1 == settings.vescMinCurrent ? "" : settings.vescMinCurrent.toString(),
+                            suffix: Text("A"),
+                            keyboardType: TextInputType.number,
+                          )),
+                      Flexible(
+                          flex: 3,
+                          child: ApiSettingInputWidget(
+                            api: device.api,
+                            name: "Max Current",
+                            commandCode: device.api.commandCode("vesc"),
+                            commandArg: "MaC",
+                            value: -1 == settings.vescMaxCurrent ? "" : settings.vescMaxCurrent.toString(),
+                            suffix: Text("A"),
+                            keyboardType: TextInputType.number,
+                          )),
                     ]),
-                  ]),
-                  Row(children: [
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Diff",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "RMCD",
-                      value: -1 == settings.vescRampMinCurrentDiff ? "" : settings.vescRampMinCurrentDiff.toString(),
-                      suffix: Text("A"),
-                      keyboardType: TextInputType.number,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                            flex: 4,
+                            child: ApiSettingSwitchWidget(
+                              api: device.api,
+                              commandCode: device.api.commandCode("vesc"),
+                              commandArg: "RU",
+                              name: 'Ramp up',
+                              value: settings.vescRampUp,
+                            )),
+                        Flexible(flex: 1, child: Empty()),
+                        Flexible(
+                            flex: 4,
+                            child: ApiSettingSwitchWidget(
+                              api: device.api,
+                              commandCode: device.api.commandCode("vesc"),
+                              commandArg: "RD",
+                              name: 'Ramp down',
+                              value: settings.vescRampDown,
+                            )),
+                      ],
                     ),
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Steps",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "RNS",
-                      value: -1 == settings.vescRampNumSteps ? "" : settings.vescRampNumSteps.toString(),
-                      keyboardType: TextInputType.number,
-                    ),
-                    ApiSettingInputWidget(
-                      api: device.api,
-                      name: "Time",
-                      commandCode: device.api.commandCode("vesc"),
-                      commandArg: "RT",
-                      value: -1 == settings.vescRampTime ? "" : settings.vescRampTime.toString(),
-                      suffix: Text("ms"),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ]),
-                  Row(
-                    children: [
-                      ApiSettingInputWidget(
-                        api: device.api,
-                        name: "Mot Warn",
-                        commandCode: device.api.commandCode("vesc"),
-                        commandArg: "TMW",
-                        value: -1 == settings.vescTempMotorWarning ? "" : settings.vescTempMotorWarning.toString(),
-                        suffix: Text("˚C"),
-                        keyboardType: TextInputType.number,
-                      ),
-                      ApiSettingInputWidget(
-                        api: device.api,
-                        name: "Mot Limit",
-                        commandCode: device.api.commandCode("vesc"),
-                        commandArg: "TML",
-                        value: -1 == settings.vescTempMotorLimit ? "" : settings.vescTempMotorLimit.toString(),
-                        suffix: Text("˚C"),
-                        keyboardType: TextInputType.number,
-                      ),
-                      ApiSettingInputWidget(
-                        api: device.api,
-                        name: "ESC Warn",
-                        commandCode: device.api.commandCode("vesc"),
-                        commandArg: "TEW",
-                        value: -1 == settings.vescTempEscWarning ? "" : settings.vescTempEscWarning.toString(),
-                        suffix: Text("˚C"),
-                        keyboardType: TextInputType.number,
-                      ),
-                      ApiSettingInputWidget(
-                        api: device.api,
-                        name: "ESC Limit",
-                        commandCode: device.api.commandCode("vesc"),
-                        commandArg: "TEL",
-                        value: -1 == settings.vescTempEscLimit ? "" : settings.vescTempEscLimit.toString(),
-                        suffix: Text("˚C"),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ],
-                  )
-                ]),
+                    Row(children: [
+                      Flexible(
+                          flex: 3,
+                          child: ApiSettingInputWidget(
+                            api: device.api,
+                            name: "Diff",
+                            commandCode: device.api.commandCode("vesc"),
+                            commandArg: "RMCD",
+                            value: -1 == settings.vescRampMinCurrentDiff ? "" : settings.vescRampMinCurrentDiff.toString(),
+                            suffix: Text("A"),
+                            keyboardType: TextInputType.number,
+                          )),
+                      Flexible(
+                          flex: 4,
+                          child: ApiSettingInputWidget(
+                            api: device.api,
+                            name: "Steps",
+                            commandCode: device.api.commandCode("vesc"),
+                            commandArg: "RNS",
+                            value: -1 == settings.vescRampNumSteps ? "" : settings.vescRampNumSteps.toString(),
+                            keyboardType: TextInputType.number,
+                          )),
+                      Flexible(
+                          flex: 3,
+                          child: ApiSettingInputWidget(
+                            api: device.api,
+                            name: "Time",
+                            commandCode: device.api.commandCode("vesc"),
+                            commandArg: "RT",
+                            value: -1 == settings.vescRampTime ? "" : settings.vescRampTime.toString(),
+                            suffix: Text("ms"),
+                            keyboardType: TextInputType.number,
+                          )),
+                    ]),
+                    Row(
+                      children: [
+                        Flexible(
+                            flex: 3,
+                            child: ApiSettingInputWidget(
+                              api: device.api,
+                              name: "Mot Warn",
+                              commandCode: device.api.commandCode("vesc"),
+                              commandArg: "TMW",
+                              value: -1 == settings.vescTempMotorWarning ? "" : settings.vescTempMotorWarning.toString(),
+                              suffix: Text("˚C"),
+                              keyboardType: TextInputType.number,
+                            )),
+                        Flexible(
+                            flex: 2,
+                            child: ApiSettingInputWidget(
+                              api: device.api,
+                              name: "Mot Limit",
+                              commandCode: device.api.commandCode("vesc"),
+                              commandArg: "TML",
+                              value: -1 == settings.vescTempMotorLimit ? "" : settings.vescTempMotorLimit.toString(),
+                              suffix: Text("˚C"),
+                              keyboardType: TextInputType.number,
+                            )),
+                        Flexible(
+                            flex: 2,
+                            child: ApiSettingInputWidget(
+                              api: device.api,
+                              name: "ESC Warn",
+                              commandCode: device.api.commandCode("vesc"),
+                              commandArg: "TEW",
+                              value: -1 == settings.vescTempEscWarning ? "" : settings.vescTempEscWarning.toString(),
+                              suffix: Text("˚C"),
+                              keyboardType: TextInputType.number,
+                            )),
+                        Flexible(
+                            flex: 3,
+                            child: ApiSettingInputWidget(
+                              api: device.api,
+                              name: "ESC Limit",
+                              commandCode: device.api.commandCode("vesc"),
+                              commandArg: "TEL",
+                              value: -1 == settings.vescTempEscLimit ? "" : settings.vescTempEscLimit.toString(),
+                              suffix: Text("˚C"),
+                              keyboardType: TextInputType.number,
+                            )),
+                      ],
+                    )
+                  ],
+                ),
               ],
             ),
           ),
@@ -1952,6 +1981,79 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
   }
 }
 
+class EpeverSettingsWidget extends StatelessWidget with Debug {
+  final Api api;
+  final EpeverSettings settings;
+  EpeverSettingsWidget(this.settings, this.api);
+
+  @override
+  Widget build(BuildContext context) {
+    List<Widget> widgets = [];
+    int cs = settings.get('cs')?.value ?? 1;
+    settings.values.forEach((arg, setting) {
+      Widget input;
+      if ('typ' == arg) {
+        input = ApiSettingDropdownWidget(
+          api: api,
+          command: api.commandCode('ep'),
+          commandArg: arg,
+          name: 'Battery type',
+          value: setting.value.toString(),
+          items: [
+            DropdownMenuItem(value: '0', child: Text('User')),
+            DropdownMenuItem(value: '1', child: Text('Sealed LA')),
+            DropdownMenuItem(value: '2', child: Text('Gel')),
+            DropdownMenuItem(value: '3', child: Text('Flooded')),
+          ],
+        );
+      } else {
+        input = ApiSettingInputWidget(
+          api: api,
+          commandCode: api.commandCode('ep'),
+          commandArg: arg,
+          name: setting.name,
+          value: null == setting.value ? '' : setting.value.toString(),
+          suffix: Text(setting.unit),
+          keyboardType: TextInputType.number,
+        );
+      }
+      if ('V' == setting.unit) {
+        widgets.add(Flexible(
+            child: Row(children: [
+          Flexible(flex: 5, child: input),
+          Flexible(
+            flex: 5,
+            child: ApiSettingInputWidget(
+              api: api,
+              commandCode: api.commandCode('ep'),
+              commandArg: arg,
+              value: null == setting.value ? '' : (setting.value / cs).toString(),
+              transformInput: (String val) {
+                var out = double.tryParse(val);
+                return null == out ? '' : (out * cs).toString();
+              },
+              suffix: Text('Vpc'),
+              keyboardType: TextInputType.number,
+            ),
+          ),
+        ])));
+        return;
+      }
+      widgets.add(
+        Flexible(
+          child: input,
+        ),
+      );
+    });
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
+  }
+}
+
 class HomeAutoSettingsWidget extends StatelessWidget with Debug {
   final HomeAuto device;
 
@@ -2001,60 +2103,74 @@ class HomeAutoSettingsWidget extends StatelessWidget with Debug {
       valueListenable: device.settings,
       builder: (_, settings, __) {
         var widgets = <Widget>[
-          Row(children: [
-            Flexible(
-              child: Column(children: [
-                Row(children: [Text("Peers")]),
+          ExpansionTile(title: Text('Switches'), children: []),
+          Divider(color: Colors.white38),
+          ExpansionTile(title: Text('Charger'), children: [
+            SizedBox(width: 1, height: 5),
+            EpeverSettingsWidget(
+              settings.epever,
+              device.api,
+            )
+          ]),
+          Divider(color: Colors.white38),
+          ExpansionTile(title: Text('BMS'), children: []),
+          Divider(color: Colors.white38),
+          ExpansionTile(title: Text('Peers'), children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
                 peers,
-              ]),
-            ),
-            EspmuiElevatedButton(
-              onPressed: () {
-                dialog(
-                  title: Text("Peers"),
-                  body: PeersEditorWidget(device),
-                );
-              },
-              child: Icon(Icons.edit),
+                EspmuiElevatedButton(
+                  onPressed: () {
+                    dialog(
+                      title: Text("Peers"),
+                      body: PeersEditorWidget(device),
+                    );
+                  },
+                  child: Icon(Icons.edit),
+                ),
+              ],
             ),
           ]),
           Divider(color: Colors.white38),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            EspmuiElevatedButton(
-              backgroundColorEnabled: Colors.blue.shade900,
-              onPressed: settings.otaMode
-                  ? null
-                  : () async {
-                      int? code = await device.api.requestResultCode("system=ota");
-                      if (1 == code) {
-                        device.settings.value.otaMode = true;
-                        device.settings.notifyListeners();
-                        snackbar("Waiting for OTA update, reboot to cancel", context);
-                      } else
-                        snackbar("Failed to enter OTA mode", context);
-                    },
-              child: Row(children: [
-                Icon(Icons.system_update),
-                Text("OTA"),
-              ]),
-            ),
-            EspmuiElevatedButton(
-              backgroundColorEnabled: Colors.yellow.shade900,
-              onPressed: () async {
-                int? code = await device.api.requestResultCode("system=reboot");
-                if (code == ApiResult.success) {
-                  // snackbar("Rebooting", context);
-                  // device.disconnect();
-                  // await Future.delayed(Duration(seconds: 2));
-                  // device.connect();
-                } else
-                  snackbar("Failed to reboot", context);
-              },
-              child: Row(children: [
-                Icon(Icons.restart_alt),
-                Text("Reboot"),
-              ]),
-            ),
+          ExpansionTile(title: Text('System'), children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              EspmuiElevatedButton(
+                backgroundColorEnabled: Colors.blue.shade900,
+                onPressed: settings.otaMode
+                    ? null
+                    : () async {
+                        int? code = await device.api.requestResultCode("system=ota");
+                        if (1 == code) {
+                          device.settings.value.otaMode = true;
+                          device.settings.notifyListeners();
+                          snackbar("Waiting for OTA update, reboot to cancel", context);
+                        } else
+                          snackbar("Failed to enter OTA mode", context);
+                      },
+                child: Row(children: [
+                  Icon(Icons.system_update),
+                  Text("OTA"),
+                ]),
+              ),
+              EspmuiElevatedButton(
+                backgroundColorEnabled: Colors.yellow.shade900,
+                onPressed: () async {
+                  int? code = await device.api.requestResultCode("system=reboot");
+                  if (code == ApiResult.success) {
+                    // snackbar("Rebooting", context);
+                    // device.disconnect();
+                    // await Future.delayed(Duration(seconds: 2));
+                    // device.connect();
+                  } else
+                    snackbar("Failed to reboot", context);
+                },
+                child: Row(children: [
+                  Icon(Icons.restart_alt),
+                  Text("Reboot"),
+                ]),
+              ),
+            ])
           ]),
         ];
 
@@ -2071,8 +2187,8 @@ class HomeAutoSettingsWidget extends StatelessWidget with Debug {
       iconColor: Colors.white,
       children: [
         Column(mainAxisSize: MainAxisSize.min, children: [
-          frame(apiWifiSettings),
           frame(deviceSettings),
+          frame(apiWifiSettings),
           frame(ApiInterfaceWidget(device.api)),
         ])
       ],
@@ -2095,7 +2211,7 @@ class ApiWifiSettingsWidget extends StatelessWidget {
         var widgets = <Widget>[
           ApiSettingSwitchWidget(
             api: api,
-            name: "Wifi",
+            name: "Enable Wifi",
             commandCode: api.commandCode("w", logOnError: false),
             value: settings.enabled,
             onChanged: () {
@@ -2175,10 +2291,7 @@ class ApiWifiSettingsWidget extends StatelessWidget {
             );
           }
         }
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: widgets,
-        );
+        return ExpansionTile(title: Text('Wifi'), children: widgets);
       },
     );
   }
