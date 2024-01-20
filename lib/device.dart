@@ -62,6 +62,7 @@ class Device with Debug {
     if (null == peripheral) return false;
     return await peripheral!.isConnected().catchError((e) {
       bleError(debugTag, "could not get connection state", e);
+      return false;
     });
   }
 

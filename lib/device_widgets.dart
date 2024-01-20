@@ -101,7 +101,7 @@ class DeviceAppBarTitle extends StatelessWidget {
     Widget deviceName() {
       return Text(
         prefix + (device.name ?? "unknown"),
-        style: Theme.of(context).textTheme.headline6,
+        style: Theme.of(context).textTheme.titleLarge,
         maxLines: 1,
         overflow: TextOverflow.clip,
       );

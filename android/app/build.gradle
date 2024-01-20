@@ -34,7 +34,7 @@ android {
 
     defaultConfig {
         applicationId "org.gsoros.espmui"
-        minSdkVersion 18
+        minSdkVersion flutter.minSdkVersion
         targetSdkVersion 31
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

@@ -68,15 +68,9 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
     super.dispose();
   }
 
-  Future<bool> _onBackPressed() {
-    //if (!device.autoConnect.value) device.disconnect();
-    return Future.value(true);
-  }
-
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onBackPressed,
+    return PopScope(
       child: Scaffold(
         appBar: AppBar(
           title: BleAdapterCheck(

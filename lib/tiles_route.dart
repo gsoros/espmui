@@ -605,12 +605,12 @@ class _TileGridState extends State<TileGrid> with Debug {
                                   context,
                                   HeroDialogRoute(
                                     builder: (context) {
-                                      return WillPopScope(
-                                        onWillPop: () async {
-                                          setState(() {
-                                            showColorPicker = false;
-                                          });
-                                          return true;
+                                      return PopScope(
+                                        onPopInvoked: (didPop) async {
+                                          if (didPop)
+                                            setState(() {
+                                              showColorPicker = false;
+                                            });
                                         },
                                         child: Center(
                                           child: AlertDialog(
