@@ -138,8 +138,8 @@ void snackbar(String s, [BuildContext? context]) {
     }
     sms?.removeCurrentSnackBar();
     sms?.showSnackBar(SnackBar(
-      behavior: SnackBarBehavior.floating,
-      margin: EdgeInsets.fromLTRB(50, 0, 50, 0),
+      behavior: SnackBarBehavior.fixed,
+      //margin: EdgeInsets.fromLTRB(50, 0, 50, 0),
       backgroundColor: Colors.black45,
       content: Text(
         s,

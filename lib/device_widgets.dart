@@ -855,6 +855,7 @@ class ApiSettingSwitchWidget extends StatelessWidget with Debug {
 class EspmuiDropdownWidget extends StatelessWidget with Debug {
   final String? value;
   final List<DropdownMenuItem<String>>? items;
+  final String? name;
   final Widget? label;
   final void Function(String?)? onChanged;
 
@@ -865,6 +866,7 @@ class EspmuiDropdownWidget extends StatelessWidget with Debug {
   EspmuiDropdownWidget({
     required this.value,
     required this.items,
+    this.name,
     this.label,
     this.onChanged,
   });
@@ -927,12 +929,14 @@ class ApiSettingDropdownWidget extends EspmuiDropdownWidget {
     required this.command,
     required String? value,
     required List<DropdownMenuItem<String>>? items,
+    String? name,
     Widget? label,
     String? commandArg,
     void Function(String?)? onChanged,
   }) : super(
           value: value,
           items: items,
+          name: name,
           label: label,
           onChanged: (String? value) async {
             if (null == command) return;
@@ -942,7 +946,7 @@ class ApiSettingDropdownWidget extends EspmuiDropdownWidget {
               "$command=$commandArg${value ?? value.toString()}",
               minDelayMs: 2000,
             );
-            if (label != null) snackbar("$label ${value ?? value.toString()} ${result == ApiResult.success ? "success" : " failure"}");
+            if (name != null) snackbar("$name ${value ?? value.toString()} ${result == ApiResult.success ? "success" : " failure"}");
             print("[ApiSettingDropdown] api.requestResultCode($command): $result");
           },
         );
@@ -1173,9 +1177,9 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                         if (1 == code) {
                           device.settings.value.otaMode = true;
                           device.settings.notifyListeners();
-                          snackbar("Waiting for OTA update, reboot to cancel", context);
+                          snackbar("OTA enabled", context);
                         } else
-                          snackbar("Failed to enter OTA mode", context);
+                          snackbar("OTA failed", context);
                       },
                 child: Row(children: [
                   Icon(Icons.system_update),

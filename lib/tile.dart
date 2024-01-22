@@ -132,7 +132,7 @@ class Tile extends StatelessWidget with Debug {
         initialData: stream?.initialData != null ? stream?.initialData!() : null,
         builder: (_, snapshot) {
           if (!snapshot.hasData || (null == snapshot.data) || ('Text("")' == snapshot.data.toString())) return Empty();
-          logD('snapshot.data: ' + snapshot.data.toString());
+          //logD('snapshot.data: ' + snapshot.data.toString());
           return snapshot.data!;
         },
       );
@@ -186,19 +186,22 @@ class Tile extends StatelessWidget with Debug {
         ),
         //padding: const EdgeInsets.all(4.0),
         child: Column(
+          //mainAxisSize: MainAxisSize.min,
           //crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    softWrap: false,
-                    overflow: TextOverflow.fade,
-                    style: TextStyle(fontSize: 10, color: textColor),
-                  ),
-                ),
-                /*
+            Flexible(
+                flex: 1,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        softWrap: false,
+                        overflow: TextOverflow.visible,
+                        style: TextStyle(fontSize: 10, color: textColor),
+                      ),
+                    ),
+                    /*
                   Expanded(
                     child: Align(
                       alignment: Alignment.topRight,
@@ -211,35 +214,35 @@ class Tile extends StatelessWidget with Debug {
                     ),
                   ),
                   */
-              ],
-            ),
-            Expanded(
+                  ],
+                )),
+            Flexible(
+              flex: 8,
               child: Stack(
                 fit: StackFit.expand,
                 alignment: AlignmentDirectional.bottomEnd,
                 children: [
                   FittedBox(
-                    child: background(),
                     fit: BoxFit.fill,
+                    child: background(),
                   ),
-                  Align(
-                    child: FittedBox(
-                      fit: BoxFit.contain,
-                      child: DefaultTextStyle.merge(
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 120,
-                        ),
-                        child: getValueIfConnected(),
+                  FittedBox(
+                    child: DefaultTextStyle.merge(
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 120,
                       ),
+                      child: getValueIfConnected(),
                     ),
                   ),
                 ],
               ),
             ),
-            Row(
-              children: [
-                /*
+            Flexible(
+                flex: 1,
+                child: Row(
+                  children: [
+                    /*
                   Expanded(
                     child: Text(
                       " ",
@@ -249,19 +252,19 @@ class Tile extends StatelessWidget with Debug {
                     ),
                   ),
                   */
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomRight,
-                    child: Text(
-                      stream?.units ?? " ",
-                      softWrap: false,
-                      overflow: TextOverflow.fade,
-                      style: TextStyle(fontSize: 10, color: textColor),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.bottomRight,
+                        child: Text(
+                          stream?.units ?? " ",
+                          softWrap: false,
+                          overflow: TextOverflow.fade,
+                          style: TextStyle(fontSize: 10, color: textColor),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            ),
+                  ],
+                )),
           ],
         ),
       ),

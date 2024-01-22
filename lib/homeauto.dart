@@ -28,6 +28,12 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
 
   final switchesTileStreamController = StreamController<Widget>.broadcast();
   Stream<Widget> get switchesTileStream => switchesTileStreamController.stream;
+  final voltageTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get voltageTileStream => voltageTileStreamController.stream;
+  final currentTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get currentTileStream => currentTileStreamController.stream;
+  final cellsTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get cellsTileStream => cellsTileStreamController.stream;
 
   @override
   int get defaultMtu => 512;
@@ -36,7 +42,14 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
   int get largeMtu => 512;
 
   HomeAuto(Peripheral peripheral) : super(peripheral) {
-    settings = AlwaysNotifier<HomeAutoSettings>(HomeAutoSettings(switchesTileStreamController));
+    settings = AlwaysNotifier<HomeAutoSettings>(
+      HomeAutoSettings(
+        switchesTileStreamController,
+        voltageTileStreamController,
+        currentTileStreamController,
+        cellsTileStreamController,
+      ),
+    );
 
     deviceWithApiConstruct(
       characteristic: HomeAutoApiCharacteristic(this),
@@ -45,11 +58,28 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
     );
 
     tileStreams.addAll({
-      "switches": DeviceTileStream(
-        label: "Switches",
+      'switches': DeviceTileStream(
+        label: 'Switches',
         stream: switchesTileStream,
         initialData: () => settings.value.switches.asTile,
-      )
+      ),
+      'voltage': DeviceTileStream(
+        label: 'Voltage',
+        units: 'V',
+        stream: voltageTileStream,
+        initialData: () => settings.value.bms.voltageTile,
+      ),
+      'current': DeviceTileStream(
+        label: 'Current',
+        units: 'A',
+        stream: currentTileStream,
+        initialData: () => settings.value.bms.currentTile,
+      ),
+      'cells': DeviceTileStream(
+        label: 'Cells',
+        stream: cellsTileStream,
+        initialData: () => settings.value.bms.cellsTile,
+      ),
     });
   }
 
@@ -73,6 +103,9 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
   Future<void> dispose() async {
     logD("$name dispose");
     switchesTileStreamController.close();
+    voltageTileStreamController.close();
+    currentTileStreamController.close();
+    cellsTileStreamController.close();
     await apiDispose();
     await wifiDispose();
     await peerDispose();
@@ -117,6 +150,12 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
       minDelayMs: 10000,
       maxAttempts: 3,
     );
+    await Future.delayed(Duration(seconds: 2));
+    await api.request<String>(
+      "ci=delay:2000",
+      minDelayMs: 10000,
+      maxAttempts: 3,
+    );
   }
 
   @override
@@ -131,10 +170,19 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
 class HomeAutoSettings with Debug {
   bool otaMode = false;
   final switches = HomeAutoSwitches();
-  StreamController<Widget> switchesTileStreamController;
   final epever = EpeverSettings();
+  final bms = Bms();
+  StreamController<Widget> switchesTileStreamController;
+  StreamController<Widget> voltageTileStreamController;
+  StreamController<Widget> currentTileStreamController;
+  StreamController<Widget> cellsTileStreamController;
 
-  HomeAutoSettings(this.switchesTileStreamController) {
+  HomeAutoSettings(
+    this.switchesTileStreamController,
+    this.voltageTileStreamController,
+    this.currentTileStreamController,
+    this.cellsTileStreamController,
+  ) {
     logD('construct');
   }
 
@@ -191,6 +239,32 @@ class HomeAutoSettings with Debug {
       return true;
     }
 
+    if ('ci' == message.command) {
+      if (message.value?.startsWith('delay:') ?? false) {
+        logD('received delay reply: ${message.valueAsString}');
+        return true;
+      }
+      logD("parsing ci=${message.valueAsString}");
+      //name,voltage,current,balanceCurrent[,cellVoltage1,cellVoltage2,...,cellVoltageN]
+      List<String> values = message.valueAsString?.split(',') ?? [];
+      if ((values.length) < 4) {
+        logE("not enough values in ${message.valueAsString}");
+        return false;
+      }
+      bms.updatedAt = uts();
+      bms.name = values[0];
+      bms.voltage = double.tryParse(values[1]) ?? 0.0;
+      bms.current = double.tryParse(values[2]) ?? 0.0;
+      bms.balanceCurrent = double.tryParse(values[3]) ?? 0.0;
+      List<double> cells = [];
+      for (int i = 4; i < values.length; i++) cells.add((double.tryParse(values[i]) ?? 0.0) / 1000);
+      bms.cellVoltage = cells;
+      voltageTileStreamController.sink.add(bms.voltageTile);
+      currentTileStreamController.sink.add(bms.currentTile);
+      cellsTileStreamController.sink.add(bms.cellsTile);
+      return true;
+    }
+
     return false;
   }
 
@@ -198,18 +272,19 @@ class HomeAutoSettings with Debug {
     otaMode = false;
     await switches.onDisconnected();
     await epever.onDisconnected();
+    await bms.onDisconnected();
   }
 
   @override
   bool operator ==(other) {
-    return (other is HomeAutoSettings) && other.otaMode == otaMode && other.switches == switches;
+    return (other is HomeAutoSettings) && other.otaMode == otaMode && other.switches == switches && other.bms == bms;
   }
 
   @override
-  int get hashCode => otaMode.hashCode ^ switches.hashCode;
+  int get hashCode => otaMode.hashCode ^ switches.hashCode ^ bms.hashCode;
 
   String toString() {
-    return "${describeIdentity(this)} (otaMode: $otaMode, sitches: $switches)";
+    return "${describeIdentity(this)} (otaMode: $otaMode, switches: $switches, bms: $bms)";
   }
 }
 
@@ -512,6 +587,72 @@ class HomeAutoSwitchStates {
     var matches = values.values.where((hass) => hass.label.toLowerCase() == s.toLowerCase());
     if (matches.length == 1) return matches.first;
     return null;
+  }
+}
+
+class Bms {
+  String name = '';
+  int updatedAt = 0;
+  double voltage = 0.0;
+  double current = 0.0;
+  double balanceCurrent = 0.0;
+  List<double> cellVoltage = [];
+
+  Future<void> onDisconnected() async {
+    updatedAt = 0;
+    voltage = 0;
+    current = 0.0;
+    cellVoltage = [];
+  }
+
+  Widget get voltageTile {
+    return Text(voltage.toStringAsFixed(3));
+  }
+
+  Widget get currentTile {
+    return Text(current.toStringAsFixed(3));
+  }
+
+  Widget get cellsTile {
+    var voltages = cellVoltage;
+    //var voltages = <double>[3.382, 3.383, 3.386, 3.381, 3.384, 3.382, 3.383, 3.381]; // balanced
+    //var voltages = <double>[3.383, 3.272, 3.172, 3.272, 3.372, 3.212, 3.222, 3.151]; // unbalanced
+    if (voltages.length < 1) return Text('');
+    var sorted = List<double>.from(voltages);
+    sorted.sort();
+    var min = sorted.first;
+    var max = sorted.last;
+    var delta = max - min;
+    List<Widget> bars = [];
+    voltages.forEach((v) {
+      Color color = v == min
+          ? Colors.red
+          : v == max
+              ? Colors.green
+              : Colors.grey;
+      bars.add(Container(
+        width: 10,
+        height: (v - min) / delta * 30 + 5,
+        color: color,
+        margin: EdgeInsets.only(left: 1, right: 1),
+      ));
+    });
+    const small = TextStyle(fontSize: 4);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text("Max: ${max}V", style: small),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: bars),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text("Bal: ${(balanceCurrent * 1000).toInt()}mA    ", style: small),
+            Text("Delta: ${(delta * 1000).toInt()}mV    ", style: small),
+            Text("Min: ${min}V", style: small),
+          ],
+        ),
+      ],
+    );
   }
 }
 
