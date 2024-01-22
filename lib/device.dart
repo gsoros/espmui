@@ -854,7 +854,7 @@ class PeerSettings with Debug {
 }
 
 class DeviceTileStream {
-  String label;
+  String? label;
   Stream<Widget>? stream;
   Widget Function()? initialData;
   String? units;

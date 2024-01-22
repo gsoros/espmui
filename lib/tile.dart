@@ -175,6 +175,78 @@ class Tile extends StatelessWidget with Debug {
     String label = stream?.label ?? '';
     if (showDeviceName) label += "(" + (device?.name ?? "No source") + ")";
 
+    var elements = <Widget>[];
+    int dataFlex = null == stream?.units ? 9 : 8;
+    if (0 < label.length) {
+      dataFlex--;
+      elements.add(
+        // label row
+        Flexible(
+          flex: 1,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  softWrap: false,
+                  overflow: TextOverflow.visible,
+                  style: TextStyle(fontSize: 10, color: textColor),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    elements.add(
+      // data row
+      Flexible(
+        flex: dataFlex,
+        child: Stack(
+          fit: StackFit.expand,
+          alignment: AlignmentDirectional.bottomEnd,
+          children: [
+            FittedBox(
+              fit: BoxFit.fill,
+              child: background(),
+            ),
+            FittedBox(
+              child: DefaultTextStyle.merge(
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 120,
+                ),
+                child: getValueIfConnected(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (null != stream?.units) {
+      elements.add(
+        // footer row
+        Flexible(
+          flex: 1,
+          child: Row(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.bottomRight,
+                  child: Text(
+                    stream?.units ?? ' ',
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: TextStyle(fontSize: 10, color: textColor),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Material(
       child: Container(
         //padding: const EdgeInsets.all(2.0),
@@ -188,84 +260,7 @@ class Tile extends StatelessWidget with Debug {
         child: Column(
           //mainAxisSize: MainAxisSize.min,
           //crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Flexible(
-                flex: 1,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        label,
-                        softWrap: false,
-                        overflow: TextOverflow.visible,
-                        style: TextStyle(fontSize: 10, color: textColor),
-                      ),
-                    ),
-                    /*
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.topRight,
-                      child: Text(
-                        " ",
-                        softWrap: false,
-                        overflow: TextOverflow.fade,
-                        style: TextStyle(fontSize: 10, color: textColor),
-                      ),
-                    ),
-                  ),
-                  */
-                  ],
-                )),
-            Flexible(
-              flex: 8,
-              child: Stack(
-                fit: StackFit.expand,
-                alignment: AlignmentDirectional.bottomEnd,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.fill,
-                    child: background(),
-                  ),
-                  FittedBox(
-                    child: DefaultTextStyle.merge(
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 120,
-                      ),
-                      child: getValueIfConnected(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-                flex: 1,
-                child: Row(
-                  children: [
-                    /*
-                  Expanded(
-                    child: Text(
-                      " ",
-                      softWrap: false,
-                      overflow: TextOverflow.fade,
-                      style: TextStyle(fontSize: 10, color: textColor),
-                    ),
-                  ),
-                  */
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.bottomRight,
-                        child: Text(
-                          stream?.units ?? " ",
-                          softWrap: false,
-                          overflow: TextOverflow.fade,
-                          style: TextStyle(fontSize: 10, color: textColor),
-                        ),
-                      ),
-                    ),
-                  ],
-                )),
-          ],
+          children: elements,
         ),
       ),
     );
