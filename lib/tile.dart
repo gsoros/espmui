@@ -9,7 +9,7 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'preferences.dart';
 import 'device.dart';
 import 'device_list.dart';
-import 'ble_characteristic.dart';
+//import 'ble_characteristic.dart';
 import 'util.dart';
 import 'debug.dart';
 
@@ -153,7 +153,7 @@ class Tile extends StatelessWidget with Debug {
 
     Widget background() {
       if (0 == history) return Empty();
-      CharacteristicHistory? charHistory = DeviceList().byIdentifier(this.device)?.tileStreams[this.stream]?.history;
+      History? charHistory = DeviceList().byIdentifier(this.device)?.tileStreams[this.stream]?.history;
       if (null == charHistory) return Empty();
       return StreamBuilder<Widget>(
         stream: stream?.stream,
@@ -173,13 +173,13 @@ class Tile extends StatelessWidget with Debug {
     }
 
     String label = stream?.label ?? '';
-    if (showDeviceName) label += "(" + (device?.name ?? "No source") + ")";
+    if (showDeviceName) label += ' ' + (device?.name ?? 'No source');
 
-    var elements = <Widget>[];
-    int dataFlex = null == stream?.units ? 9 : 8;
+    var rows = <Widget>[];
+    int dataRowFlex = null == stream?.units ? 9 : 8;
     if (0 < label.length) {
-      dataFlex--;
-      elements.add(
+      dataRowFlex--;
+      rows.add(
         // label row
         Flexible(
           flex: 1,
@@ -198,10 +198,10 @@ class Tile extends StatelessWidget with Debug {
         ),
       );
     }
-    elements.add(
+    rows.add(
       // data row
       Flexible(
-        flex: dataFlex,
+        flex: dataRowFlex,
         child: Stack(
           fit: StackFit.expand,
           alignment: AlignmentDirectional.bottomEnd,
@@ -224,7 +224,7 @@ class Tile extends StatelessWidget with Debug {
       ),
     );
     if (null != stream?.units) {
-      elements.add(
+      rows.add(
         // footer row
         Flexible(
           flex: 1,
@@ -236,7 +236,7 @@ class Tile extends StatelessWidget with Debug {
                   child: Text(
                     stream?.units ?? ' ',
                     softWrap: false,
-                    overflow: TextOverflow.fade,
+                    overflow: TextOverflow.visible,
                     style: TextStyle(fontSize: 10, color: textColor),
                   ),
                 ),
@@ -260,7 +260,7 @@ class Tile extends StatelessWidget with Debug {
         child: Column(
           //mainAxisSize: MainAxisSize.min,
           //crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: elements,
+          children: rows,
         ),
       ),
     );

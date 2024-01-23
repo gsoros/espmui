@@ -1,12 +1,12 @@
 import 'dart:convert';
-import 'dart:math';
+
 import 'dart:typed_data';
 import 'dart:async';
-import 'dart:collection';
+
 import 'dart:io';
 
 import 'package:espmui/api.dart';
-import 'package:flutter/material.dart';
+//import 'package:flutter/material.dart';
 
 import 'package:espmui/debug.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
@@ -42,7 +42,7 @@ abstract class BleCharacteristic<T> with Debug {
   final _exclusiveAccess = BLE().mutex;
 
   /// Histories associated with the streams
-  Map<String, CharacteristicHistory> histories = {};
+  Map<String, History> histories = {};
 
   Stream<T> get defaultStream => _controller.stream;
 
@@ -232,7 +232,7 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
   final charUUID = BleConstants.BATTERY_LEVEL_CHAR_UUID;
 
   BatteryCharacteristic(Device device) : super(device) {
-    histories['charge'] = CharacteristicHistory<int>(maxEntries: 3600, maxAge: 3600);
+    histories['charge'] = History<int>(maxEntries: 3600, maxAge: 3600);
   }
 
   @override
@@ -297,8 +297,8 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
     _cadenceController.onCancel = () {
       _timer?.cancel();
     };
-    histories['power'] = CharacteristicHistory<int>(maxEntries: 3600, maxAge: 3600);
-    histories['cadence'] = CharacteristicHistory<int>(maxEntries: 3600, maxAge: 3600);
+    histories['power'] = History<int>(maxEntries: 3600, maxAge: 3600);
+    histories['cadence'] = History<int>(maxEntries: 3600, maxAge: 3600);
   }
 
   @override
@@ -619,7 +619,7 @@ class WeightScaleCharacteristic extends BleCharacteristic<double?> {
   final charUUID = BleConstants.WEIGHT_MEASUREMENT_CHAR_UUID;
 
   WeightScaleCharacteristic(Device device) : super(device) {
-    histories['measurement'] = CharacteristicHistory<double>(maxEntries: 360, maxAge: 60, absolute: true);
+    histories['measurement'] = History<double>(maxEntries: 360, maxAge: 60, absolute: true);
     super.sendBeforeUnsubscribe = true;
   }
 
@@ -662,7 +662,7 @@ class HeartRateCharacteristic extends BleCharacteristic<int?> {
   final charUUID = BleConstants.HEART_RATE_MEASUREMENT_CHAR_UUID;
 
   HeartRateCharacteristic(Device device) : super(device) {
-    histories['measurement'] = CharacteristicHistory<int>(maxEntries: 120, maxAge: 120);
+    histories['measurement'] = History<int>(maxEntries: 120, maxAge: 120);
     super.sendBeforeUnsubscribe = true;
   }
 
@@ -717,7 +717,7 @@ class TemperatureCharacteristic extends BleCharacteristic<double?> {
   final charUUID = BleConstants.TEMPERATURE_CHAR_UUID;
 
   TemperatureCharacteristic(Device device) : super(device) {
-    histories['measurement'] = CharacteristicHistory<double>(maxEntries: 360, maxAge: 60);
+    histories['measurement'] = History<double>(maxEntries: 360, maxAge: 60);
     super.sendBeforeUnsubscribe = true;
   }
 
@@ -781,75 +781,5 @@ class CharacteristicListItem {
 
   void dispose() {
     characteristic?.dispose();
-  }
-}
-
-class CharacteristicHistory<T> with Debug {
-  final _data = LinkedHashMap<int, T>();
-  final int maxEntries;
-  final int maxAge;
-  final bool absolute;
-
-  /// The oldest entries will be deleted when either
-  /// - the number of entries exceeds [maxEntries]
-  /// - or the age of the entry in seconds is greater than [maxAge].
-  CharacteristicHistory({required this.maxEntries, required this.maxAge, this.absolute = false});
-
-  /// Append a value to the history.
-  /// - [timestamp]: milliseconds since Epoch
-  void append(T value, {int? timestamp}) {
-    if (null == timestamp) timestamp = util.uts();
-    //logD("append timestamp: $timestamp value: $value length: ${_data.length}");
-    if (absolute) {
-      if (value.runtimeType == int) value = int.tryParse(value.toString())?.abs() as T;
-      if (value.runtimeType == double) value = double.tryParse(value.toString())?.abs() as T;
-    }
-    _data[timestamp] = value;
-    // Prune on every ~100 appends
-    if (.99 < Random().nextDouble()) {
-      if (.5 < Random().nextDouble())
-        while (maxEntries < _data.length) _data.remove(_data.entries.first.key);
-      else
-        _data.removeWhere((time, _) => time < util.uts() - maxAge * 1000);
-    }
-  }
-
-  /// [timestamp] is milliseconds since the Epoch
-  Map<int, T> since({required int timestamp}) {
-    Map<int, T> filtered = Map.of(_data);
-    filtered.removeWhere((time, _) => time < timestamp);
-    //logD("since  timestamp: $timestamp data: ${_data.length} filtered: ${filtered.length}");
-    return filtered;
-  }
-
-  /// [timestamp] is milliseconds since the Epoch
-  Widget graph({required int timestamp, Color? color}) {
-    Map<int, T> filtered = since(timestamp: timestamp);
-    if (filtered.length < 1) return util.Empty();
-    var data = Map<int, num>.from(filtered);
-    double? min;
-    double? max;
-    data.forEach((_, val) {
-      if (null == min || val < min!) min = val.toDouble();
-      if (null == max || max! < val) max = val.toDouble();
-    });
-    //logD("min: $min max: $max");
-    if (null == min || null == max) return util.Empty();
-    var widgets = <Widget>[];
-    Color outColor = color ?? Colors.red;
-    data.forEach((time, value) {
-      var height = util.map(value.toDouble(), min!, max!, 0, 1000);
-      widgets.add(Container(
-        width: 50,
-        height: (0 < height) ? height : 1,
-        color: outColor, //.withOpacity((0 < height) ? .5 : 0),
-        margin: EdgeInsets.all(1),
-      ));
-    });
-    if (widgets.length < 1) return util.Empty();
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: widgets,
-    );
   }
 }

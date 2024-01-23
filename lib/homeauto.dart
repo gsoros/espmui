@@ -11,6 +11,7 @@ import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 //import 'package:listenable_stream/listenable_stream.dart';
 import 'package:intl/intl.dart';
 //mport 'package:mutex/mutex.dart';
+import 'package:page_transition/page_transition.dart';
 
 import 'device.dart';
 import 'api.dart';
@@ -18,6 +19,7 @@ import 'api.dart';
 import 'ble_characteristic.dart';
 import 'ble_constants.dart';
 import 'device_widgets.dart';
+import 'device_route.dart';
 
 import 'util.dart';
 import 'debug.dart';
@@ -32,6 +34,8 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
   Stream<Widget> get voltageTileStream => voltageTileStreamController.stream;
   final currentTileStreamController = StreamController<Widget>.broadcast();
   Stream<Widget> get currentTileStream => currentTileStreamController.stream;
+  final powerTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get powerTileStream => powerTileStreamController.stream;
   final cellsTileStreamController = StreamController<Widget>.broadcast();
   Stream<Widget> get cellsTileStream => cellsTileStreamController.stream;
 
@@ -47,6 +51,7 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
         switchesTileStreamController,
         voltageTileStreamController,
         currentTileStreamController,
+        powerTileStreamController,
         cellsTileStreamController,
       ),
     );
@@ -68,17 +73,42 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
         units: 'V',
         stream: voltageTileStream,
         initialData: () => settings.value.bms.voltageTile,
+        history: settings.value.bms.voltageHistory,
       ),
       'current': DeviceTileStream(
         label: 'Current',
         units: 'A',
         stream: currentTileStream,
         initialData: () => settings.value.bms.currentTile,
+        history: settings.value.bms.currentHistory,
+      ),
+      'power': DeviceTileStream(
+        label: 'Power',
+        units: 'W',
+        stream: powerTileStream,
+        initialData: () => settings.value.bms.powerTile,
+        history: settings.value.bms.powerHistory,
       ),
       'cells': DeviceTileStream(
         label: 'Cells',
         stream: cellsTileStream,
         initialData: () => settings.value.bms.cellsTile,
+      ),
+    });
+    tileActions.addAll({
+      "switchesSettings": DeviceTileAction(
+        label: "Open Switches Settings",
+        device: this,
+        action: (context, device) {
+          if (null == device) return;
+          Navigator.push(
+            context,
+            PageTransition(
+              type: PageTransitionType.rightToLeft,
+              child: DeviceRoute(device, focus: 'switches', open: ['settings', 'switches']),
+            ),
+          );
+        },
       ),
     });
   }
@@ -105,6 +135,7 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
     switchesTileStreamController.close();
     voltageTileStreamController.close();
     currentTileStreamController.close();
+    powerTileStreamController.close();
     cellsTileStreamController.close();
     await apiDispose();
     await wifiDispose();
@@ -175,12 +206,14 @@ class HomeAutoSettings with Debug {
   StreamController<Widget> switchesTileStreamController;
   StreamController<Widget> voltageTileStreamController;
   StreamController<Widget> currentTileStreamController;
+  StreamController<Widget> powerTileStreamController;
   StreamController<Widget> cellsTileStreamController;
 
   HomeAutoSettings(
     this.switchesTileStreamController,
     this.voltageTileStreamController,
     this.currentTileStreamController,
+    this.powerTileStreamController,
     this.cellsTileStreamController,
   ) {
     logD('construct');
@@ -261,7 +294,11 @@ class HomeAutoSettings with Debug {
       bms.cellVoltage = cells;
       voltageTileStreamController.sink.add(bms.voltageTile);
       currentTileStreamController.sink.add(bms.currentTile);
+      powerTileStreamController.sink.add(bms.powerTile);
       cellsTileStreamController.sink.add(bms.cellsTile);
+      bms.voltageHistory.append(bms.voltage);
+      bms.currentHistory.append(bms.current);
+      bms.powerHistory.append((bms.voltage * bms.current).round());
       return true;
     }
 
@@ -597,6 +634,9 @@ class Bms {
   double current = 0.0;
   double balanceCurrent = 0.0;
   List<double> cellVoltage = [];
+  final voltageHistory = History<double>(maxEntries: 3600, maxAge: 3600);
+  final currentHistory = History<double>(maxEntries: 3600, maxAge: 3600);
+  final powerHistory = History<int>(maxEntries: 3600, maxAge: 3600);
 
   Future<void> onDisconnected() async {
     updatedAt = 0;
@@ -613,6 +653,10 @@ class Bms {
     return Text(current.toStringAsFixed(3));
   }
 
+  Widget get powerTile {
+    return Text((voltage * current).round().toString());
+  }
+
   Widget get cellsTile {
     var voltages = cellVoltage;
     //var voltages = <double>[3.382, 3.383, 3.386, 3.381, 3.384, 3.382, 3.383, 3.381]; // balanced
@@ -626,10 +670,10 @@ class Bms {
     List<Widget> bars = [];
     voltages.forEach((v) {
       Color color = v == min
-          ? Colors.red
+          ? const Color.fromARGB(255, 255, 0, 0)
           : v == max
-              ? Colors.green
-              : Colors.grey;
+              ? Color.fromARGB(255, 2, 124, 6)
+              : Color.fromARGB(255, 43, 55, 95);
       bars.add(Container(
         width: 10,
         height: (v - min) / delta * 30 + 5,
@@ -637,18 +681,33 @@ class Bms {
         margin: EdgeInsets.only(left: 1, right: 1),
       ));
     });
-    const small = TextStyle(fontSize: 4);
+    const small = TextStyle(fontSize: 4, color: Color.fromARGB(192, 255, 255, 255));
+    const smallActive = TextStyle(fontSize: 4, color: Color.fromARGB(255, 255, 208, 0));
+    const smallWarning = TextStyle(fontSize: 4, color: Color.fromARGB(255, 26, 209, 255));
+    const smallImportant = TextStyle(fontSize: 4, color: Color.fromARGB(255, 255, 132, 132));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text("Max: ${max}V", style: small),
+        Text("Max: ${max.toStringAsFixed(3)}V", style: small),
         Row(crossAxisAlignment: CrossAxisAlignment.end, children: bars),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Bal: ${(balanceCurrent * 1000).toInt()}mA    ", style: small),
-            Text("Delta: ${(delta * 1000).toInt()}mV    ", style: small),
-            Text("Min: ${min}V", style: small),
+            0.01 < balanceCurrent
+                ? Text(
+                    "Balance: ${(balanceCurrent * 1000).round().toString().padLeft(3, '0')}mA    ",
+                    style: smallActive,
+                  )
+                : Empty(),
+            Text(
+              "Delta: ${(delta * 1000).round()}mV    ",
+              style: 0.025 <= delta
+                  ? smallImportant
+                  : 0.01 < delta
+                      ? smallWarning
+                      : small,
+            ),
+            Text("Min: ${min.toStringAsFixed(3)}V", style: small),
           ],
         ),
       ],

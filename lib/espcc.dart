@@ -53,7 +53,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
     tileActions.addAll({
       "startStop": DeviceTileAction(
         label: "Start/stop recording",
-        action: () async {
+        action: (_, __) async {
           String action = "start";
           String succ = "Started";
           String fail = "Error starting";

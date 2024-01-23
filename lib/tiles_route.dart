@@ -11,7 +11,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 import 'tile.dart';
 import 'device.dart';
-import 'ble_characteristic.dart';
+//import 'ble_characteristic.dart';
 import 'device_list.dart';
 import 'device_list_route.dart';
 import 'device_widgets.dart';
@@ -410,7 +410,7 @@ class _TileGridState extends State<TileGrid> with Debug {
                 _tiles.save();
               },
             );
-            CharacteristicHistory? charHistory = DeviceList().byIdentifier(tile.device)?.tileStreams[tile.stream]?.history;
+            History? charHistory = DeviceList().byIdentifier(tile.device)?.tileStreams[tile.stream]?.history;
             if (null == charHistory) return sourceDropdown;
             logD("this stream supports history");
             double max = charHistory.maxAge.toDouble();
@@ -531,7 +531,7 @@ class _TileGridState extends State<TileGrid> with Debug {
       if (null == device) return;
       DeviceTileAction? action = device.tileActions[chunks[1]];
       if (null == action) return;
-      action.call();
+      action.call(context);
     }
 
     return ValueListenableBuilder<List<Tile>>(

@@ -18,9 +18,11 @@ import 'tile.dart';
 
 class DeviceRoute extends StatefulWidget with Debug {
   final Device device;
+  final String? focus;
+  final List<String> open; // list of initially open nodes
 
-  DeviceRoute(this.device) {
-    logD("construct");
+  DeviceRoute(this.device, {this.focus, this.open = const []}) {
+    logD("construct focus: $focus, opened: $open");
   }
 
   @override
@@ -28,7 +30,7 @@ class DeviceRoute extends StatefulWidget with Debug {
     logD("createState()");
     if (device is ESPM) return ESPMRouteState(device as ESPM);
     if (device is ESPCC) return ESPCCRouteState(device as ESPCC);
-    if (device is HomeAuto) return HomeAutoRouteState(device as HomeAuto);
+    if (device is HomeAuto) return HomeAutoRouteState(device as HomeAuto, focus: focus, open: open);
     if (device is PowerMeter) return PowerMeterRouteState(device as PowerMeter);
     if (device is HeartRateMonitor) return HeartRateMonitorRouteState(device as HeartRateMonitor);
     return DeviceRouteState(device);
@@ -37,9 +39,11 @@ class DeviceRoute extends StatefulWidget with Debug {
 
 class DeviceRouteState extends State<DeviceRoute> with Debug {
   Device device;
+  String? focus;
+  List<String> open;
 
-  DeviceRouteState(this.device) {
-    logD("construct");
+  DeviceRouteState(this.device, {this.focus, this.open = const []}) {
+    logD("construct device: ${device.name}, focus: $focus, open: $open");
   }
 
   @override
@@ -269,14 +273,14 @@ class ESPCCRouteState extends DeviceRouteState {
 class HomeAutoRouteState extends DeviceRouteState {
   HomeAuto homeAuto;
 
-  HomeAutoRouteState(this.homeAuto) : super(homeAuto);
+  HomeAutoRouteState(this.homeAuto, {super.focus, super.open}) : super(homeAuto);
 
   @override
   _devicePropertyItems() {
     return super._devicePropertyItems()
       ..addAll([
         StaggeredGridItem(
-          value: HomeAutoSettingsWidget(homeAuto),
+          value: HomeAutoSettingsWidget(homeAuto, focus: focus, open: open),
           colSpan: 6,
         ),
       ]);

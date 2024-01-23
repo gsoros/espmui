@@ -2061,7 +2061,10 @@ class EpeverSettingsWidget extends StatelessWidget with Debug {
 class SwitchesSettingsWidget extends StatelessWidget with Debug {
   final Api api;
   final HomeAutoSwitches switches;
-  SwitchesSettingsWidget(this.switches, this.api);
+  final focusNode = FocusNode();
+  final List<String> open;
+
+  SwitchesSettingsWidget(this.switches, this.api, {this.open = const []});
 
   @override
   Widget build(BuildContext context) {
@@ -2138,8 +2141,12 @@ class SwitchesSettingsWidget extends StatelessWidget with Debug {
 
 class HomeAutoSettingsWidget extends StatelessWidget with Debug {
   final HomeAuto device;
+  final String? focus;
+  final List<String> open;
 
-  HomeAutoSettingsWidget(this.device);
+  HomeAutoSettingsWidget(this.device, {this.focus, this.open = const []}) {
+    logD("construct focus: $focus, open: $open");
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2186,13 +2193,22 @@ class HomeAutoSettingsWidget extends StatelessWidget with Debug {
     final deviceSettings = ValueListenableBuilder<HomeAutoSettings>(
       valueListenable: device.settings,
       builder: (_, settings, __) {
+        var switchesSettingsWidget = SwitchesSettingsWidget(
+          settings.switches,
+          device.api,
+          open: open,
+        );
+        if ('switches' == focus) {
+          switchesSettingsWidget.focusNode.requestFocus();
+        }
         var widgets = <Widget>[
-          ExpansionTile(title: Text('Switches'), children: [
-            SwitchesSettingsWidget(
-              settings.switches,
-              device.api,
-            ),
-          ]),
+          ExpansionTile(
+            title: Text('Switches'),
+            initiallyExpanded: open.contains('switches'),
+            children: [
+              switchesSettingsWidget,
+            ],
+          ),
           Divider(color: Colors.white38),
           ExpansionTile(title: Text('Charger'), children: [
             SizedBox(width: 1, height: 5),
@@ -2274,6 +2290,7 @@ class HomeAutoSettingsWidget extends StatelessWidget with Debug {
       title: Text("Settings"),
       textColor: Colors.white,
       iconColor: Colors.white,
+      initiallyExpanded: open.contains('settings'),
       children: [
         Column(mainAxisSize: MainAxisSize.min, children: [
           frame(deviceSettings),

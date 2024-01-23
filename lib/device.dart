@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as dev;
+import 'dart:math';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 //import 'package:flutter/painting.dart';
@@ -858,7 +860,7 @@ class DeviceTileStream {
   Stream<Widget>? stream;
   Widget Function()? initialData;
   String? units;
-  CharacteristicHistory? history;
+  History? history;
 
   DeviceTileStream({
     required this.label,
@@ -870,15 +872,87 @@ class DeviceTileStream {
 }
 
 class DeviceTileAction {
+  Device? device;
   String label;
-  Function action;
+  Function(BuildContext context, Device? device) action;
 
   DeviceTileAction({
     required this.label,
     required this.action,
+    this.device,
   });
 
-  void call() {
-    action();
+  void call(BuildContext context) {
+    action(context, device);
+  }
+}
+
+class History<T> with Debug {
+  final _data = LinkedHashMap<int, T>();
+  final int maxEntries;
+  final int maxAge;
+  final bool absolute;
+
+  /// The oldest entries will be deleted when either
+  /// - the number of entries exceeds [maxEntries]
+  /// - or the age of the entry in seconds is greater than [maxAge].
+  History({required this.maxEntries, required this.maxAge, this.absolute = false});
+
+  /// Append a value to the history.
+  /// - [timestamp]: milliseconds since Epoch
+  void append(T value, {int? timestamp}) {
+    if (null == timestamp) timestamp = uts();
+    //logD("append timestamp: $timestamp value: $value length: ${_data.length}");
+    if (absolute) {
+      if (value.runtimeType == int) value = int.tryParse(value.toString())?.abs() as T;
+      if (value.runtimeType == double) value = double.tryParse(value.toString())?.abs() as T;
+    }
+    _data[timestamp] = value;
+    // Prune on every ~100 appends
+    if (.99 < Random().nextDouble()) {
+      if (.5 < Random().nextDouble())
+        while (maxEntries < _data.length) _data.remove(_data.entries.first.key);
+      else
+        _data.removeWhere((time, _) => time < uts() - maxAge * 1000);
+    }
+  }
+
+  /// [timestamp] is milliseconds since the Epoch
+  Map<int, T> since({required int timestamp}) {
+    Map<int, T> filtered = Map.of(_data);
+    filtered.removeWhere((time, _) => time < timestamp);
+    //logD("since  timestamp: $timestamp data: ${_data.length} filtered: ${filtered.length}");
+    return filtered;
+  }
+
+  /// [timestamp] is milliseconds since the Epoch
+  Widget graph({required int timestamp, Color? color}) {
+    Map<int, T> filtered = since(timestamp: timestamp);
+    if (filtered.length < 1) return Empty();
+    var data = Map<int, num>.from(filtered);
+    double? min;
+    double? max;
+    data.forEach((_, val) {
+      if (null == min || val < min!) min = val.toDouble();
+      if (null == max || max! < val) max = val.toDouble();
+    });
+    //logD("min: $min max: $max");
+    if (null == min || null == max) return Empty();
+    var widgets = <Widget>[];
+    Color outColor = color ?? Colors.red;
+    data.forEach((time, value) {
+      var height = map(value.toDouble(), min!, max!, 0, 1000);
+      widgets.add(Container(
+        width: 50,
+        height: (0 < height) ? height : 1,
+        color: outColor, //.withOpacity((0 < height) ? .5 : 0),
+        margin: EdgeInsets.all(1),
+      ));
+    });
+    if (widgets.length < 1) return Empty();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: widgets,
+    );
   }
 }

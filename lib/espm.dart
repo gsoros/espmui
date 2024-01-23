@@ -77,7 +77,7 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
     tileActions.addAll({
       "tare": DeviceTileAction(
         label: "Tare",
-        action: () async {
+        action: (_, __) async {
           var resultCode = await api.requestResultCode("tare=0");
           snackbar("Tare " + (resultCode == ApiResult.success ? "success" : "failed"));
         },
