@@ -543,7 +543,7 @@ class Api with Debug {
       minDelayMs: minDelayMs,
       maxAgeMs: maxAgeMs,
     );
-    //logD("requestResultCode: $message");
+    logD("requestResultCode: $command");
     await isDone(message);
     return message.resultCode;
   }

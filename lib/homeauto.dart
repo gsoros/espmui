@@ -281,7 +281,7 @@ class HomeAutoSettings with Debug {
         logD('received delay reply: ${message.valueAsString}');
         return true;
       }
-      logD("parsing ci=${message.valueAsString}");
+      //logD("parsing ci=${message.valueAsString}");
       //name,voltage,current,balanceCurrent[,cellVoltage1,cellVoltage2,...,cellVoltageN]
       List<String> values = message.valueAsString?.split(',') ?? [];
       if ((values.length) < 4) {
@@ -333,9 +333,20 @@ class EpeverSetting<T> {
   String arg;
   String name;
   Type type;
-  T? value;
+  T? _value;
+  late TextEditingController controller;
 
-  EpeverSetting(this.arg, this.name, this.type, [this.value]);
+  EpeverSetting(this.arg, this.name, this.type, [T? value]) {
+    controller = TextEditingController(text: '');
+    this.value = value;
+  }
+
+  set value(T? updated) {
+    _value = updated;
+    controller.value = TextEditingValue(text: (null == updated) ? '' : updated.toString());
+  }
+
+  T? get value => _value;
 
   String get unit {
     switch (arg) {

@@ -662,7 +662,7 @@ class ApiInterfaceWidget extends StatelessWidget {
   }
 }
 
-class SettingInputWidget extends StatelessWidget with Debug {
+class SettingInputWidget extends StatefulWidget with Debug {
   final String? value;
   final bool enabled;
   final String? name;
@@ -670,10 +670,12 @@ class SettingInputWidget extends StatelessWidget with Debug {
   final String Function(String)? transformInput;
   final Widget? suffix;
   final TextInputType? keyboardType;
-  final void Function(String)? onSubmitted;
-  final TextEditingController? textController;
+  final void Function(String, BuildContext? context)? onChanged;
+  final void Function(String, BuildContext? context)? onSubmitted;
+  final TextEditingController? controller;
 
   SettingInputWidget({
+    Key? key,
     this.value,
     this.enabled = true,
     this.name,
@@ -681,24 +683,101 @@ class SettingInputWidget extends StatelessWidget with Debug {
     this.transformInput,
     this.suffix,
     this.keyboardType,
+    this.onChanged,
     this.onSubmitted,
-    this.textController,
+    this.controller,
+  }) : super(key: key) {
+    //logD("construct $name key: $key, value: $value, controller: $textController");
+  }
+
+  static GlobalKey<_SettingInputWidgetState> get newGlobalKey => GlobalKey<_SettingInputWidgetState>();
+
+  @override
+  _SettingInputWidgetState createState() {
+    //logD("creating state for $name");
+    return _SettingInputWidgetState(
+      value: value,
+      enabled: enabled,
+      name: name,
+      isPassword: isPassword,
+      transformInput: transformInput,
+      suffix: suffix,
+      keyboardType: keyboardType,
+      onChanged: onChanged,
+      onSubmitted: onSubmitted,
+      controller: controller,
+    );
+  }
+}
+
+class _SettingInputWidgetState extends State<SettingInputWidget> with Debug {
+  final String? value;
+  final bool enabled;
+  final String? name;
+  final bool isPassword;
+  final String Function(String)? transformInput;
+  final Widget? suffix;
+  final TextInputType? keyboardType;
+  final void Function(String, BuildContext? context)? onChanged;
+  final void Function(String, BuildContext? context)? onSubmitted;
+  TextEditingController? controller;
+
+  _SettingInputWidgetState({
+    this.value,
+    this.enabled = true,
+    this.name,
+    this.isPassword = false,
+    this.transformInput,
+    this.suffix,
+    this.keyboardType,
+    this.onChanged,
+    this.onSubmitted,
+    this.controller,
   });
 
-  String? getValue() => textController?.text;
+  String? getValue() => controller?.text;
 
-  void Function(String)? _onSubmitted(BuildContext context) => null;
+  void setValue(String value) {
+    logD("setting $value on controller: $controller");
+    controller?.value = TextEditingValue(text: value);
+  }
+
+  @override
+  void initState() {
+    if (null == controller) {
+      logD("creating textController for $name");
+      controller = TextEditingController(text: value);
+    }
+    controller!.addListener(() {
+      logD("listener on $name got ${controller?.text}");
+    });
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    // logD("disposing textController for $name");
+    // controller?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    //logD("SettingInputWidget build() value: $value");
+    //logD("_SettingInputWidgetState build() value: $value");
     return TextField(
       keyboardType: keyboardType,
       obscureText: isPassword,
       enableSuggestions: false,
       autocorrect: false,
       enabled: enabled,
-      controller: textController ?? TextEditingController(text: value),
+      //controller: textController ?? TextEditingController(text: value),
+      controller: controller ??
+          TextEditingController.fromValue(
+            TextEditingValue(
+              text: value ?? '',
+              //selection: TextSelection.collapsed(offset: value?.length ?? 0),
+            ),
+          ),
       decoration: InputDecoration(
         labelText: name,
         suffix: suffix,
@@ -709,7 +788,14 @@ class SettingInputWidget extends StatelessWidget with Debug {
           borderSide: BorderSide(color: Colors.white24),
         ),
       ),
-      onSubmitted: _onSubmitted(context),
+      onSubmitted: (text) {
+        logD("onSubmitted $name $text");
+        if (null != onSubmitted) onSubmitted!(text, context);
+      },
+      onChanged: (text) {
+        logD("onChanged $name $text");
+        if (null != onChanged) onChanged!(text, context);
+      },
     );
   }
 }
@@ -720,6 +806,7 @@ class ApiSettingInputWidget extends SettingInputWidget {
   final String? commandArg;
 
   ApiSettingInputWidget({
+    Key? key,
     required this.api,
     required this.commandCode,
     this.commandArg,
@@ -730,8 +817,10 @@ class ApiSettingInputWidget extends SettingInputWidget {
     String Function(String)? transformInput,
     Widget? suffix,
     TextInputType? keyboardType,
-    TextEditingController? textController,
+    TextEditingController? controller,
+    void Function(String, BuildContext?)? onChanged,
   }) : super(
+          key: key,
           value: value,
           enabled: enabled,
           name: name,
@@ -739,26 +828,25 @@ class ApiSettingInputWidget extends SettingInputWidget {
           transformInput: transformInput,
           suffix: suffix,
           keyboardType: keyboardType,
-          textController: textController,
+          controller: controller,
+          onChanged: onChanged,
+          onSubmitted: (edited, context) async {
+            if (null == commandCode) {
+              //logD("command is null");
+              return;
+            }
+            if (transformInput != null) edited = transformInput(edited);
+            String command = "$commandCode=" + (null != commandArg ? "$commandArg:" : "") + "$edited";
+            String? expect = null != commandArg ? "$commandArg:" : null;
+            final result = await api.requestResultCode(
+              command,
+              expectValue: expect,
+              minDelayMs: 2000,
+            );
+            if (name != null) snackbar("$name update${result == ApiResult.success ? "d" : " failed"}", context);
+            //logD('api.requestResultCode("$command", expectValue="$expect"): $result');
+          },
         );
-
-  @override
-  void Function(String)? _onSubmitted(BuildContext context) => (String edited) async {
-        if (null == commandCode) {
-          logD("command is null");
-          return;
-        }
-        if (transformInput != null) edited = transformInput!(edited);
-        String command = "$commandCode=" + (null != commandArg ? "$commandArg:" : "") + "$edited";
-        String? expect = null != commandArg ? "$commandArg:" : null;
-        final result = await api.requestResultCode(
-          command,
-          expectValue: expect,
-          minDelayMs: 2000,
-        );
-        if (name != null) snackbar("$name update${result == ApiResult.success ? "d" : " failed"}", context);
-        logD('api.requestResultCode("$command", expectValue="$expect"): $result');
-      };
 }
 
 class SettingSwitchWidget extends StatelessWidget with Debug {
@@ -1546,14 +1634,16 @@ class PeersListWidget extends StatelessWidget with Debug {
         /* ESPM */
         iconType = "ESPM";
         if ("add" == action) {
+          var key = SettingInputWidget.newGlobalKey;
           passcodeEntry = SettingInputWidget(
+            key: key,
             name: "Passcode",
             keyboardType: TextInputType.number,
-            textController: device.peerSettings.value.getController(peer: peer),
+            controller: device.peerSettings.value.getController(peer: peer),
           );
           commandProcessor = (command, passcodeEntry) {
             if (null == command) return command;
-            String? value = passcodeEntry?.getValue();
+            String? value = key.currentState?.getValue();
             logD("commandProcessor: value=$value");
             if (null == value) return command;
             command += ",${int.tryParse(value)}";
@@ -1573,14 +1663,16 @@ class PeersListWidget extends StatelessWidget with Debug {
         /* JkBms */
         iconType = "BMS";
         if ("add" == action) {
+          var key = SettingInputWidget.newGlobalKey;
           passcodeEntry = SettingInputWidget(
+            key: key,
             name: "Passcode",
             keyboardType: TextInputType.number,
-            textController: device.peerSettings.value.getController(peer: peer),
+            controller: device.peerSettings.value.getController(peer: peer),
           );
           commandProcessor = (command, passcodeEntry) {
             if (null == command) return command;
-            String? value = passcodeEntry?.getValue();
+            String? value = key.currentState?.getValue();
             logD("commandProcessor: value=$value");
             if (null == value) return command;
             command += ",${int.tryParse(value)}";
@@ -1993,7 +2085,7 @@ class EpeverSettingsWidget extends StatelessWidget with Debug {
   @override
   Widget build(BuildContext context) {
     List<Widget> widgets = [];
-    int cs = settings.get('cs')?.value ?? 1;
+    int cellCount = settings.get('cs')?.value ?? 1;
     settings.values.forEach((arg, setting) {
       Widget input;
       if ('typ' == arg) {
@@ -2011,34 +2103,46 @@ class EpeverSettingsWidget extends StatelessWidget with Debug {
           ],
         );
       } else {
+        var onChanged = ('V' != setting.unit)
+            ? null
+            : (changed, context) {
+                logD("changed $arg");
+              };
         input = ApiSettingInputWidget(
           api: api,
           commandCode: api.commandCode('ep'),
           commandArg: arg,
           name: setting.name,
-          value: null == setting.value ? '' : setting.value.toString(),
           suffix: Text(setting.unit),
           keyboardType: TextInputType.number,
+          onChanged: onChanged,
+          controller: setting.controller,
         );
       }
-      if ('V' == setting.unit) {
+      if ('V' == setting.unit && input is ApiSettingInputWidget) {
+        var inputVpc = ApiSettingInputWidget(
+          api: api,
+          commandCode: api.commandCode('ep'),
+          commandArg: arg,
+          value: null == setting.value ? '' : (setting.value / cellCount).toString(),
+          transformInput: (String val) {
+            var out = double.tryParse(val);
+            return null == out ? '' : (out * cellCount).toString();
+          },
+          suffix: Text('Vpc'),
+          keyboardType: TextInputType.number,
+          onChanged: (changed, context) {
+            var d = double.tryParse(changed);
+            if (null != d) setting.controller.value = TextEditingValue(text: (d * cellCount).toString());
+            logD("changed: $arg $changed Vpc, set: ${setting.controller.value.text}");
+          },
+        );
         widgets.add(Flexible(
             child: Row(children: [
           Flexible(flex: 5, child: input),
           Flexible(
             flex: 5,
-            child: ApiSettingInputWidget(
-              api: api,
-              commandCode: api.commandCode('ep'),
-              commandArg: arg,
-              value: null == setting.value ? '' : (setting.value / cs).toString(),
-              transformInput: (String val) {
-                var out = double.tryParse(val);
-                return null == out ? '' : (out * cs).toString();
-              },
-              suffix: Text('Vpc'),
-              keyboardType: TextInputType.number,
-            ),
+            child: inputVpc,
           ),
         ])));
         return;
@@ -2094,7 +2198,7 @@ class SwitchesSettingsWidget extends StatelessWidget with Debug {
       ));
 
       if (null == sw.mode?.unit) return;
-      widgets.addAll({
+      widgets.add(
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -2107,9 +2211,11 @@ class SwitchesSettingsWidget extends StatelessWidget with Debug {
                   name: 'On above',
                   value: sw.onValue().toString(),
                   suffix: null == sw.mode?.unit ? null : Text(sw.mode!.unit!),
-                  keyboardType: TextInputType.number,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
                   transformInput: (input) {
-                    return (sw.mode?.name ?? 'NO_MODE') + ',' + input + ',' + sw.offValue().toString();
+                    var ret = (sw.mode?.name ?? 'NO_MODE') + ',' + input + ',' + sw.offValue().toString();
+                    logD("$input transformed to $ret");
+                    return ret;
                   },
                 )),
             Flexible(
@@ -2121,14 +2227,16 @@ class SwitchesSettingsWidget extends StatelessWidget with Debug {
                   name: 'Off below',
                   value: sw.offValue().toString(),
                   suffix: null == sw.mode?.unit ? null : Text(sw.mode!.unit!),
-                  keyboardType: TextInputType.number,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
                   transformInput: (input) {
-                    return (sw.mode?.name ?? 'NO_MODE') + ',' + sw.onValue().toString() + ',' + input;
+                    var ret = (sw.mode?.name ?? 'NO_MODE') + ',' + sw.onValue().toString() + ',' + input;
+                    logD("$input transformed to $ret");
+                    return ret;
                   },
                 )),
           ],
         ),
-      });
+      );
     });
 
     return Column(
