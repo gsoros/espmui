@@ -166,15 +166,16 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
   /// request initial values, returned value is discarded
   /// because the message.done subscription will handle it
   void _requestInit() async {
-    logD("Requesting init start");
+    logD('Requesting init');
     if (!await ready()) return;
     //await characteristic("api")?.write("init");
 
     await api.request<String>(
-      "init",
+      'init',
       minDelayMs: 10000,
       maxAttempts: 3,
     );
+    /*
     await Future.delayed(Duration(seconds: 2));
     await api.request<String>(
       "ep=dump",
@@ -187,14 +188,17 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
       minDelayMs: 10000,
       maxAttempts: 3,
     );
+    */
   }
 
   @override
-  IconData get iconData => DeviceIcon("HomeAuto").data();
+  IconData get iconData => DeviceIcon('HomeAuto').data();
 
   @override
   void onCommandAdded(String command) {
-    if ("switch" == command) api.sendCommand("switch=all");
+    if ('switch' == command) api.sendCommand('switch=all');
+    if ('ep' == command) api.sendCommand('ep=dump');
+    if ('ci' == command) api.sendCommand('ci=delay:2000');
   }
 }
 
@@ -520,7 +524,7 @@ class HomeAutoSwitches with Debug {
         mainAxisSize: MainAxisSize.min,
         children: [
           Flexible(flex: 2, child: sw.stateIcon(size: 100)),
-          Flexible(flex: 8, child: Text("$name: ${sw.mode?.name}")),
+          Flexible(flex: 8, child: Text(" $name: ${sw.mode?.name}")),
         ],
       )));
     });
@@ -667,47 +671,61 @@ class Bms {
     var min = sorted.first;
     var max = sorted.last;
     var delta = max - min;
+    if (delta < 0.0001) delta = 0.0001;
+    const double minBarHeight = 5.0;
+    const double maxBarHeight = 35.0;
+    double factor = 1 / delta * (maxBarHeight - minBarHeight);
     List<Widget> bars = [];
     voltages.forEach((v) {
-      Color color = v == min
-          ? const Color.fromARGB(255, 255, 0, 0)
-          : v == max
-              ? Color.fromARGB(255, 2, 124, 6)
-              : Color.fromARGB(255, 43, 55, 95);
+      Color color = v == max
+          ? const Color.fromARGB(255, 2, 124, 6)
+          : v == min
+              ? const Color.fromARGB(255, 255, 0, 0)
+              : const Color.fromARGB(255, 43, 55, 95);
       bars.add(Container(
         width: 10,
-        height: (v - min) / delta * 30 + 5,
+        height: (v - min) * factor + minBarHeight,
         color: color,
-        margin: EdgeInsets.only(left: 1, right: 1),
+        margin: const EdgeInsets.only(left: 2),
       ));
     });
     const small = TextStyle(fontSize: 4, color: Color.fromARGB(192, 255, 255, 255));
     const smallActive = TextStyle(fontSize: 4, color: Color.fromARGB(255, 255, 208, 0));
-    const smallWarning = TextStyle(fontSize: 4, color: Color.fromARGB(255, 26, 209, 255));
-    const smallImportant = TextStyle(fontSize: 4, color: Color.fromARGB(255, 255, 132, 132));
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+    const warning = TextStyle(fontSize: 10, color: Color.fromARGB(255, 26, 209, 255));
+    const important = TextStyle(fontSize: 32, color: Color.fromARGB(255, 255, 132, 132));
+    return Stack(
       children: [
-        Text("Max: ${max.toStringAsFixed(3)}V", style: small),
-        Row(crossAxisAlignment: CrossAxisAlignment.end, children: bars),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            0.01 < balanceCurrent
-                ? Text(
-                    "Balance: ${(balanceCurrent * 1000).round().toString().padLeft(3, '0')}mA    ",
-                    style: smallActive,
-                  )
-                : Empty(),
+            Text("Max: ${max.toStringAsFixed(3)}V", style: small),
+            SizedBox(height: 35, child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: bars)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                0.01 < balanceCurrent
+                    ? Text(
+                        "Balance: ${(balanceCurrent * 1000).round().toString().padLeft(3, '0')}mA    ",
+                        style: smallActive,
+                      )
+                    : Empty(),
+                Text("Min: ${min.toStringAsFixed(3)}V", style: small),
+              ],
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Text('±', style: small),
             Text(
-              "Delta: ${(delta * 1000).round()}mV    ",
+              "${(delta * 1000).round()}",
               style: 0.025 <= delta
-                  ? smallImportant
+                  ? important
                   : 0.01 < delta
-                      ? smallWarning
+                      ? warning
                       : small,
             ),
-            Text("Min: ${min.toStringAsFixed(3)}V", style: small),
+            Text('mV', style: small),
           ],
         ),
       ],
