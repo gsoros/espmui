@@ -176,7 +176,7 @@ class Tile extends StatelessWidget with Debug {
     if (showDeviceName) label += ' ' + (device?.name ?? 'No source');
 
     var rows = <Widget>[];
-    int dataRowFlex = null == stream?.units ? 9 : 8;
+    int dataRowFlex = null == stream?.units ? 6 : 5;
     if (0 < label.length) {
       dataRowFlex--;
       rows.add(
@@ -189,7 +189,7 @@ class Tile extends StatelessWidget with Debug {
                 child: Text(
                   label,
                   softWrap: false,
-                  overflow: TextOverflow.visible,
+                  overflow: TextOverflow.clip,
                   style: TextStyle(fontSize: 10, color: textColor),
                 ),
               ),

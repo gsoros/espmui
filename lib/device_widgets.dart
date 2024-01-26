@@ -662,7 +662,7 @@ class ApiInterfaceWidget extends StatelessWidget {
   }
 }
 
-class SettingInputWidget extends StatefulWidget with Debug {
+class SettingInputWidget extends StatelessWidget with Debug {
   final String? value;
   final bool enabled;
   final String? name;
@@ -690,75 +690,11 @@ class SettingInputWidget extends StatefulWidget with Debug {
     //logD("construct $name key: $key, value: $value, controller: $textController");
   }
 
-  static GlobalKey<_SettingInputWidgetState> get newGlobalKey => GlobalKey<_SettingInputWidgetState>();
-
-  @override
-  _SettingInputWidgetState createState() {
-    //logD("creating state for $name");
-    return _SettingInputWidgetState(
-      value: value,
-      enabled: enabled,
-      name: name,
-      isPassword: isPassword,
-      transformInput: transformInput,
-      suffix: suffix,
-      keyboardType: keyboardType,
-      onChanged: onChanged,
-      onSubmitted: onSubmitted,
-      controller: controller,
-    );
-  }
-}
-
-class _SettingInputWidgetState extends State<SettingInputWidget> with Debug {
-  final String? value;
-  final bool enabled;
-  final String? name;
-  final bool isPassword;
-  final String Function(String)? transformInput;
-  final Widget? suffix;
-  final TextInputType? keyboardType;
-  final void Function(String, BuildContext? context)? onChanged;
-  final void Function(String, BuildContext? context)? onSubmitted;
-  TextEditingController? controller;
-
-  _SettingInputWidgetState({
-    this.value,
-    this.enabled = true,
-    this.name,
-    this.isPassword = false,
-    this.transformInput,
-    this.suffix,
-    this.keyboardType,
-    this.onChanged,
-    this.onSubmitted,
-    this.controller,
-  });
-
   String? getValue() => controller?.text;
 
   void setValue(String value) {
     logD("setting $value on controller: $controller");
     controller?.value = TextEditingValue(text: value);
-  }
-
-  @override
-  void initState() {
-    if (null == controller) {
-      logD("creating textController for $name");
-      controller = TextEditingController(text: value);
-    }
-    controller!.addListener(() {
-      logD("listener on $name got ${controller?.text}");
-    });
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    // logD("disposing textController for $name");
-    // controller?.dispose();
-    super.dispose();
   }
 
   @override
@@ -1634,16 +1570,15 @@ class PeersListWidget extends StatelessWidget with Debug {
         /* ESPM */
         iconType = "ESPM";
         if ("add" == action) {
-          var key = SettingInputWidget.newGlobalKey;
+          var controller = device.peerSettings.value.getController(peer: peer);
           passcodeEntry = SettingInputWidget(
-            key: key,
             name: "Passcode",
             keyboardType: TextInputType.number,
-            controller: device.peerSettings.value.getController(peer: peer),
+            controller: controller,
           );
           commandProcessor = (command, passcodeEntry) {
             if (null == command) return command;
-            String? value = key.currentState?.getValue();
+            String? value = controller?.value.text;
             logD("commandProcessor: value=$value");
             if (null == value) return command;
             command += ",${int.tryParse(value)}";
@@ -1663,16 +1598,15 @@ class PeersListWidget extends StatelessWidget with Debug {
         /* JkBms */
         iconType = "BMS";
         if ("add" == action) {
-          var key = SettingInputWidget.newGlobalKey;
+          var controller = device.peerSettings.value.getController(peer: peer);
           passcodeEntry = SettingInputWidget(
-            key: key,
             name: "Passcode",
             keyboardType: TextInputType.number,
-            controller: device.peerSettings.value.getController(peer: peer),
+            controller: controller,
           );
           commandProcessor = (command, passcodeEntry) {
             if (null == command) return command;
-            String? value = key.currentState?.getValue();
+            String? value = controller?.value.text;
             logD("commandProcessor: value=$value");
             if (null == value) return command;
             command += ",${int.tryParse(value)}";
@@ -2209,11 +2143,11 @@ class SwitchesSettingsWidget extends StatelessWidget with Debug {
                   commandCode: api.commandCode('switch'),
                   commandArg: name,
                   name: 'On above',
-                  value: sw.onValue().toString(),
+                  value: sw.onValue.toString(),
                   suffix: null == sw.mode?.unit ? null : Text(sw.mode!.unit!),
                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                   transformInput: (input) {
-                    var ret = (sw.mode?.name ?? 'NO_MODE') + ',' + input + ',' + sw.offValue().toString();
+                    var ret = (sw.mode?.name ?? 'NO_MODE') + ',' + input + ',' + sw.offValue.toString();
                     logD("$input transformed to $ret");
                     return ret;
                   },
@@ -2225,11 +2159,11 @@ class SwitchesSettingsWidget extends StatelessWidget with Debug {
                   commandCode: api.commandCode('switch'),
                   commandArg: name,
                   name: 'Off below',
-                  value: sw.offValue().toString(),
+                  value: sw.offValue.toString(),
                   suffix: null == sw.mode?.unit ? null : Text(sw.mode!.unit!),
                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                   transformInput: (input) {
-                    var ret = (sw.mode?.name ?? 'NO_MODE') + ',' + sw.onValue().toString() + ',' + input;
+                    var ret = (sw.mode?.name ?? 'NO_MODE') + ',' + sw.onValue.toString() + ',' + input;
                     logD("$input transformed to $ret");
                     return ret;
                   },

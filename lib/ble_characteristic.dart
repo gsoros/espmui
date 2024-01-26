@@ -211,6 +211,8 @@ abstract class BleCharacteristic<T> with Debug {
 
   Future<void> deinit() async {
     //logD("deinit()");
+    lastValue = null;
+    util.streamSendIfNotClosed(_controller, lastValue);
     _characteristic = null;
   }
 
@@ -463,7 +465,7 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
     if (null != device.mtu && 0 < device.mtu! && value.length < device.mtu! - 3) return value;
     // read full value as the notification is limited to the size of one packet
     String? fullValue = await read();
-    logD("ApiCharacteristic::onNotify() mtu=${device.mtu} value(${value.length}) fullValue(${fullValue?.length})");
+    logD("ApiCharacteristic::onNotify() mtu=${device.mtu} value(${value.length}): '$value' fullValue(${fullValue?.length}): '$fullValue'");
     return fullValue;
   }
 }
