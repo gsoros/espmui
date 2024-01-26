@@ -26,18 +26,28 @@ import 'debug.dart';
 
 class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
   late final AlwaysNotifier<HomeAutoSettings> settings;
-  //Stream<HomeAutoSettings>? _settingsStream;
+
+  final bmsStatus = AlwaysNotifier<BmsStatus>(BmsStatus());
+  final epeverStatus = AlwaysNotifier<EpeverStatus>(EpeverStatus());
 
   final switchesTileStreamController = StreamController<Widget>.broadcast();
   Stream<Widget> get switchesTileStream => switchesTileStreamController.stream;
-  final voltageTileStreamController = StreamController<Widget>.broadcast();
-  Stream<Widget> get voltageTileStream => voltageTileStreamController.stream;
-  final currentTileStreamController = StreamController<Widget>.broadcast();
-  Stream<Widget> get currentTileStream => currentTileStreamController.stream;
-  final powerTileStreamController = StreamController<Widget>.broadcast();
-  Stream<Widget> get powerTileStream => powerTileStreamController.stream;
-  final cellsTileStreamController = StreamController<Widget>.broadcast();
-  Stream<Widget> get cellsTileStream => cellsTileStreamController.stream;
+  final bmsVoltageTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get bmsVoltageTileStream => bmsVoltageTileStreamController.stream;
+  final bmsCurrentTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get bmsCurrentTileStream => bmsCurrentTileStreamController.stream;
+  final bmsPowerTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get bmsPowerTileStream => bmsPowerTileStreamController.stream;
+  final bmsCellsTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get bmsCellsTileStream => bmsCellsTileStreamController.stream;
+  final epeverInVoltageTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get epeverInVoltageTileStream => epeverInVoltageTileStreamController.stream;
+  final epeverOutVoltageTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get epeverOutVoltageTileStream => epeverOutVoltageTileStreamController.stream;
+  final epeverOutCurrentTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get epeverOutCurrentTileStream => epeverOutCurrentTileStreamController.stream;
+  final epeverOutPowerTileStreamController = StreamController<Widget>.broadcast();
+  Stream<Widget> get epeverOutPowerTileStream => epeverOutPowerTileStreamController.stream;
 
   @override
   int get defaultMtu => 512;
@@ -49,10 +59,6 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
     settings = AlwaysNotifier<HomeAutoSettings>(
       HomeAutoSettings(
         switchesTileStreamController,
-        voltageTileStreamController,
-        currentTileStreamController,
-        powerTileStreamController,
-        cellsTileStreamController,
       ),
     );
 
@@ -68,36 +74,64 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
         stream: switchesTileStream,
         initialData: () => settings.value.switches.asTile,
       ),
-      'voltage': DeviceTileStream(
-        label: 'Voltage',
+      'bmsVoltage': DeviceTileStream(
+        label: 'BMS Voltage',
         units: 'V',
-        stream: voltageTileStream,
-        initialData: () => settings.value.bms.voltageTile,
-        history: settings.value.bms.voltageHistory,
+        stream: bmsVoltageTileStream,
+        initialData: () => bmsStatus.value.voltageTile,
+        history: bmsStatus.value.voltageHistory,
       ),
-      'current': DeviceTileStream(
-        label: 'Current',
+      'bmsCurrent': DeviceTileStream(
+        label: 'BMS Current',
         units: 'A',
-        stream: currentTileStream,
-        initialData: () => settings.value.bms.currentTile,
-        history: settings.value.bms.currentHistory,
+        stream: bmsCurrentTileStream,
+        initialData: () => bmsStatus.value.currentTile,
+        history: bmsStatus.value.currentHistory,
       ),
-      'power': DeviceTileStream(
-        label: 'Power',
+      'bmsPpower': DeviceTileStream(
+        label: 'BMS Power',
         units: 'W',
-        stream: powerTileStream,
-        initialData: () => settings.value.bms.powerTile,
-        history: settings.value.bms.powerHistory,
+        stream: bmsPowerTileStream,
+        initialData: () => bmsStatus.value.powerTile,
+        history: bmsStatus.value.powerHistory,
       ),
-      'cells': DeviceTileStream(
-        label: 'Cells',
-        stream: cellsTileStream,
-        initialData: () => settings.value.bms.cellsTile,
+      'bmsCells': DeviceTileStream(
+        label: 'BMS Cells',
+        stream: bmsCellsTileStream,
+        initialData: () => bmsStatus.value.cellsTile,
+      ),
+      'epeverInVoltage': DeviceTileStream(
+        label: 'Charger Voltage In',
+        units: 'V',
+        stream: epeverInVoltageTileStream,
+        initialData: () => epeverStatus.value.inVoltageTile,
+        history: epeverStatus.value.inVoltageHistory,
+      ),
+      'epeverOutVoltage': DeviceTileStream(
+        label: 'Charger Voltage Out',
+        units: 'V',
+        stream: epeverOutVoltageTileStream,
+        initialData: () => epeverStatus.value.outVoltageTile,
+        history: epeverStatus.value.outVoltageHistory,
+      ),
+      'epeverOutCurrent': DeviceTileStream(
+        label: 'Charger Current Out',
+        units: 'A',
+        stream: epeverOutCurrentTileStream,
+        initialData: () => epeverStatus.value.outCurrentTile,
+        history: epeverStatus.value.outCurrentHistory,
+      ),
+      'epeverOutPower': DeviceTileStream(
+        label: 'Charger Power Out',
+        units: 'W',
+        stream: epeverOutPowerTileStream,
+        initialData: () => epeverStatus.value.outPowerTile,
+        history: epeverStatus.value.outPowerHistory,
       ),
     });
     tileActions.addAll({
-      "switchesSettings": DeviceTileAction(
-        label: "Open Switches Settings",
+      'switchesSettings': DeviceTileAction(
+        label: 'Open Switches Settings',
         device: this,
         action: (context, device) {
           if (null == device) return;
@@ -106,6 +140,20 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
             PageTransition(
               type: PageTransitionType.rightToLeft,
               child: DeviceRoute(device, focus: 'switches', open: ['settings', 'switches']),
+            ),
+          );
+        },
+      ),
+      'epeverSettings': DeviceTileAction(
+        label: 'Open Charger Settings',
+        device: this,
+        action: (context, device) {
+          if (null == device) return;
+          Navigator.push(
+            context,
+            PageTransition(
+              type: PageTransitionType.rightToLeft,
+              child: DeviceRoute(device, focus: 'charger', open: ['settings', 'charger']),
             ),
           );
         },
@@ -126,6 +174,64 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
       return true;
     }
 
+    if ('ci' == message.command) {
+      if (message.value?.startsWith('delay:') ?? false) {
+        logD('received ci delay reply: ${message.valueAsString}');
+        return true;
+      }
+      //logD("parsing ci=${message.valueAsString}");
+      //name,voltage,current,balanceCurrent[,cellVoltage1,cellVoltage2,...,cellVoltageN]
+      List<String> values = message.valueAsString?.split(',') ?? [];
+      if ((values.length) < 4) {
+        logE("not enough values in ${message.valueAsString}");
+        return false;
+      }
+      BmsStatus bms = this.bmsStatus.value;
+      bms.updatedAt = uts();
+      bms.name = values[0];
+      bms.voltage = double.tryParse(values[1]) ?? 0.0;
+      bms.current = double.tryParse(values[2]) ?? 0.0;
+      bms.balanceCurrent = double.tryParse(values[3]) ?? 0.0;
+      List<double> cells = [];
+      for (int i = 4; i < values.length; i++) cells.add((double.tryParse(values[i]) ?? 0.0) / 1000);
+      bms.cellVoltage = cells;
+      bmsVoltageTileStreamController.sink.add(bms.voltageTile);
+      bmsCurrentTileStreamController.sink.add(bms.currentTile);
+      bmsPowerTileStreamController.sink.add(bms.powerTile);
+      bmsCellsTileStreamController.sink.add(bms.cellsTile);
+      bms.voltageHistory.append(bms.voltage);
+      bms.currentHistory.append(bms.current);
+      bms.powerHistory.append((bms.voltage * bms.current).round());
+      return true;
+    }
+
+    if ('eps' == message.command) {
+      if (message.value?.startsWith('delay:') ?? false) {
+        logD('received eps delay reply: ${message.valueAsString}');
+        return true;
+      }
+      //logD("parsing eps=${message.valueAsString}");
+      List<String>? tokens = message.valueAsString?.split(',');
+      if (tokens?.length != 3) {
+        logD("wrong number of tokens in $message");
+        return false;
+      }
+      var ev = epeverStatus.value;
+      ev.updatedAt = uts();
+      ev.inVoltage = double.tryParse(tokens?[0] ?? '') ?? 0.0;
+      epeverInVoltageTileStreamController.sink.add(ev.inVoltageTile);
+      ev.inVoltageHistory.append(ev.inVoltage);
+      ev.outVoltage = double.tryParse(tokens?[1] ?? '') ?? 0.0;
+      epeverOutVoltageTileStreamController.sink.add(ev.outVoltageTile);
+      ev.outVoltageHistory.append(ev.outVoltage);
+      ev.outCurrent = double.tryParse(tokens?[2] ?? '') ?? 0.0;
+      epeverOutCurrentTileStreamController.sink.add(ev.outCurrentTile);
+      ev.outCurrentHistory.append(ev.outCurrent);
+      epeverOutPowerTileStreamController.sink.add(ev.outPowerTile);
+      ev.outPowerHistory.append(ev.outPower);
+      return true;
+    }
+
     logD("unhandled: $message");
     return false;
   }
@@ -133,10 +239,14 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
   Future<void> dispose() async {
     logD("$name dispose");
     switchesTileStreamController.close();
-    voltageTileStreamController.close();
-    currentTileStreamController.close();
-    powerTileStreamController.close();
-    cellsTileStreamController.close();
+    bmsVoltageTileStreamController.close();
+    bmsCurrentTileStreamController.close();
+    bmsPowerTileStreamController.close();
+    bmsCellsTileStreamController.close();
+    epeverInVoltageTileStreamController.close();
+    epeverOutVoltageTileStreamController.close();
+    epeverOutCurrentTileStreamController.close();
+    epeverOutPowerTileStreamController.close();
     await apiDispose();
     await wifiDispose();
     await peerDispose();
@@ -160,6 +270,7 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
     await apiOnDisconnected();
     await wifiOnDisconnected();
     await peerOnDisconnected();
+    await bmsStatus.value.onDisconnected();
     await super.onDisconnected();
   }
 
@@ -195,10 +306,23 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
   IconData get iconData => DeviceIcon('HomeAuto').data();
 
   @override
-  void onCommandAdded(String command) {
-    if ('switch' == command) api.sendCommand('switch=all');
-    if ('ep' == command) api.sendCommand('ep=dump');
-    if ('ci' == command) api.sendCommand('ci=delay:2000');
+  Future<void> onCommandAdded(String command) async {
+    if ('switch' == command)
+      await Future.delayed(Duration(seconds: 1), () {
+        api.sendCommand('switch=all');
+      });
+    if ('ep' == command)
+      await Future.delayed(Duration(seconds: 2), () {
+        api.sendCommand('ep=dump');
+      });
+    if ('ci' == command)
+      await Future.delayed(Duration(seconds: 3), () {
+        api.sendCommand('ci=delay:1973');
+      });
+    if ('eps' == command)
+      await Future.delayed(Duration(seconds: 4), () {
+        api.sendCommand('eps=delay:2124');
+      });
   }
 }
 
@@ -206,19 +330,10 @@ class HomeAutoSettings with Debug {
   bool otaMode = false;
   final switches = HomeAutoSwitches();
   final epever = EpeverSettings();
-  final bms = Bms();
   StreamController<Widget> switchesTileStreamController;
-  StreamController<Widget> voltageTileStreamController;
-  StreamController<Widget> currentTileStreamController;
-  StreamController<Widget> powerTileStreamController;
-  StreamController<Widget> cellsTileStreamController;
 
   HomeAutoSettings(
     this.switchesTileStreamController,
-    this.voltageTileStreamController,
-    this.currentTileStreamController,
-    this.powerTileStreamController,
-    this.cellsTileStreamController,
   ) {
     logD('construct');
   }
@@ -276,36 +391,6 @@ class HomeAutoSettings with Debug {
       return true;
     }
 
-    if ('ci' == message.command) {
-      if (message.value?.startsWith('delay:') ?? false) {
-        logD('received delay reply: ${message.valueAsString}');
-        return true;
-      }
-      //logD("parsing ci=${message.valueAsString}");
-      //name,voltage,current,balanceCurrent[,cellVoltage1,cellVoltage2,...,cellVoltageN]
-      List<String> values = message.valueAsString?.split(',') ?? [];
-      if ((values.length) < 4) {
-        logE("not enough values in ${message.valueAsString}");
-        return false;
-      }
-      bms.updatedAt = uts();
-      bms.name = values[0];
-      bms.voltage = double.tryParse(values[1]) ?? 0.0;
-      bms.current = double.tryParse(values[2]) ?? 0.0;
-      bms.balanceCurrent = double.tryParse(values[3]) ?? 0.0;
-      List<double> cells = [];
-      for (int i = 4; i < values.length; i++) cells.add((double.tryParse(values[i]) ?? 0.0) / 1000);
-      bms.cellVoltage = cells;
-      voltageTileStreamController.sink.add(bms.voltageTile);
-      currentTileStreamController.sink.add(bms.currentTile);
-      powerTileStreamController.sink.add(bms.powerTile);
-      cellsTileStreamController.sink.add(bms.cellsTile);
-      bms.voltageHistory.append(bms.voltage);
-      bms.currentHistory.append(bms.current);
-      bms.powerHistory.append((bms.voltage * bms.current).round());
-      return true;
-    }
-
     return false;
   }
 
@@ -313,19 +398,18 @@ class HomeAutoSettings with Debug {
     otaMode = false;
     await switches.onDisconnected();
     await epever.onDisconnected();
-    await bms.onDisconnected();
   }
 
   @override
   bool operator ==(other) {
-    return (other is HomeAutoSettings) && other.otaMode == otaMode && other.switches == switches && other.bms == bms;
+    return (other is HomeAutoSettings) && other.otaMode == otaMode && other.switches == switches;
   }
 
   @override
-  int get hashCode => otaMode.hashCode ^ switches.hashCode ^ bms.hashCode;
+  int get hashCode => otaMode.hashCode ^ switches.hashCode;
 
   String toString() {
-    return "${describeIdentity(this)} (otaMode: $otaMode, switches: $switches, bms: $bms)";
+    return "${describeIdentity(this)} (otaMode: $otaMode, switches: $switches)";
   }
 }
 
@@ -642,7 +726,7 @@ class HomeAutoSwitchStates {
   }
 }
 
-class Bms {
+class BmsStatus {
   String name = '';
   int updatedAt = 0;
   double voltage = 0.0;
@@ -741,6 +825,41 @@ class Bms {
         ),
       ],
     );
+  }
+}
+
+class EpeverStatus {
+  int updatedAt = 0;
+  double inVoltage = 0.0;
+  double outVoltage = 0.0;
+  double outCurrent = 0.0;
+  int get outPower => (outVoltage * outCurrent).round();
+  final inVoltageHistory = History<double>(maxEntries: 3600, maxAge: 3600);
+  final outVoltageHistory = History<double>(maxEntries: 3600, maxAge: 3600);
+  final outCurrentHistory = History<double>(maxEntries: 3600, maxAge: 3600);
+  final outPowerHistory = History<int>(maxEntries: 3600, maxAge: 3600);
+
+  Future<void> onDisconnected() async {
+    updatedAt = 0;
+    inVoltage = 0;
+    outVoltage = 0;
+    outCurrent = 0.0;
+  }
+
+  Widget get inVoltageTile {
+    return Text(inVoltage.toStringAsFixed(2));
+  }
+
+  Widget get outVoltageTile {
+    return Text(outVoltage.toStringAsFixed(2));
+  }
+
+  Widget get outCurrentTile {
+    return Text(outCurrent.toStringAsFixed(2));
+  }
+
+  Widget get outPowerTile {
+    return Text(outPower.toString());
   }
 }
 
