@@ -190,7 +190,7 @@ class Tile extends StatelessWidget with Debug {
                   label,
                   softWrap: false,
                   overflow: TextOverflow.clip,
-                  style: TextStyle(fontSize: 10, color: textColor),
+                  style: TextStyle(fontSize: 10, color: textColor.withAlpha(100)),
                 ),
               ),
             ],
