@@ -237,7 +237,7 @@ class Tile extends StatelessWidget with Debug {
                     stream?.units ?? ' ',
                     softWrap: false,
                     overflow: TextOverflow.visible,
-                    style: TextStyle(fontSize: 10, color: textColor),
+                    style: TextStyle(fontSize: 10, color: textColor.withAlpha(100)),
                   ),
                 ),
               ),

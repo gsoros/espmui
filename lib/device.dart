@@ -790,40 +790,57 @@ class PeerSettings with Debug {
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
     String tag = "PeerSettings.handleApiMessageSuccess";
     //logD("$tag $message");
-    String? valueS = message.valueAsString;
 
-    if ("peers" == message.commandStr &&
-        valueS != null &&
-        !valueS.startsWith("scan:") &&
+    if ('peers' != message.commandStr) return false;
+
+    String valueS = message.valueAsString ?? '';
+    logD('$tag value: $valueS');
+
+    // no arg: list of peers
+    if (!valueS.startsWith("scan:") &&
         !valueS.startsWith("scanResult:") &&
         !valueS.startsWith("add:") &&
-        !valueS.startsWith("delete:")) {
-      String? v = message.valueAsString;
-      if (null == v) return false;
-      List<String> tokens = v.split("|");
+        !valueS.startsWith("delete:") &&
+        !valueS.startsWith("disable:") &&
+        !valueS.startsWith("enable:")) {
+      List<String> tokens = valueS.split("|");
       List<String> values = [];
       tokens.forEach((token) {
         if (token.length < 1) return;
         values.add(token);
       });
-      //logD("$tag peers=$values");
+      logD("$tag peers=$values");
       peers = values;
       return true;
     }
-
-    if ("peers" == message.commandStr && message.valueAsString != null && message.valueAsString!.startsWith("scanResult:")) {
-      String result = message.valueAsString!.substring("scanResult:".length);
+    if (valueS.startsWith("scan:")) {
+      int? timeout = int.tryParse(valueS.substring("scan:".length));
+      logD("$tag peers=scan:$timeout");
+      scanning = null != timeout && 0 < timeout;
+      return true;
+    }
+    if (valueS.startsWith("scanResult:")) {
+      String result = valueS.substring("scanResult:".length);
       logD("$tag scanResult: received $result");
       if (0 == result.length) return false;
       if (scanResults.contains(result)) return false;
       scanResults.add(result);
       return true;
     }
-
-    if ("peers" == message.commandStr && message.valueAsString != null && message.valueAsString!.startsWith("scan:")) {
-      int? timeout = int.tryParse(message.valueAsString!.substring("scan:".length));
-      logD("$tag peers=scan:$timeout");
-      scanning = null != timeout && 0 < timeout;
+    if (valueS.startsWith('add:')) {
+      logD('$tag add not implemented (value: $valueS)');
+      return true;
+    }
+    if (valueS.startsWith('delete:')) {
+      logD('$tag delete not implemented (value: $valueS)');
+      return true;
+    }
+    if (valueS.startsWith('enable:')) {
+      logD('$tag enable not implemented (value: $valueS)');
+      return true;
+    }
+    if (valueS.startsWith('disable:')) {
+      logD('$tag disable not implemented (value: $valueS)');
       return true;
     }
 

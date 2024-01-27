@@ -1266,9 +1266,11 @@ class PeersEditorWidget extends StatelessWidget with Debug {
               onPressed: settings.scanning
                   ? null
                   : () {
+                      logD("before: ${device.peerSettings.value.peers}");
                       //device.peerSettings.value.scanning = true;
                       device.peerSettings.value.scanResults = [];
                       device.peerSettings.notifyListeners();
+                      logD("after: ${device.peerSettings.value.peers}");
                       (device as DeviceWithApi).api.sendCommand("peers=scan:10");
                     },
             ),
@@ -1643,7 +1645,7 @@ class PeersListWidget extends StatelessWidget with Debug {
                 Text(parts[3]),
               ]),
               Row(children: [
-                passcodeEntry ?? Text(" "),
+                (null != passcodeEntry) ? Expanded(child: passcodeEntry) : Text(" "),
                 Text(" "),
                 button,
               ])
