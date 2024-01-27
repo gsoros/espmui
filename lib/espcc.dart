@@ -482,7 +482,7 @@ class ESPCCFile with Debug {
   </metadata>
   <trk>
     <name>ride</name>
-    <type>1</type>
+    <type>cycling</type>
     <trkseg>""";
     String s = sprintf(header, [p.timeAsIso8601]);
     //debugLog(s);
