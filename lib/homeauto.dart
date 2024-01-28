@@ -324,6 +324,10 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
       await Future.delayed(Duration(seconds: 4), () {
         api.sendCommand('eps=delay:2124');
       });
+    if ('acv' == command)
+      await Future.delayed(Duration(seconds: 5), () {
+        api.sendCommand('acv=dump');
+      });
   }
 }
 
@@ -331,6 +335,7 @@ class HomeAutoSettings with Debug {
   bool otaMode = false;
   final switches = HomeAutoSwitches();
   final epever = EpeverSettings();
+  final acv = AutoChargingVoltage();
   StreamController<Widget> switchesTileStreamController;
 
   HomeAutoSettings(
@@ -381,16 +386,18 @@ class HomeAutoSettings with Debug {
     }
 
     if ("ep" == message.command) {
-      logD("parsing ep=${message.arg}");
+      logD("parsing ep=${message.valueAsString}");
       List<String>? tokens = message.valueAsString?.split(',');
       tokens?.forEach((s) {
         List<String> kv = s.split(':');
         if (2 != kv.length) return;
-        logD('ep: ' + kv[0] + ' = ' + kv[1]);
+        //logD('ep: ' + kv[0] + ' = ' + kv[1]);
         epever.set(kv[0], kv[1]);
       });
       return true;
     }
+
+    if (await acv.handleApiMessageSuccess(message)) return true;
 
     return false;
   }
@@ -399,19 +406,100 @@ class HomeAutoSettings with Debug {
     otaMode = false;
     await switches.onDisconnected();
     await epever.onDisconnected();
+    await acv.onDisconnected();
   }
 
   @override
   bool operator ==(other) {
-    return (other is HomeAutoSettings) && other.otaMode == otaMode && other.switches == switches;
+    return (other is HomeAutoSettings) && other.otaMode == otaMode && other.switches == switches && other.epever == epever && other.acv == acv;
   }
 
   @override
-  int get hashCode => otaMode.hashCode ^ switches.hashCode;
+  int get hashCode => otaMode.hashCode ^ switches.hashCode ^ epever.hashCode ^ acv.hashCode;
 
   String toString() {
-    return "${describeIdentity(this)} (otaMode: $otaMode, switches: $switches)";
+    return "${describeIdentity(this)} (otaMode: $otaMode, switches: $switches, epever: $epever, acv: $acv)";
   }
+}
+
+class AutoChargingVoltage with Debug {
+  bool? enabled;
+  double? min;
+  double? max;
+  double? trigger;
+  double? release;
+
+  /// returns true if the message does not need any further handling
+  Future<bool> handleApiMessageSuccess(ApiMessage message) async {
+    if ('acv' != message.commandStr) return false;
+    if (message.value?.length == 1) {
+      enabled = message.valueAsBool;
+      return true;
+    }
+    logD('parsing ${message.value}');
+    var parts = message.value?.split(',') ?? <String>[];
+    if (5 == parts.length) {
+      enabled = int.tryParse(parts[0]) == 1;
+      min = double.tryParse(parts[1]);
+      max = double.tryParse(parts[2]);
+      trigger = double.tryParse(parts[3]);
+      release = double.tryParse(parts[4]);
+      logD(toString());
+      return true;
+    }
+    if (10 == parts.length) {
+      parts.forEach((part) {
+        var pair = part.split(':');
+        if (pair.length != 2) return;
+        switch (pair[0]) {
+          case 'enabled':
+            enabled = int.tryParse(pair[1]) == 1;
+            break;
+          case 'min':
+            min = double.tryParse(pair[1]);
+            break;
+          case 'max':
+            max = double.tryParse(pair[1]);
+            break;
+          case 'trigger':
+            trigger = double.tryParse(pair[1]);
+            break;
+          case 'release':
+            release = double.tryParse(pair[1]);
+            break;
+          default:
+            logD('unhandled ${pair[0]}: ${pair[1]}');
+        }
+      });
+      logD(toString());
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> onDisconnected() async {
+    enabled = null;
+    min = null;
+    max = null;
+    trigger = null;
+    release = null;
+  }
+
+  @override
+  bool operator ==(other) {
+    return (other is AutoChargingVoltage) &&
+        other.enabled == enabled &&
+        other.min == min &&
+        other.max == max &&
+        other.trigger == trigger &&
+        other.release == release;
+  }
+
+  @override
+  int get hashCode => enabled.hashCode ^ min.hashCode ^ max.hashCode ^ trigger.hashCode ^ release.hashCode;
+
+  @override
+  String toString() => '[enabled: $enabled, min: $min, max: $max, trigger: $trigger, release: $release]';
 }
 
 class EpeverSetting<T> {
@@ -452,7 +540,7 @@ class EpeverSetting<T> {
   }
 
   @override
-  String toString() => "$name: $type($value)";
+  String toString() => "$value ($name) ($type)";
 
   Future<void> onDisconnected() async {
     value = null;

@@ -22,7 +22,11 @@ enum ExtendedBool {
 
   const ExtendedBool(this.value);
 
-  factory ExtendedBool.fromBool(bool b) => b ? True : False;
+  factory ExtendedBool.fromBool(bool? b) => (null == b)
+      ? Unknown
+      : b
+          ? True
+          : False;
 
   factory ExtendedBool.fromString(String s) {
     if (s.toLowerCase() == "true" || s == "1") return True;

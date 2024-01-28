@@ -706,7 +706,8 @@ class SettingInputWidget extends StatelessWidget with Debug {
       enableSuggestions: false,
       autocorrect: false,
       enabled: enabled,
-      //controller: textController ?? TextEditingController(text: value),
+      controller: controller ?? TextEditingController(text: value),
+      /*
       controller: controller ??
           TextEditingController.fromValue(
             TextEditingValue(
@@ -714,6 +715,7 @@ class SettingInputWidget extends StatelessWidget with Debug {
               //selection: TextSelection.collapsed(offset: value?.length ?? 0),
             ),
           ),
+      */
       decoration: InputDecoration(
         labelText: name,
         suffix: suffix,
@@ -740,12 +742,16 @@ class ApiSettingInputWidget extends SettingInputWidget {
   final Api api;
   final int? commandCode;
   final String? commandArg;
+  final String commandArgValueSeparator;
+  final String? expect;
 
   ApiSettingInputWidget({
     Key? key,
     required this.api,
     required this.commandCode,
     this.commandArg,
+    this.commandArgValueSeparator = ':',
+    this.expect,
     String? value,
     bool enabled = true,
     String? name,
@@ -772,11 +778,16 @@ class ApiSettingInputWidget extends SettingInputWidget {
               return;
             }
             if (transformInput != null) edited = transformInput(edited);
-            String command = "$commandCode=" + (null != commandArg ? "$commandArg:" : "") + "$edited";
-            String? expect = null != commandArg ? "$commandArg:" : null;
+            var sep = commandArgValueSeparator;
+            String command = "$commandCode=" + (null != commandArg ? "$commandArg$sep" : "") + "$edited";
+            String? expectValue = null != expect
+                ? expect
+                : null != commandArg
+                    ? "$commandArg$sep"
+                    : null;
             final result = await api.requestResultCode(
               command,
-              expectValue: expect,
+              expectValue: expectValue,
               minDelayMs: 2000,
             );
             if (name != null) snackbar("$name update${result == ApiResult.success ? "d" : " failed"}", context);
@@ -2016,11 +2027,88 @@ class EspccSettingsWidget extends StatelessWidget with Debug {
 class EpeverSettingsWidget extends StatelessWidget with Debug {
   final Api api;
   final EpeverSettings settings;
-  EpeverSettingsWidget(this.settings, this.api);
+  final AutoChargingVoltage acv;
+  EpeverSettingsWidget(this.settings, this.acv, this.api);
+
+  Widget get suffixVpack => const Row(children: [const Text('V'), const Text('pack', style: const TextStyle(fontSize: 5))], mainAxisSize: MainAxisSize.min);
+
+  Widget get suffixVcell => const Row(children: [const Text('V'), const Text('cell', style: const TextStyle(fontSize: 5))], mainAxisSize: MainAxisSize.min);
+
+  TextInputType get keyboardNumDec => const TextInputType.numberWithOptions(decimal: true);
 
   @override
   Widget build(BuildContext context) {
     List<Widget> widgets = [];
+    widgets.add(ApiSettingSwitchWidget(
+      api: api,
+      commandCode: api.commandCode('acv'),
+      value: ExtendedBool.fromBool(acv.enabled),
+      name: 'Auto Charging Voltage',
+      onChanged: () {
+        logD('onChanged');
+      },
+    ));
+    if (acv.enabled ?? false) {
+      widgets.addAll([
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(
+            flex: 5,
+            child: ApiSettingInputWidget(
+              api: api,
+              commandCode: api.commandCode('acv'),
+              commandArg: 'min',
+              expect: '',
+              value: acv.min.toString(),
+              name: 'Min',
+              suffix: suffixVpack,
+              keyboardType: keyboardNumDec,
+            ),
+          ),
+          Flexible(
+            flex: 5,
+            child: ApiSettingInputWidget(
+              api: api,
+              commandCode: api.commandCode('acv'),
+              commandArg: 'max',
+              expect: '',
+              value: acv.max.toString(),
+              name: 'Max',
+              suffix: suffixVpack,
+              keyboardType: keyboardNumDec,
+            ),
+          ),
+        ]),
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(
+            flex: 5,
+            child: ApiSettingInputWidget(
+              api: api,
+              commandCode: api.commandCode('acv'),
+              commandArg: 'release',
+              expect: '',
+              value: acv.release.toString(),
+              name: 'Low trigger',
+              suffix: suffixVcell,
+              keyboardType: keyboardNumDec,
+            ),
+          ),
+          Flexible(
+            flex: 5,
+            child: ApiSettingInputWidget(
+              api: api,
+              commandCode: api.commandCode('acv'),
+              commandArg: 'trigger',
+              expect: '',
+              value: acv.trigger.toString(),
+              name: 'High trigger',
+              suffix: suffixVcell,
+              keyboardType: keyboardNumDec,
+            ),
+          ),
+        ]),
+      ]);
+    }
+    widgets.add(Divider(color: Colors.white38));
     int cellCount = settings.get('cs')?.value ?? 1;
     settings.values.forEach((arg, setting) {
       Widget input;
@@ -2049,8 +2137,8 @@ class EpeverSettingsWidget extends StatelessWidget with Debug {
           commandCode: api.commandCode('ep'),
           commandArg: arg,
           name: setting.name,
-          suffix: Text(setting.unit),
-          keyboardType: TextInputType.number,
+          suffix: ('V' == setting.unit) ? suffixVpack : Text(setting.unit),
+          keyboardType: keyboardNumDec,
           onChanged: onChanged,
           controller: setting.controller,
         );
@@ -2065,8 +2153,8 @@ class EpeverSettingsWidget extends StatelessWidget with Debug {
             var out = double.tryParse(val);
             return null == out ? '' : (out * cellCount).toString();
           },
-          suffix: Text('Vpc'),
-          keyboardType: TextInputType.number,
+          suffix: suffixVcell,
+          keyboardType: keyboardNumDec,
           onChanged: (changed, context) {
             var d = double.tryParse(changed);
             if (null != d) setting.controller.value = TextEditingValue(text: (d * cellCount).toString());
@@ -2076,10 +2164,7 @@ class EpeverSettingsWidget extends StatelessWidget with Debug {
         widgets.add(Flexible(
             child: Row(children: [
           Flexible(flex: 5, child: input),
-          Flexible(
-            flex: 5,
-            child: inputVpc,
-          ),
+          Flexible(flex: 5, child: inputVpc),
         ])));
         return;
       }
@@ -2258,6 +2343,7 @@ class HomeAutoSettingsWidget extends StatelessWidget with Debug {
             SizedBox(width: 1, height: 5),
             EpeverSettingsWidget(
               settings.epever,
+              settings.acv,
               device.api,
             )
           ]),
