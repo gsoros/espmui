@@ -1101,25 +1101,28 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
           //logD("MDM==SG strainThresLow: ${settings.strainThresLow}");
           widgets.add(Divider(color: Colors.white38));
           widgets.add(
-            Row(children: [
-              ApiSettingInputWidget(
-                api: device.api,
-                name: "Low Threshold",
-                commandCode: device.api.commandCode("stl", logOnError: false),
-                value: settings.strainThresLow == null ? null : settings.strainThresLow.toString(),
-                keyboardType: TextInputType.number,
-                enabled: settings.strainThresLow != null,
-                suffix: Text("kg"),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Flexible(
+                child: ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Low Threshold",
+                  commandCode: device.api.commandCode("stl", logOnError: false),
+                  value: settings.strainThresLow == null ? null : settings.strainThresLow.toString(),
+                  keyboardType: TextInputType.number,
+                  enabled: settings.strainThresLow != null,
+                  suffix: Text("kg"),
+                ),
               ),
-              Empty(),
-              ApiSettingInputWidget(
-                api: device.api,
-                name: "High Threshold",
-                commandCode: device.api.commandCode("st", logOnError: false),
-                value: settings.strainThreshold == null ? null : settings.strainThreshold.toString(),
-                keyboardType: TextInputType.number,
-                enabled: settings.strainThreshold != null,
-                suffix: Text("kg"),
+              Flexible(
+                child: ApiSettingInputWidget(
+                  api: device.api,
+                  name: "High Threshold",
+                  commandCode: device.api.commandCode("st", logOnError: false),
+                  value: settings.strainThreshold == null ? null : settings.strainThreshold.toString(),
+                  keyboardType: TextInputType.number,
+                  enabled: settings.strainThreshold != null,
+                  suffix: Text("kg"),
+                ),
               ),
             ]),
           );
@@ -1175,25 +1178,28 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
         );
         if (ExtendedBool.True == settings.autoTare) {
           widgets.add(
-            Row(children: [
-              ApiSettingInputWidget(
-                api: device.api,
-                name: "Delay",
-                commandCode: device.api.commandCode("atd", logOnError: false),
-                value: settings.autoTareDelayMs == null ? null : settings.autoTareDelayMs.toString(),
-                keyboardType: TextInputType.number,
-                enabled: settings.autoTareDelayMs != null,
-                suffix: Text("ms"),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Flexible(
+                child: ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Delay",
+                  commandCode: device.api.commandCode("atd", logOnError: false),
+                  value: settings.autoTareDelayMs == null ? null : settings.autoTareDelayMs.toString(),
+                  keyboardType: TextInputType.number,
+                  enabled: settings.autoTareDelayMs != null,
+                  suffix: Text("ms"),
+                ),
               ),
-              Empty(),
-              ApiSettingInputWidget(
-                api: device.api,
-                name: "Max. Range",
-                commandCode: device.api.commandCode("atr", logOnError: false),
-                value: settings.autoTareRangeG == null ? null : settings.autoTareRangeG.toString(),
-                keyboardType: TextInputType.number,
-                enabled: settings.autoTareRangeG != null,
-                suffix: Text("g"),
+              Flexible(
+                child: ApiSettingInputWidget(
+                  api: device.api,
+                  name: "Max. Range",
+                  commandCode: device.api.commandCode("atr", logOnError: false),
+                  value: settings.autoTareRangeG == null ? null : settings.autoTareRangeG.toString(),
+                  keyboardType: TextInputType.number,
+                  enabled: settings.autoTareRangeG != null,
+                  suffix: Text("g"),
+                ),
               ),
             ]),
           );
