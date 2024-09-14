@@ -49,7 +49,9 @@ class ESPCCSyncer with Debug {
     String? name,
   }) {
     if (null == file && null == name) return null;
-    for (ESPCCFile g in _queue) if (file?.name == g.name || (name != null && name == g.name)) return g;
+    for (ESPCCFile g in _queue) {
+      if (file?.name == g.name || (name != null && name == g.name)) return g;
+    }
     return null;
   }
 
@@ -123,7 +125,7 @@ class ESPCCSyncer with Debug {
       maxAgeMs: 3000,
       maxAttempts: 1,
     );
-    if (null == reply || reply.length < 1) {
+    if (null == reply || reply.isEmpty) {
       logD("$tag empty reply for $request");
       _queue.add(ef);
       _running = false;

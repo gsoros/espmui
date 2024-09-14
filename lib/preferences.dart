@@ -15,7 +15,7 @@ class Preferences with Debug {
   final _exclusiveAccess = Mutex();
 
   /* Devices */
-  var _devices = AlwaysNotifier<List<String>>([]);
+  final _devices = AlwaysNotifier<List<String>>([]);
 
   Future<AlwaysNotifier<List<String>>> getDevices() async {
     await _init();
@@ -30,7 +30,7 @@ class Preferences with Debug {
   }
 
   /* Tiles */
-  var _tiles = AlwaysNotifier<List<String>>([]);
+  final _tiles = AlwaysNotifier<List<String>>([]);
 
   Future<AlwaysNotifier<List<String>>> getTiles() async {
     await _init();

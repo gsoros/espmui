@@ -21,7 +21,7 @@ class DeviceRoute extends StatefulWidget with Debug {
   final String? focus;
   final List<String> open; // list of initially open nodes
 
-  DeviceRoute(this.device, {this.focus, this.open = const []}) {
+  DeviceRoute(this.device, {super.key, this.focus, this.open = const []}) {
     logD("construct focus: $focus, opened: $open");
   }
 
@@ -150,7 +150,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
             builder: (_, value, __) {
               //logD("saveLog changed: $value");
               return SettingSwitchWidget(
-                label: Text("Log"),
+                label: const Text("Log"),
                 value: ExtendedBool.fromBool(device.saveLog.value),
                 onChanged: device.setSaveLog,
                 enabled: null != device.characteristic("apiLog"),
@@ -181,9 +181,9 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
       },
       itemBuilder: (context, index) {
         return Container(
-          decoration: new BoxDecoration(
+          decoration: BoxDecoration(
             boxShadow: [
-              new BoxShadow(
+              BoxShadow(
                 color: Colors.black38,
                 blurRadius: 5.0,
                 offset: Offset.fromDirection(1, 2),
@@ -215,6 +215,7 @@ class PowerMeterRouteState extends DeviceRouteState {
   @override
   _devicePropertyItems() {
     return [
+      ...super._devicePropertyItems()
       // StaggeredGridItem(
       //   value: PowerCadenceWidget(powerMeter, mode: "power"),
       //   colSpan: 3,
@@ -223,7 +224,7 @@ class PowerMeterRouteState extends DeviceRouteState {
       //   value: PowerCadenceWidget(powerMeter, mode: "cadence"),
       //   colSpan: 3,
       // ),
-    ]..addAll(super._devicePropertyItems());
+    ];
   }
 }
 
@@ -294,11 +295,12 @@ class HeartRateMonitorRouteState extends DeviceRouteState {
   @override
   _devicePropertyItems() {
     return [
+      ...super._devicePropertyItems()
       // StaggeredGridItem(
       //   value: HeartRateWidget(hrm),
       //   colSpan: 3,
       // ),
-    ]..addAll(super._devicePropertyItems());
+    ];
   }
 }
 

@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'dart:async';
 import 'dart:io';
 
@@ -247,7 +249,7 @@ class BleAdapterCheck extends StatelessWidget with Debug {
 
   /// Displays [ifEnabled] or [ifDisabled] depending on the current
   /// state of the bluetooth adapter.
-  BleAdapterCheck(this.ifReady, {this.ifNotReady});
+  BleAdapterCheck(this.ifReady, {super.key, this.ifNotReady});
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +259,7 @@ class BleAdapterCheck extends StatelessWidget with Debug {
       initialData: ble._currentStatus,
       builder: (BuildContext context, AsyncSnapshot<BleStatus> snapshot) {
         if (snapshot.data == BleStatus.ready) return ifReady;
-        return null != ifNotReady ? ifNotReady!(snapshot.data) : Text('Not ready');
+        return null != ifNotReady ? ifNotReady!(snapshot.data) : const Text('Not ready');
       },
     );
   }
@@ -265,7 +267,7 @@ class BleAdapterCheck extends StatelessWidget with Debug {
 
 class BleNotReady extends StatelessWidget with Debug {
   final BleStatus? status;
-  const BleNotReady(this.status);
+  const BleNotReady(this.status, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -291,46 +293,44 @@ class BleNotReady extends StatelessWidget with Debug {
         message = "unknown state";
         break;
     }
-    return Container(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start, // Align left
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      "Bluetooth is disabled",
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Text(
-                      message,
-                      style: TextStyle(fontSize: 10),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end, // Align right
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start, // Align left
             children: [
-              EspmuiElevatedButton(
-                child: Text("Press me"),
-                onPressed: () {
-                  logD("Radio enable button pressed");
-                  //BLE().enableRadio();
-                },
+              const Row(
+                children: [
+                  Text(
+                    "Bluetooth is disabled",
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Text(
+                    message,
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                ],
               ),
             ],
-          )
-        ],
-      ),
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end, // Align right
+          children: [
+            EspmuiElevatedButton(
+              child: const Text("Press me"),
+              onPressed: () {
+                logD("Radio enable button pressed");
+                //BLE().enableRadio();
+              },
+            ),
+          ],
+        )
+      ],
     );
   }
 }

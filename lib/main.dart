@@ -6,7 +6,7 @@ import 'tiles_route.dart';
 
 void main() {
   //debugRepaintRainbowEnabled = true;
-  runApp(EspmUiApp());
+  runApp(const EspmUiApp());
 }
 
 /// TODO move to some globals class
@@ -38,7 +38,7 @@ class EspmUiApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       //showPerformanceOverlay: true,
       //home: ScannerRoute(),
-      home: TilesRoute(),
+      home: const TilesRoute(),
     );
   }
 }

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as dev;
 import 'dart:math';
-import 'dart:collection';
+//import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 //import 'package:flutter/painting.dart';
@@ -103,24 +103,24 @@ class Device with Debug {
 
   static Device fromScanResult(DiscoveredDevice scanResult) {
     var uuids = scanResult.serviceUuids;
-    if (0 == uuids.length) {
+    if (uuids.isEmpty) {
       dev.log('[Device] fromScanResult: no serviceUuids in scanResult');
       return Device(scanResult.id, scanResult.name);
     }
     dev.log('[Device] fromScanResult uuids: $uuids');
-    if (uuids.contains(BleConstants.ESPM_API_SERVICE_UUID)) {
+    if (uuids.contains(Uuid.parse(BleConstants.ESPM_API_SERVICE_UUID))) {
       return ESPM(scanResult.id, scanResult.name);
     }
-    if (uuids.contains(BleConstants.ESPCC_API_SERVICE_UUID)) {
+    if (uuids.contains(Uuid.parse(BleConstants.ESPCC_API_SERVICE_UUID))) {
       return ESPCC(scanResult.id, scanResult.name);
     }
-    if (uuids.contains(BleConstants.HOMEAUTO_API_SERVICE_UUID)) {
+    if (uuids.contains(Uuid.parse(BleConstants.HOMEAUTO_API_SERVICE_UUID))) {
       return HomeAuto(scanResult.id, scanResult.name);
     }
-    if (uuids.contains(BleConstants.CYCLING_POWER_SERVICE_UUID)) {
+    if (uuids.contains(Uuid.parse(BleConstants.CYCLING_POWER_SERVICE_UUID))) {
       return PowerMeter(scanResult.id, scanResult.name);
     }
-    if (uuids.contains(BleConstants.HEART_RATE_SERVICE_UUID)) {
+    if (uuids.contains(Uuid.parse(BleConstants.HEART_RATE_SERVICE_UUID))) {
       return HeartRateMonitor(scanResult.id, scanResult.name);
     }
     dev.log('[Device] fromScanResult no uuid match');
@@ -135,7 +135,7 @@ class Device with Debug {
     String name = "";
     bool autoConnect = false;
     bool saveLog = false;
-    chunks.forEach((chunk) {
+    for (var chunk in chunks) {
       String key = "type=";
       if (chunk.startsWith(key)) type = chunk.substring(key.length);
       key = "name=";
@@ -144,24 +144,23 @@ class Device with Debug {
       if (chunk.startsWith(key)) autoConnect = chunk.substring(key.length) == "true";
       key = "saveLog=";
       if (chunk.startsWith(key)) saveLog = chunk.substring(key.length) == "true";
-    });
-    dev.log("Device.fromSaved($savedDevice): address: $address, type: $type, name: $name, autoConnect: " +
-        (autoConnect ? "true" : "false") +
-        ", saveLog: " +
-        (saveLog ? "true" : "false"));
+    }
+    dev.log(
+        "Device.fromSaved($savedDevice): address: $address, type: $type, name: $name, autoConnect: ${autoConnect ? "true" : "false"}, saveLog: ${saveLog ? "true" : "false"}");
     Device device;
-    if ("ESPM" == type)
+    if ("ESPM" == type) {
       device = ESPM(address, name);
-    else if ("ESPCC" == type)
+    } else if ("ESPCC" == type) {
       device = ESPCC(address, name);
-    else if ("HomeAuto" == type)
+    } else if ("HomeAuto" == type) {
       device = HomeAuto(address, name);
-    else if ("PowerMeter" == type)
+    } else if ("PowerMeter" == type) {
       device = PowerMeter(address, name);
-    else if ("HeartRateMonitor" == type)
+    } else if ("HeartRateMonitor" == type) {
       device = HeartRateMonitor(address, name);
-    else
+    } else {
       return null;
+    }
     device.autoConnect.value = autoConnect;
     device.remember.value = true;
     device.saveLog.value = saveLog;
@@ -176,28 +175,24 @@ class Device with Debug {
       saveLog.value = saved.contains("saveLog=true");
     }
 
-    if (stateSubscription == null) {
-      stateSubscription = stateStream.listen(
-        (state) async {
-          logD("$name _stateSubscription state: $state");
-          if (state == DeviceConnectionState.connected) {
-            await onConnected();
-          } else if (state == DeviceConnectionState.disconnected) {
-            await onDisconnected();
-          }
-        },
-        onError: (e) => bleError(debugTag, "$name _stateSubscription", e),
-      );
-    }
-    if (_batteryLevelSubscription == null) {
-      _batteryLevelSubscription = battery?.defaultStream.listen(
-        (level) {
-          logD("$name _batteryLevelSubscription level: $level%, charging: $isCharging");
-          if (isCharging.asBool) notifyCharging();
-        },
-        onError: (e) => logD("$debugTag _batteryLevelSubscription $e"),
-      );
-    }
+    stateSubscription ??= stateStream.listen(
+      (state) async {
+        logD("$name _stateSubscription state: $state");
+        if (state == DeviceConnectionState.connected) {
+          await onConnected();
+        } else if (state == DeviceConnectionState.disconnected) {
+          await onDisconnected();
+        }
+      },
+      onError: (e) => bleError(debugTag, "$name _stateSubscription", e),
+    );
+    _batteryLevelSubscription ??= battery?.defaultStream.listen(
+      (level) {
+        logD("$name _batteryLevelSubscription level: $level%, charging: $isCharging");
+        if (isCharging.asBool) notifyCharging();
+      },
+      onError: (e) => logD("$debugTag _batteryLevelSubscription $e"),
+    );
   }
 
   Future<void> dispose() async {
@@ -226,7 +221,7 @@ class Device with Debug {
     if (!connected) return false;
     var stopwatch = Stopwatch();
     while (!_discovered) {
-      await Future.delayed(Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 500));
       if (3000 < stopwatch.elapsedMilliseconds) return false;
     }
     return true;
@@ -236,7 +231,7 @@ class Device with Debug {
     if (!connected) return false;
     var stopwatch = Stopwatch();
     while (!_subscribed) {
-      await Future.delayed(Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 500));
       if (3000 < stopwatch.elapsedMilliseconds) return false;
     }
     return true;
@@ -248,7 +243,7 @@ class Device with Debug {
   }
 
   Future<void> onDisconnected() async {
-    String tag = "$name";
+    String tag = name;
     // if (await connected) {
     //   logD("but $name is connected");
     //   return;
@@ -264,7 +259,7 @@ class Device with Debug {
 
     logD("$tag autoConnect.value: ${autoConnect.value}");
     if (autoConnect.value && !connected) {
-      await Future.delayed(Duration(seconds: 15)).then((_) async {
+      await Future.delayed(const Duration(seconds: 15)).then((_) async {
         if (autoConnect.value && !connected) {
           logD("$tag calling connect()");
           await connect();
@@ -297,8 +292,8 @@ class Device with Debug {
         .connectToAdvertisingDevice(
       id: id,
       withServices: [],
-      prescanDuration: Duration(seconds: 5),
-      connectionTimeout: Duration(seconds: 2),
+      prescanDuration: const Duration(seconds: 5),
+      connectionTimeout: const Duration(seconds: 2),
     )
         .listen(
       (stateUpdate) async {
@@ -336,14 +331,14 @@ class Device with Debug {
     });
     //logD("$subject getDiscoveredServices() end");
     Map<Uuid, List<Uuid>> uuidMap = {};
-    services.forEach((s) {
+    for (var s in services) {
       List<Uuid> charList = [];
-      s.characteristics.forEach((c) {
+      for (var c in s.characteristics) {
         characteristics.byUuid(c.service.id, c.id)?.characteristic = c;
         charList.add(c.id);
-      });
+      }
       uuidMap.addAll({s.id: charList});
-    });
+    }
     logD("$subject end services: $uuidMap");
     _discovered = true;
   }
@@ -365,12 +360,12 @@ class Device with Debug {
   /// FlutterReactiveBle service
   Future<Service?> frbService(Uuid uuid) async {
     Service? s;
-    (await frbServices).forEach((e) {
+    for (var e in (await frbServices)) {
       if (e.id == uuid) {
         s = e;
-        return;
+        continue;
       }
-    });
+    }
     return s;
   }
 
@@ -447,9 +442,11 @@ class Device with Debug {
   }
 
   void setSaveLog(bool value) async {
-    if (!saveLog.value && value)
+    if (!saveLog.value && value) {
       characteristics.get("apiLog")?.subscribe();
-    else if (saveLog.value && !value) characteristics.get("apiLog")?.unsubscribe();
+    } else if (saveLog.value && !value) {
+      characteristics.get("apiLog")?.unsubscribe();
+    }
     saveLog.value = value;
     await updatePreferences();
   }
@@ -459,15 +456,8 @@ class Device with Debug {
     logD('updatePreferences savedDevices before: $devices');
     devices.removeWhere((item) => item.startsWith(id));
     if (remember.value) {
-      String item = id +
-          ";name=" +
-          (name.replaceAll(RegExp(r';'), '')) +
-          ";type=" +
-          runtimeType.toString() +
-          ";autoConnect=" +
-          (autoConnect.value ? "true" : "false") +
-          ";saveLog=" +
-          (saveLog.value ? "true" : "false");
+      String item =
+          "$id;name=${name.replaceAll(RegExp(r';'), '')};type=$runtimeType;autoConnect=${autoConnect.value ? "true" : "false"};saveLog=${saveLog.value ? "true" : "false"}";
       logD('updatePreferences item: $item');
       devices.add(item);
     }
@@ -495,12 +485,12 @@ class Device with Debug {
     return this;
   }
 
-  IconData get iconData => DeviceIcon(null).data();
+  IconData get iconData => const DeviceIcon(null).data();
 
   void notifyCharging() {
     bool charging = isCharging.asBool;
     String status = charging ? "charging" : "charge end";
-    int progress = this.battery?.lastValue ?? -1;
+    int progress = battery?.lastValue ?? -1;
     bool showProgress = progress != -1;
 
     Notifications().cancel(id.hashCode);
@@ -508,7 +498,7 @@ class Device with Debug {
     logD("$name notifyCharging() battery charging: $charging");
 
     Notifications().notify(
-      name.length > 0 ? name : "unknown device",
+      name.isNotEmpty ? name : "unknown device",
       status,
       id: id.hashCode,
       channelId: status,
@@ -608,7 +598,7 @@ mixin DeviceWithPeers on Device {
 class PowerMeter extends Device {
   PowerCharacteristic? get power => characteristic("power") as PowerCharacteristic?;
 
-  PowerMeter(String id, String name) : super(id, name) {
+  PowerMeter(super.id, super.name) {
     characteristics.addAll({
       'power': CharacteristicListItem(PowerCharacteristic(this)),
     });
@@ -639,13 +629,13 @@ class PowerMeter extends Device {
     Type t = runtimeType;
     if (!await discovered()) return t;
     logD("_correctType 2");
-    (await frbServices).forEach((s) {
+    for (var s in (await frbServices)) {
       if (s.id == Uuid.parse(BleConstants.ESPM_API_SERVICE_UUID)) {
         logD("correctType() ESPM detected");
         t = ESPM;
-        return;
+        continue;
       }
-    });
+    }
     return t;
   }
 
@@ -658,19 +648,20 @@ class PowerMeter extends Device {
       device = ESPM(id, name);
       device.autoConnect.value = autoConnect.value;
       device.remember.value = remember.value;
-    } else
+    } else {
       return this;
+    }
     return device;
   }
 
   @override
-  IconData get iconData => DeviceIcon("PM").data();
+  IconData get iconData => const DeviceIcon("PM").data();
 }
 
 class HeartRateMonitor extends Device {
   HeartRateCharacteristic? get heartRate => characteristic("heartRate") as HeartRateCharacteristic?;
 
-  HeartRateMonitor(String id, String name) : super(id, name) {
+  HeartRateMonitor(super.id, super.name) {
     characteristics.addAll({
       'heartRate': CharacteristicListItem(HeartRateCharacteristic(this)),
     });
@@ -686,7 +677,7 @@ class HeartRateMonitor extends Device {
   }
 
   @override
-  IconData get iconData => DeviceIcon("HRM").data();
+  IconData get iconData => const DeviceIcon("HRM").data();
 }
 
 class WifiSettings with Debug {
@@ -762,6 +753,7 @@ class WifiSettings with Debug {
   int get hashCode =>
       enabled.hashCode ^ apEnabled.hashCode ^ apSSID.hashCode ^ apPassword.hashCode ^ staEnabled.hashCode ^ staSSID.hashCode ^ staPassword.hashCode;
 
+  @override
   String toString() {
     return "${describeIdentity(this)} ("
         "enabled: $enabled, "
@@ -799,10 +791,10 @@ class PeerSettings with Debug {
         !valueS.startsWith("enable:")) {
       List<String> tokens = valueS.split("|");
       List<String> values = [];
-      tokens.forEach((token) {
-        if (token.length < 1) return;
+      for (var token in tokens) {
+        if (token.isEmpty) continue;
         values.add(token);
-      });
+      }
       logD("$tag peers=$values");
       peers = values;
       return true;
@@ -816,7 +808,7 @@ class PeerSettings with Debug {
     if (valueS.startsWith("scanResult:")) {
       String result = valueS.substring("scanResult:".length);
       logD("$tag scanResult: received $result");
-      if (0 == result.length) return false;
+      if (result.isEmpty) return false;
       if (scanResults.contains(result)) return false;
       scanResults.add(result);
       return true;
@@ -849,12 +841,13 @@ class PeerSettings with Debug {
   @override
   int get hashCode => peers.hashCode;
 
+  @override
   String toString() {
     return "${describeIdentity(this)} (peers: $peers)";
   }
 
   TextEditingController? getController({String? peer, String? initialValue}) {
-    if (null == peer || peer.length <= 0) return null;
+    if (null == peer || peer.isEmpty) return null;
     if (null == peerPasskeyEditingControllers[peer]) peerPasskeyEditingControllers[peer] = TextEditingController(text: initialValue);
     return peerPasskeyEditingControllers[peer];
   }
@@ -899,7 +892,7 @@ class DeviceTileAction {
 }
 
 class History<T> with Debug {
-  final _data = LinkedHashMap<int, T>();
+  final _data = <int, T>{};
   final int maxEntries;
   final int maxAge;
   final bool absolute;
@@ -912,7 +905,7 @@ class History<T> with Debug {
   /// Append a value to the history.
   /// - [timestamp]: milliseconds since Epoch
   void append(T value, {int? timestamp}) {
-    if (null == timestamp) timestamp = uts();
+    timestamp ??= uts();
     //logD("append timestamp: $timestamp value: $value length: ${_data.length}");
     if (absolute) {
       if (value.runtimeType == int) value = int.tryParse(value.toString())?.abs() as T;
@@ -921,10 +914,13 @@ class History<T> with Debug {
     _data[timestamp] = value;
     // Prune on every ~100 appends
     if (.99 < Random().nextDouble()) {
-      if (.5 < Random().nextDouble())
-        while (maxEntries < _data.length) _data.remove(_data.entries.first.key);
-      else
+      if (.5 < Random().nextDouble()) {
+        while (maxEntries < _data.length) {
+          _data.remove(_data.entries.first.key);
+        }
+      } else {
         _data.removeWhere((time, _) => time < uts() - maxAge * 1000);
+      }
     }
   }
 
@@ -939,7 +935,7 @@ class History<T> with Debug {
   /// [timestamp] is milliseconds since the Epoch
   Widget graph({required int timestamp, Color? color}) {
     Map<int, T> filtered = since(timestamp: timestamp);
-    if (filtered.length < 1) return Empty();
+    if (filtered.isEmpty) return const Empty();
     var data = Map<int, num>.from(filtered);
     double? min;
     double? max;
@@ -948,7 +944,7 @@ class History<T> with Debug {
       if (null == max || max! < val) max = val.toDouble();
     });
     //logD("min: $min max: $max");
-    if (null == min || null == max) return Empty();
+    if (null == min || null == max) return const Empty();
     var widgets = <Widget>[];
     Color outColor = color ?? Colors.red;
     data.forEach((time, value) {
@@ -957,10 +953,10 @@ class History<T> with Debug {
         width: 50,
         height: (0 < height) ? height : 1,
         color: outColor, //.withOpacity((0 < height) ? .5 : 0),
-        margin: EdgeInsets.all(1),
+        margin: const EdgeInsets.all(1),
       ));
     });
-    if (widgets.length < 1) return Empty();
+    if (widgets.isEmpty) return const Empty();
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: widgets,

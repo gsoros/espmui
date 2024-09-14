@@ -76,12 +76,12 @@ class Scanner with Debug {
       return;
     }
     if (await ble.currentStatus() != BleStatus.ready) {
-      bleError(runtimeType.toString(), "startScan() adapter not ready, state is: " + (await ble.currentStatus()).toString());
+      bleError(runtimeType.toString(), "startScan() adapter not ready, state is: ${await ble.currentStatus()}");
       return;
     }
     if (_stopTimer != null) _stopTimer!.cancel();
     _stopTimer = Timer(
-      Duration(seconds: 5),
+      const Duration(seconds: 5),
       () async {
         await stopScan();
       },

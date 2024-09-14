@@ -127,7 +127,7 @@ class TC with Debug {
   set isReading(bool value) {
     _isReading = value;
     espm.settings.notifyListeners();
-    status((value ? "Starting" : "Stopped") + " reading");
+    status("${value ? "Starting" : "Stopped"} reading");
   }
 
   Future<bool> readFromDevice() async {
@@ -176,7 +176,7 @@ class TC with Debug {
       }
       var command = task["command"];
       var expect = task["expect"];
-      if (null != command && 0 < command.length) {
+      if (null != command && command.isNotEmpty) {
         rc = await espm.api.requestResultCode(command, expectValue: expect);
         if (ApiResult.success != rc) {
           status("Failed $msg");
@@ -184,7 +184,7 @@ class TC with Debug {
           success = false;
           break;
         }
-        await Future.delayed(Duration(milliseconds: 300));
+        await Future.delayed(const Duration(milliseconds: 300));
       }
       if (task.containsKey("mtu")) {
         await espm.requestMtu(int.tryParse(task["mtu"] ?? "") ?? espm.defaultMtu);
@@ -200,7 +200,7 @@ class TC with Debug {
   set isWriting(bool value) {
     _isWriting = value;
     espm.settings.notifyListeners();
-    status((value ? "Starting" : "Stopped") + " writing");
+    status("${value ? "Starting" : "Stopped"} writing");
   }
 
   Future<bool> writeToDevice() async {
@@ -300,7 +300,7 @@ class TC with Debug {
       }
       var command = task["command"];
       var expect = task["expect"];
-      if (null != command && 0 < command.length) {
+      if (null != command && command.isNotEmpty) {
         rc = await espm.api.requestResultCode(command, expectValue: expect);
         if (ApiResult.success != rc) {
           status("Failed $msg");
@@ -308,7 +308,7 @@ class TC with Debug {
           success = false;
           break;
         }
-        await Future.delayed(Duration(milliseconds: 300));
+        await Future.delayed(const Duration(milliseconds: 300));
       }
       if (task.containsKey("mtu")) {
         await espm.requestMtu(int.tryParse(task["mtu"] ?? "") ?? espm.defaultMtu);
@@ -321,7 +321,7 @@ class TC with Debug {
 
   bool handleApiMessage(ApiMessage m) {
     String tag = "";
-    logD("$tag");
+    logD(tag);
     if (null == m.value) {
       logD("$tag m.value is null");
       return true;
@@ -346,8 +346,8 @@ class TC with Debug {
 
   bool handleApiTableParams(ApiMessage m) {
     String tag = "";
-    logD("$tag");
-    if (null == m.value || m.value!.indexOf("table;") < 0) return true;
+    logD(tag);
+    if (null == m.value || !m.value!.contains("table;")) return true;
     if (m.hasParamValue("size:")) size = int.tryParse(m.getParamValue("size:") ?? "") ?? 0;
     if (m.hasParamValue("keyOffset:")) keyOffset = int.tryParse(m.getParamValue("keyOffset:") ?? "");
     if (m.hasParamValue("keyRes:")) keyResolution = double.tryParse(m.getParamValue("keyRes:") ?? "");
@@ -357,8 +357,8 @@ class TC with Debug {
 
   bool handleApiTableValues(ApiMessage m) {
     String tag = "";
-    logD("$tag");
-    if (null == m.value || m.value!.indexOf("valuesFrom:") < 0) {
+    logD(tag);
+    if (null == m.value || !m.value!.contains("valuesFrom:")) {
       logD("$tag invalid message");
       return true;
     }
@@ -403,7 +403,7 @@ class TC with Debug {
   void addCollected(double temperature, double weight) {
     weight = (weight * 100).round() / 100; //reduce to 2 decimals
     double? updateTemp, updateWeight;
-    if (0 < collected.length && 1 < collected.last.length) {
+    if (collected.isNotEmpty && 1 < collected.last.length) {
       if (collected.last[0] == temperature && collected.last[1] != weight) {
         logD("updated weight: ${collected.last[1]} -> $weight");
         updateWeight = (collected.last[1] + weight) / 2;
@@ -429,17 +429,17 @@ class TC with Debug {
 
   double? get collectedMinTemp {
     double? d;
-    collected.forEach((e) {
-      if ((0 < e.length) && (null == d || e[0] < d!)) d = e[0];
-    });
+    for (var e in collected) {
+      if ((e.isNotEmpty) && (null == d || e[0] < d)) d = e[0];
+    }
     return d;
   }
 
   double? get collectedMaxTemp {
     double? d;
-    collected.forEach((e) {
-      if ((0 < e.length) && (null == d || d! < e[0])) d = e[0];
-    });
+    for (var e in collected) {
+      if ((e.isNotEmpty) && (null == d || d < e[0])) d = e[0];
+    }
     return d;
   }
 
@@ -448,7 +448,7 @@ class TC with Debug {
   set isCollecting(bool value) {
     _isCollecting = value;
     espm.settings.notifyListeners();
-    status((value ? "Starting" : "Stopped") + " collecting");
+    status("${value ? "Starting" : "Stopped"} collecting");
   }
 
   ExtendedBool prevEnabled = ExtendedBool.Unknown;
@@ -545,21 +545,23 @@ class TC with Debug {
             //if (weightDist != 0)
             //logD("$tag at ${prev[0]}˚C weightDist: ${weightDist}kg, next[1]: ${next[1]}, prev[1]: ${prev[1]}, weightToAdd: $weightToAdd");
           }
-          if (crosses.containsKey(current))
+          if (crosses.containsKey(current)) {
             crosses[current]?.add(weightToAdd);
-          else
+          } else {
             crosses.addAll({
               current: [weightToAdd]
             });
+          }
         }
         if (!crosses.containsKey(current)) {
           var key = temperatureToKey(current);
           if (null != key) {
             var savedWeight = getValueAt(key);
-            if (null != savedWeight)
+            if (null != savedWeight) {
               crosses.addAll({
                 current: [valueToWeight(savedWeight)]
               });
+            }
           }
         }
       }

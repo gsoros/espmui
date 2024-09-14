@@ -42,7 +42,7 @@ enum ExtendedBool {
 ///
 /// After modifying a value indirectly (e.g. "alwaysNotifier.value.x = y;"), call [notifyListeners()].
 class AlwaysNotifier<T> extends ValueNotifier<T> with Debug {
-  AlwaysNotifier(T value) : super(value);
+  AlwaysNotifier(super.value);
 
   @override
   set value(T newValue) {
@@ -93,6 +93,7 @@ class EspmuiElevatedButton extends StatelessWidget {
   late final Color? backgroundColorDisabled;
 
   EspmuiElevatedButton({
+    super.key,
     required this.child,
     this.onPressed,
     this.padding,
@@ -111,7 +112,6 @@ class EspmuiElevatedButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ElevatedButton(
       onPressed: onPressed,
-      child: child,
       style: ButtonStyle(
         padding: WidgetStateProperty.all<EdgeInsetsGeometry?>(padding),
         backgroundColor: WidgetStateProperty.resolveWith((state) {
@@ -121,6 +121,7 @@ class EspmuiElevatedButton extends StatelessWidget {
           return state.contains(WidgetState.disabled) ? foregroundColorDisabled : foregroundColorEnabled;
         }),
       ),
+      child: child,
     );
   }
 }
@@ -131,10 +132,11 @@ void snackbar(String s, [BuildContext? context]) {
 
   SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
     try {
-      if (null != context)
+      if (null != context) {
         sms = ScaffoldMessenger.of(context);
-      else
+      } else {
         sms = scaffoldMessengerKey.currentState;
+      }
       if (null == sms) throw ("ScaffoldMessengerState is null");
     } catch (e) {
       Debug.log("error: $e");
@@ -160,7 +162,7 @@ double map(double x, double inMin, double inMax, double outMin, double outMax) {
 }
 
 class Empty extends StatelessWidget {
-  const Empty();
+  const Empty({super.key});
 
   @override
   Widget build(BuildContext context) => const SizedBox.square(dimension: 1);
@@ -169,17 +171,17 @@ class Empty extends StatelessWidget {
 String bytesToString(int b, {int digits = 2}) {
   if (digits < 0) digits = 0;
   int k = 1024;
-  if (b >= pow(k, 4)) return (b / pow(k, 4)).toStringAsFixed(digits) + "TB";
-  if (b >= pow(k, 3)) return (b / pow(k, 3)).toStringAsFixed(digits) + "GB";
-  if (b >= pow(k, 2)) return (b / pow(k, 2)).toStringAsFixed(digits) + "MB";
-  if (b >= k) return (b / k).toStringAsFixed(digits) + "kB";
+  if (b >= pow(k, 4)) return "${(b / pow(k, 4)).toStringAsFixed(digits)}TB";
+  if (b >= pow(k, 3)) return "${(b / pow(k, 3)).toStringAsFixed(digits)}GB";
+  if (b >= pow(k, 2)) return "${(b / pow(k, 2)).toStringAsFixed(digits)}MB";
+  if (b >= k) return "${(b / k).toStringAsFixed(digits)}kB";
   return "${b}B";
 }
 
 String distanceToString(int d, {int digits = 2}) {
   if (digits < 0) digits = 0;
   int k = 1000;
-  if (d >= k) return (d / k).toStringAsFixed(digits) + "km";
+  if (d >= k) return "${(d / k).toStringAsFixed(digits)}km";
   return "${d}m";
 }
 

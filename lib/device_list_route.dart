@@ -17,7 +17,7 @@ import 'util.dart';
 import 'debug.dart';
 
 class DeviceListRoute extends StatefulWidget {
-  DeviceListRoute({Key? key}) : super(key: key);
+  const DeviceListRoute({super.key});
 
   @override
   DeviceListRouteState createState() => DeviceListRouteState();
@@ -55,37 +55,35 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
         ),
       ),
       body: Container(
-        margin: EdgeInsets.all(6),
+        margin: const EdgeInsets.all(6),
         child: _list(),
       ),
     );
   }
 
   Widget _appBarTitle() {
-    return Container(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start, // Align left
-              children: [
-                Row(children: [
-                  Text(defaultTitle),
-                ]),
-                Row(
-                  children: [
-                    _status(),
-                  ],
-                ),
-              ],
-            ),
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start, // Align left
+            children: [
+              Row(children: [
+                Text(defaultTitle),
+              ]),
+              Row(
+                children: [
+                  _status(),
+                ],
+              ),
+            ],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end, // Align right
-            children: [_scanButton()],
-          )
-        ],
-      ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end, // Align right
+          children: [_scanButton()],
+        )
+      ],
     );
   }
 
@@ -95,11 +93,12 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
       initialData: scanner.scanning,
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
         String status = "";
-        if (snapshot.hasData)
-          status = snapshot.data! ? "Scanning..." : scanner.devices.length.toString() + " device" + (scanner.devices.length == 1 ? "" : "s");
+        if (snapshot.hasData) {
+          status = snapshot.data! ? "Scanning..." : "${scanner.devices.length} device${scanner.devices.length == 1 ? "" : "s"}";
+        }
         return Text(
           status,
-          style: TextStyle(fontSize: 10),
+          style: const TextStyle(fontSize: 10),
         );
       },
     );
@@ -111,7 +110,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
       initialData: scanner.scanning,
       builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
         bool scanning = snapshot.hasData ? snapshot.data! : false;
-        return EspmuiElevatedButton(child: Text("Scan"), onPressed: scanning ? null : scanner.startScan);
+        return EspmuiElevatedButton(onPressed: scanning ? null : scanner.startScan, child: const Text("Scan"));
       },
     );
   }
@@ -124,21 +123,19 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
       builder: (BuildContext context, AsyncSnapshot<Map<String, Device>> snapshot) {
         //logD("_list() rebuilding");
         List<Widget> items = [];
-        if (devices.length < 1)
-          items.add(Center(child: Text("No devices")));
-        else {
+        if (devices.isEmpty) {
+          items.add(const Center(child: Text("No devices")));
+        } else {
           List<Device> sorted = devices.values.toList(growable: false);
           sorted.sort((a, b) {
             // if (a.autoConnect.value == b.autoConnect.value) return a.name?.compareTo(b.name ?? "") ?? -1;
             // return a.autoConnect.value ? 1 : -1;
             return a.name.compareTo(b.name);
           });
-          sorted.forEach(
-            (device) {
-              //logD("_list() adding ${device.runtimeType} ${device.name} ${device.lastScanRssi}");
-              items.add(_listItem(device));
-            },
-          );
+          for (var device in sorted) {
+            //logD("_list() adding ${device.runtimeType} ${device.name} ${device.lastScanRssi}");
+            items.add(_listItem(device));
+          }
         }
         return RefreshIndicator(
           key: _key,
@@ -161,9 +158,9 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
         openDevice(device);
       },
       child: Container(
-        padding: EdgeInsets.all(10),
-        margin: EdgeInsets.fromLTRB(0, 0, 0, 6),
-        decoration: BoxDecoration(
+        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.fromLTRB(0, 0, 0, 6),
+        decoration: const BoxDecoration(
           color: Colors.black38,
           borderRadius: BorderRadius.all(
             Radius.circular(10),
@@ -179,8 +176,8 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
                     children: [
                       Icon(device.iconData),
                       Text(
-                        device.name.length > 0 ? device.name : 'Unnamed device',
-                        style: TextStyle(fontSize: 18),
+                        device.name.isNotEmpty ? device.name : 'Unnamed device',
+                        style: const TextStyle(fontSize: 18),
                       ),
                       Expanded(
                         child: Padding(
@@ -221,7 +218,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
                   ),
                   Text(
                     0 < device.lastScanRssi ? "rssi: ${device.lastScanRssi}" : " ",
-                    style: TextStyle(fontSize: 10),
+                    style: const TextStyle(fontSize: 10),
                   ),
                 ],
               ),

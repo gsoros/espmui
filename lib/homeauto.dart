@@ -56,7 +56,7 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
   @override
   int get largeMtu => 512;
 
-  HomeAuto(String id, String name) : super(id, name) {
+  HomeAuto(super.id, super.name) {
     settings = AlwaysNotifier<HomeAutoSettings>(
       HomeAutoSettings(
         switchesTileStreamController,
@@ -140,7 +140,7 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
             context,
             PageTransition(
               type: PageTransitionType.rightToLeft,
-              child: DeviceRoute(device, focus: 'switches', open: ['settings', 'switches']),
+              child: DeviceRoute(device, focus: 'switches', open: const ['settings', 'switches']),
             ),
           );
         },
@@ -154,7 +154,7 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
             context,
             PageTransition(
               type: PageTransitionType.rightToLeft,
-              child: DeviceRoute(device, focus: 'charger', open: ['settings', 'charger']),
+              child: DeviceRoute(device, focus: 'charger', open: const ['settings', 'charger']),
             ),
           );
         },
@@ -187,14 +187,16 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
         logE("not enough values in ${message.valueAsString}");
         return false;
       }
-      BmsStatus bms = this.bmsStatus.value;
+      BmsStatus bms = bmsStatus.value;
       bms.updatedAt = uts();
       bms.name = values[0];
       bms.voltage = double.tryParse(values[1]) ?? 0.0;
       bms.current = double.tryParse(values[2]) ?? 0.0;
       bms.balanceCurrent = double.tryParse(values[3]) ?? 0.0;
       List<double> cells = [];
-      for (int i = 4; i < values.length; i++) cells.add((double.tryParse(values[i]) ?? 0.0) / 1000);
+      for (int i = 4; i < values.length; i++) {
+        cells.add((double.tryParse(values[i]) ?? 0.0) / 1000);
+      }
       bms.cellVoltage = cells;
       bmsVoltageTileStreamController.sink.add(bms.voltageTile);
       bmsCurrentTileStreamController.sink.add(bms.currentTile);
@@ -237,6 +239,7 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
     return false;
   }
 
+  @override
   Future<void> dispose() async {
     logD("$name dispose");
     switchesTileStreamController.close();
@@ -254,6 +257,7 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
     super.dispose();
   }
 
+  @override
   Future<void> onConnected() async {
     logD("_onConnected()");
     // api char can use values longer than 20 bytes
@@ -264,6 +268,7 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
     _requestInit();
   }
 
+  @override
   Future<void> onDisconnected() async {
     logD("$name onDisconnected()");
     await settings.value.onDisconnected();
@@ -305,30 +310,35 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
   }
 
   @override
-  IconData get iconData => DeviceIcon('HomeAuto').data();
+  IconData get iconData => const DeviceIcon('HomeAuto').data();
 
   @override
   Future<void> onCommandAdded(String command) async {
-    if ('switch' == command)
-      await Future.delayed(Duration(seconds: 1), () {
+    if ('switch' == command) {
+      await Future.delayed(const Duration(seconds: 1), () {
         api.sendCommand('switch=all');
       });
-    if ('ep' == command)
-      await Future.delayed(Duration(seconds: 2), () {
+    }
+    if ('ep' == command) {
+      await Future.delayed(const Duration(seconds: 2), () {
         api.sendCommand('ep=dump');
       });
-    if ('ci' == command)
-      await Future.delayed(Duration(seconds: 3), () {
+    }
+    if ('ci' == command) {
+      await Future.delayed(const Duration(seconds: 3), () {
         api.sendCommand('ci=delay:1973');
       });
-    if ('eps' == command)
-      await Future.delayed(Duration(seconds: 4), () {
+    }
+    if ('eps' == command) {
+      await Future.delayed(const Duration(seconds: 4), () {
         api.sendCommand('eps=delay:2124');
       });
-    if ('acv' == command)
-      await Future.delayed(Duration(seconds: 5), () {
+    }
+    if ('acv' == command) {
+      await Future.delayed(const Duration(seconds: 5), () {
         api.sendCommand('acv=dump');
       });
+    }
   }
 }
 
@@ -418,6 +428,7 @@ class HomeAutoSettings with Debug {
   @override
   int get hashCode => otaMode.hashCode ^ switches.hashCode ^ epever.hashCode ^ acv.hashCode;
 
+  @override
   String toString() {
     return "${describeIdentity(this)} (otaMode: $otaMode, switches: $switches, epever: $epever, acv: $acv)";
   }
@@ -449,9 +460,9 @@ class AutoChargingVoltage with Debug {
       return true;
     }
     if (10 == parts.length) {
-      parts.forEach((part) {
+      for (var part in parts) {
         var pair = part.split(':');
-        if (pair.length != 2) return;
+        if (pair.length != 2) continue;
         switch (pair[0]) {
           case 'enabled':
             enabled = int.tryParse(pair[1]) == 1;
@@ -471,7 +482,7 @@ class AutoChargingVoltage with Debug {
           default:
             logD('unhandled ${pair[0]}: ${pair[1]}');
         }
-      });
+      }
       logD(toString());
       return true;
     }
@@ -664,6 +675,7 @@ class HomeAutoSwitch with Debug {
   @override
   int get hashCode => mode.hashCode ^ state.hashCode ^ bvOn.hashCode ^ bvOff.hashCode ^ socOn.hashCode ^ socOff.hashCode ^ cvmOn.hashCode ^ cvmOff.hashCode;
 
+  @override
   String toString() {
     return "${describeIdentity(this)} ("
         "mode: ${mode?.name ?? 'unknown'}, "
@@ -700,10 +712,11 @@ class HomeAutoSwitches with Debug {
 
   void set(String name, HomeAutoSwitch value) {
     logD("set $name $value");
-    if (values.containsKey(name))
+    if (values.containsKey(name)) {
       values[name] = value;
-    else
+    } else {
       values.addAll({name: value});
+    }
   }
 
   Widget get asTile {
@@ -721,7 +734,7 @@ class HomeAutoSwitches with Debug {
         ],
       )));
     });
-    if (widgets.length < 1) return Empty();
+    if (widgets.isEmpty) return const Empty();
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -737,10 +750,11 @@ class HomeAutoSwitches with Debug {
     */
   }
 
+  @override
   String toString() {
     String sws = '';
     values.forEach((key, value) {
-      if (0 < sws.length) sws += ', ';
+      if (sws.isNotEmpty) sws += ', ';
       sws += "$key ($value)";
     });
     return "${describeIdentity(this)} ($sws)";
@@ -771,6 +785,7 @@ class HomeAutoSwitchMode {
 
   static HomeAutoSwitchMode? fromString(String name) => HomeAutoSwitchModes.byName(name);
 
+  @override
   String toString() => "${describeIdentity(this)} $name: $label";
 }
 
@@ -804,6 +819,7 @@ class HomeAutoSwitchState {
 
   static HomeAutoSwitchState? fromString(String label) => HomeAutoSwitchStates.fromLabel(label);
 
+  @override
   String toString() => "${describeIdentity(this)} $label ($id)";
 }
 
@@ -858,7 +874,7 @@ class BmsStatus {
     var voltages = cellVoltage;
     //var voltages = <double>[3.382, 3.383, 3.386, 3.381, 3.384, 3.382, 3.383, 3.381]; // balanced
     //var voltages = <double>[3.383, 3.272, 3.172, 3.272, 3.372, 3.212, 3.222, 3.151]; // unbalanced
-    if (voltages.length < 1) return Text('');
+    if (voltages.isEmpty) return const Text('');
     var sorted = List<double>.from(voltages);
     sorted.sort();
     var min = sorted.first;
@@ -869,7 +885,7 @@ class BmsStatus {
     const double maxBarHeight = 35.0;
     double factor = 1 / delta * (maxBarHeight - minBarHeight);
     List<Widget> bars = [];
-    voltages.forEach((v) {
+    for (var v in voltages) {
       Color color = v == max
           ? const Color.fromARGB(255, 2, 124, 6)
           : v == min
@@ -881,7 +897,7 @@ class BmsStatus {
         color: color,
         margin: const EdgeInsets.only(left: 2),
       ));
-    });
+    }
     const small = TextStyle(fontSize: 4, color: Color.fromARGB(192, 255, 255, 255));
     const smallActive = TextStyle(fontSize: 4, color: Color.fromARGB(255, 255, 208, 0));
     const warning = TextStyle(fontSize: 10, color: Color.fromARGB(255, 26, 209, 255));
@@ -901,7 +917,7 @@ class BmsStatus {
                         "Balance: ${((balanceCurrent ?? 0.0) * 1000).round().toString().padLeft(3, '0')}mA    ",
                         style: smallActive,
                       )
-                    : Empty(),
+                    : const Empty(),
                 Text("Min: ${min.toStringAsFixed(3)}V", style: small),
               ],
             ),
@@ -909,7 +925,7 @@ class BmsStatus {
         ),
         Row(
           children: [
-            Text('±', style: small),
+            const Text('±', style: small),
             Text(
               "${(delta * 1000).round()}",
               style: 0.025 <= delta
@@ -918,7 +934,7 @@ class BmsStatus {
                       ? warning
                       : small,
             ),
-            Text('mV', style: small),
+            const Text('mV', style: small),
           ],
         ),
       ],

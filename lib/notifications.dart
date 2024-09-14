@@ -20,7 +20,7 @@ class Notifications with Debug {
   static final Notifications _instance = Notifications._construct();
   final _exclusiveAccess = Mutex();
   bool _initDone = false;
-  Plugin _plugin = Plugin();
+  final Plugin _plugin = Plugin();
 
   Future<void> _init() async {
     if (_initDone) return;
@@ -28,7 +28,7 @@ class Notifications with Debug {
       if (_initDone) return;
 
       await _plugin.initialize(
-        Settings(android: AndroidSettings('@mipmap/ic_launcher')),
+        const Settings(android: AndroidSettings('@mipmap/ic_launcher')),
         //onDidReceiveBackgroundNotificationResponse: onResponse,
         //onDidReceiveNotificationResponse: onResponse,
       );

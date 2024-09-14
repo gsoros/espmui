@@ -35,7 +35,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
   @override
   int get largeMtu => 512;
 
-  ESPCC(String id, String name) : super(id, name) {
+  ESPCC(super.id, super.name) {
     deviceWithApiConstruct(
       characteristic: EspccApiCharacteristic(this),
       handler: handleApiMessageSuccess,
@@ -66,7 +66,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
             expect = ESPCCRecordingState.NOT_RECORDING;
           }
           var state = await api.request<int>("rec=$action");
-          snackbar((state == expect ? succ : fail) + " recording");
+          snackbar("${state == expect ? succ : fail} recording");
         },
       ),
     });
@@ -116,7 +116,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
           );
           if (f.remoteSize < 0) {
             api.requestResultCode("rec=info:${f.name}", expectValue: "info:${f.name}");
-            await Future.delayed(Duration(milliseconds: 500));
+            await Future.delayed(const Duration(milliseconds: 500));
           }
         });
         for (ESPCCFile f in files.value.files) {
@@ -131,7 +131,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
         var f = ESPCCFile(tokens[0], this, remoteExists: ExtendedBool.True);
         if (8 <= f.name.length) {
           tokens.removeAt(0);
-          tokens.forEach((token) {
+          for (var token in tokens) {
             if ("size:" == token.substring(0, 5)) {
               int? s = int.tryParse(token.substring(5));
               if (s != null && 0 <= s) f.remoteSize = s;
@@ -142,7 +142,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
               int? s = int.tryParse(token.substring(8));
               if (s != null && 0 <= s) f.altGain = s;
             }
-          });
+          }
           files.value.files.firstWhere(
             (file) => file.name == f.name,
             orElse: () {
@@ -167,6 +167,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
     return false;
   }
 
+  @override
   Future<void> dispose() async {
     logD("$name dispose");
     await apiDispose();
@@ -175,6 +176,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
     super.dispose();
   }
 
+  @override
   Future<void> onConnected() async {
     logD("_onConnected()");
     // api char can use values longer than 20 bytes
@@ -183,6 +185,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
     _requestInit();
   }
 
+  @override
   Future<void> onDisconnected() async {
     logD("$name onDisconnected()");
     settings.value = ESPCCSettings();
@@ -218,13 +221,15 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
     files.value.syncing = ExtendedBool.True;
     files.notifyListeners();
     await api.requestResultCode("rec=files", expectValue: "files:");
-    for (ESPCCFile f in files.value.files) f.updateLocalStatus();
+    for (ESPCCFile f in files.value.files) {
+      f.updateLocalStatus();
+    }
     files.value.syncing = ExtendedBool.False;
     files.notifyListeners();
   }
 
   @override
-  IconData get iconData => DeviceIcon("ESPCC").data();
+  IconData get iconData => const DeviceIcon("ESPCC").data();
 }
 
 class ESPCCFile with Debug {
@@ -237,7 +242,7 @@ class ESPCCFile with Debug {
   ExtendedBool remoteExists;
   ExtendedBool localExists;
   bool _generatingGpx = false;
-  Mutex _mutex = Mutex();
+  final Mutex _mutex = Mutex();
 
   /// flag for syncer queue
   bool cancelDownload = false;
@@ -266,11 +271,11 @@ class ESPCCFile with Debug {
   }
 
   Future<String?> get path async {
-    if (name.length < 1) return null;
+    if (name.isEmpty) return null;
     String? path = Platform.isAndroid ? await Path().external : await Path().documents;
     if (null == path) return null;
     String deviceName = "unnamedDevice";
-    if (0 < device.name.length) deviceName = device.name;
+    if (device.name.isNotEmpty) deviceName = device.name;
     return "$path/${Path().sanitize(deviceName)}/rec/${Path().sanitize(name)}";
   }
 
@@ -310,13 +315,13 @@ class ESPCCFile with Debug {
         logD("$tag local size is $sizeBefore but offset is $offset");
         return 0;
       }
-      if (null != data && 0 < data.length)
+      if (null != data && data.isNotEmpty) {
         f = await f.writeAsString(
           data,
           mode: FileMode.append,
           flush: true,
         );
-      else if (null != byteData && 0 < byteData.length)
+      } else if (null != byteData && byteData.isNotEmpty)
         f = await f.writeAsBytes(
           byteData.toList(growable: false),
           mode: FileMode.append,
@@ -333,7 +338,7 @@ class ESPCCFile with Debug {
   }
 
   /// any file with a dot in the name is treated as non-binary :)
-  bool get isBinary => name.indexOf(".") < 0;
+  bool get isBinary => !name.contains(".");
 
   bool get isRec => isBinary;
 
@@ -341,7 +346,7 @@ class ESPCCFile with Debug {
 
   /// generates non-standard format for exporting to str%v#
   Future<bool> generateGpx({bool overwrite = false}) async {
-    String tag = "$name";
+    String tag = name;
     if (_generatingGpx) {
       logD("$tag already generating");
       return false;
@@ -601,6 +606,7 @@ class ESPCCFile with Debug {
       remoteExists.hashCode ^
       localExists.hashCode;
 
+  @override
   String toString() {
     return "${describeIdentity(this)} ("
         "name: $name, "
@@ -650,12 +656,12 @@ class ESPCCSettings with Debug {
         List<String> values = v.substring("read:".length).split(",");
         int index = 0;
         Map<int, int> readings = {};
-        values.forEach((value) {
+        for (var value in values) {
           int? i = int.tryParse(value);
-          if (null == i) return;
+          if (null == i) continue;
           readings[index] = i;
           index++;
-        });
+        }
         touchRead = readings;
         logD("$tag touchRead=$touchRead");
         return true;
@@ -664,12 +670,12 @@ class ESPCCSettings with Debug {
         List<String> values = v.substring("thresholds:".length).split(",");
         int index = 0;
         Map<int, int> thresholds = {};
-        values.forEach((value) {
+        for (var value in values) {
           int? i = int.tryParse(value);
-          if (null == i) return;
+          if (null == i) continue;
           thresholds[index] = i;
           index++;
-        });
+        }
         touchThres = thresholds;
         logD("$tag touchThres=$touchThres");
         return true;
@@ -698,11 +704,11 @@ class ESPCCSettings with Debug {
     if ("vesc" == message.commandStr) {
       if (null == message.valueAsString) return false;
       List<String> tokens = message.valueAsString!.split("|");
-      tokens.forEach((token) {
+      for (var token in tokens) {
         List<String> pair = token.split(":");
         if (2 != pair.length) {
           logD("$tag invalid token: $token");
-          return;
+          continue;
         }
         switch (pair[0]) {
           case "BNS":
@@ -750,7 +756,7 @@ class ESPCCSettings with Debug {
           default:
             logD("$tag unknown name: token: $token, name: ${pair[0]}, value: ${pair[1]}");
         }
-      });
+      }
       logD("$tag updated settings: $this");
       return true;
     }
@@ -802,6 +808,7 @@ class ESPCCSettings with Debug {
       vescRampNumSteps.hashCode ^
       vescRampTime.hashCode;
 
+  @override
   String toString() {
     return "${describeIdentity(this)} ("
         "touchThres: $touchThres, "
@@ -867,7 +874,7 @@ class ESPCCDataPoint with Debug {
   var _temperature = Uint8List(2);
 
   bool fromList(Uint8List bytes) {
-    String tag = "$_tag";
+    String tag = _tag;
     if (bytes.length < sizeInBytes) {
       logD("$tag incorrect length: ${bytes.length}, need at least $sizeInBytes");
       return false;
@@ -1076,6 +1083,7 @@ class ESPCCFileList {
   @override
   int get hashCode => files.hashCode;
 
+  @override
   String toString() {
     return "${describeIdentity(this)} ("
         "files: $files"

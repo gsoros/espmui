@@ -38,7 +38,7 @@ class ApiResult {
   static int get localBtError => 120;
 }
 
-typedef void ApiCallback(ApiMessage message);
+typedef ApiCallback = void Function(ApiMessage message);
 
 class ApiMessage with Debug {
   Api api;
@@ -109,9 +109,9 @@ class ApiMessage with Debug {
     String? parsedArg;
     if (eqSign > 0) {
       parsedArg = command.substring(eqSign + 1);
-      if (parsedArg.length > 0) arg = parsedArg.toString();
+      if (parsedArg.isNotEmpty) arg = parsedArg.toString();
       command = command.substring(0, eqSign);
-      if (command.length > 0) commandStr = command.toString();
+      if (command.isNotEmpty) commandStr = command.toString();
     }
     var intParsed = int.tryParse(command);
     for (int k in api.commands.keys) {
@@ -133,7 +133,7 @@ class ApiMessage with Debug {
 
   void checkAge() {
     if (createdAt + maxAgeMs <= uts()) {
-      logD("max age reached: " + toString());
+      logD("max age reached: ${toString()}");
       resultCode = -1;
       resultStr = "ClientError";
       info = "Maximum age reached";
@@ -143,7 +143,7 @@ class ApiMessage with Debug {
 
   void checkAttempts() {
     if (maxAttempts < (attempts ?? 0)) {
-      logD("max attmpts reached: " + toString());
+      logD("max attmpts reached: ${toString()}");
       resultCode = -1;
       resultStr = "ClientError";
       info = "Maximum attempts reached";
@@ -157,26 +157,9 @@ class ApiMessage with Debug {
     //info = ((info == null) ? "" : info.toString()) + " destructed";
   }
 
+  @override
   String toString() {
-    return "$runtimeType (" +
-        "command: '$command'" +
-        ((commandStr != null) ? ", commandStr='$commandStr'" : "") +
-        ((commandCode != null) ? ", commandCode='$commandCode'" : "") +
-        ((expectValue != null) ? ", expectValue='$expectValue'" : "") +
-        ((arg != null) ? ", arg='$arg'" : "") +
-        ((onDone != null) ? ", onDone='$onDone'" : "") +
-        ", maxAttempts='$maxAttempts'" +
-        ", minDelayMs='$minDelayMs'" +
-        ", maxAgeMs='$maxAgeMs'" +
-        ", createdAt='$createdAt'" +
-        ((lastSentAt != null) ? ", lastSentAt='$lastSentAt'" : "") +
-        ((attempts != null) ? ", attempts='$attempts'" : "") +
-        ((resultCode != null) ? ", resultCode='$resultCode'" : "") +
-        ((resultStr != null) ? ", resultStr='$resultStr'" : "") +
-        ((info != null) ? ", info='$info'" : "") +
-        ((value != null) ? ", value='$value'" : "") +
-        ((isDone != null) ? ", isDone='$isDone'" : "") +
-        ")";
+    return "$runtimeType (command: '$command'${(commandStr != null) ? ", commandStr='$commandStr'" : ""}${(commandCode != null) ? ", commandCode='$commandCode'" : ""}${(expectValue != null) ? ", expectValue='$expectValue'" : ""}${(arg != null) ? ", arg='$arg'" : ""}${(onDone != null) ? ", onDone='$onDone'" : ""}, maxAttempts='$maxAttempts', minDelayMs='$minDelayMs', maxAgeMs='$maxAgeMs', createdAt='$createdAt'${(lastSentAt != null) ? ", lastSentAt='$lastSentAt'" : ""}${(attempts != null) ? ", attempts='$attempts'" : ""}${(resultCode != null) ? ", resultCode='$resultCode'" : ""}${(resultStr != null) ? ", resultStr='$resultStr'" : ""}${(info != null) ? ", info='$info'" : ""}${(value != null) ? ", value='$value'" : ""}${(isDone != null) ? ", isDone='$isDone'" : ""})";
   }
 
   bool? get valueAsBool {
@@ -273,8 +256,9 @@ class Api with Debug {
       resultCodeStr = result.substring(0, colon);
       resultStr = result.substring(colon + 1);
       resultCode = int.tryParse(resultCodeStr);
-    } else
+    } else {
       resultCode = int.tryParse(result);
+    }
     if (resultCode == null) {
       logD("$tag Error parsing resultCode as int");
       return;
@@ -361,7 +345,7 @@ class Api with Debug {
         return true;
       }
       List<String> tokens = message.value!.split(";");
-      tokens.forEach((token) {
+      for (var token in tokens) {
         int? code;
         String? command;
         String? value;
@@ -369,12 +353,13 @@ class Api with Debug {
         if (parts.length == 1) {
           //logD("parts.length == 1; $parts");
           value = null;
-        } else
+        } else {
           value = parts[1];
+        }
         List<String> c = parts[0].split(":");
         if (c.length != 2) {
           //logD("c.length != 2; $c");
-          return;
+          continue;
         }
         code = int.tryParse(c[0]);
         command = c[1];
@@ -409,7 +394,7 @@ class Api with Debug {
           // call the message done processor
           _onDone(m);
         }
-      });
+      }
       // device.requestMtu(device.defaultMtu);
       return true;
     }
@@ -420,7 +405,7 @@ class Api with Debug {
 
       if (0 == v.indexOf("hostname:")) {
         String name = v.substring("hostname:".length);
-        if (0 < name.length) {
+        if (name.isNotEmpty) {
           device.name = name;
           logD("$tag device name: $name");
         }
@@ -435,7 +420,7 @@ class Api with Debug {
       if (0 == v.indexOf("reboot")) {
         snackbar("Rebooting...");
         device.disconnect();
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 2));
         device.connect();
         return true;
       }
@@ -565,13 +550,14 @@ class Api with Debug {
   bool queueContainsCommand({String? commandStr, int? command}) {
     bool result = false;
     _queueMutex.protect(() {
-      for (ApiMessage message in _queue)
+      for (ApiMessage message in _queue) {
         if ((null != commandStr && message.commandStr == commandStr) //
             ||
             (null != command && message.commandCode == command)) {
           result = true;
           break;
         }
+      }
       return Future.value(null);
     });
     return result;
@@ -610,7 +596,7 @@ class Api with Debug {
         } else {
           message.lastSentAt = now;
           message.attempts = (message.attempts ?? 0) + 1;
-          String toWrite = "${message.commandCode}" + (null != message.arg ? "=" + message.arg! : "");
+          String toWrite = "${message.commandCode}${null != message.arg ? "=${message.arg!}" : ""}";
           //logD("_send() $now attempt #${message.attempts} calling char.write($toWrite)");
           characteristic?.write(toWrite);
         }

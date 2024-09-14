@@ -19,17 +19,17 @@ import 'util.dart';
 import 'debug.dart';
 
 class TilesRoute extends StatefulWidget {
-  const TilesRoute({Key? key}) : super(key: key);
+  const TilesRoute({super.key});
 
   @override
-  _TilesRouteState createState() => _TilesRouteState();
+  TilesRouteState createState() => TilesRouteState();
 }
 
-class _TilesRouteState extends State<TilesRoute> with Debug {
+class TilesRouteState extends State<TilesRoute> with Debug {
   bool _fabVisible = false;
   Timer? _fabTimer;
 
-  var _tileGrid = TileGrid();
+  final _tileGrid = const TileGrid();
   // var devices = DeviceList();
 
   @override
@@ -44,7 +44,7 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
       _fabVisible = true;
     });
     _fabTimer?.cancel();
-    _fabTimer = Timer(Duration(seconds: 3), () {
+    _fabTimer = Timer(const Duration(seconds: 3), () {
       logD("hideFab");
       setState(() {
         _fabVisible = false;
@@ -63,8 +63,8 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
             builder: (BuildContext context) {
               return Center(
                 child: AlertDialog(
-                  title: Hero(tag: 'fab', child: Icon(Icons.settings)),
-                  contentPadding: EdgeInsets.fromLTRB(0, 20, 0, 0),
+                  title: const Hero(tag: 'fab', child: Icon(Icons.settings)),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 20, 0, 0),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -76,8 +76,8 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
                             });
                             Navigator.of(context).pop(); // close dialog
                           },
-                          child: Text("Add tile")),
-                      SizedBox(width: 10, height: 20, child: Empty()),
+                          child: const Text("Add tile")),
+                      const SizedBox(width: 10, height: 20, child: Empty()),
                       ElevatedButton(
                         onPressed: () {
                           Navigator.of(context).pop(); // close dialog
@@ -85,18 +85,18 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
                             context,
                             PageTransition(
                               type: PageTransitionType.rightToLeft,
-                              child: DeviceListRoute(),
+                              child: const DeviceListRoute(),
                             ),
                           );
                         },
-                        child: Text("Devices"),
+                        child: const Text("Devices"),
                       ),
                     ],
                   ),
                   actions: <Widget>[
                     TextButton(
-                      child: Text('Close'),
                       onPressed: Navigator.of(context).pop,
+                      child: const Text('Close'),
                     ),
                   ],
                 ),
@@ -105,12 +105,12 @@ class _TilesRouteState extends State<TilesRoute> with Debug {
           ),
         );
       },
-      child: Icon(
+      backgroundColor: Colors.red,
+      heroTag: "fab",
+      child: const Icon(
         Icons.settings,
         color: Colors.white,
       ),
-      backgroundColor: Colors.red,
-      heroTag: "fab",
     );
   }
 
@@ -133,18 +133,18 @@ class TileGrid extends StatefulWidget with Debug {
   final String mode;
 
   const TileGrid({
-    Key? key,
+    super.key,
     this.mode = 'fromPreferences',
-  }) : super(key: key);
+  });
 
   @override
-  _TileGridState createState() {
+  TileGridState createState() {
     logD('createState()');
-    return _TileGridState();
+    return TileGridState();
   }
 }
 
-class _TileGridState extends State<TileGrid> with Debug {
+class TileGridState extends State<TileGrid> with Debug {
   late TileList _tiles;
   double dialogOpacity = 1;
   bool showColorPicker = false;
@@ -152,7 +152,7 @@ class _TileGridState extends State<TileGrid> with Debug {
   String? colorPickerTarget;
   Color? colorPickerColor;
 
-  _TileGridState() {
+  TileGridState() {
     _tiles = TileList();
   }
 
@@ -179,13 +179,14 @@ class _TileGridState extends State<TileGrid> with Debug {
         builder: (context, List<Tile> tiles, _) {
           return StatefulBuilder(
             builder: (context, setChildState) {
-              void Function(void Function() f) setStates = (f) {
+              setStates(f) {
                 setState(() {
                   setChildState(() {
                     f();
                   });
                 });
-              };
+              }
+
               if (showColorPicker && colorPickerColor != null && colorPickerCallback != null) {
                 return Column(
                   children: [
@@ -216,7 +217,7 @@ class _TileGridState extends State<TileGrid> with Debug {
                         Expanded(
                           flex: 4,
                           child: EspmuiElevatedButton(
-                            child: Text("Cancel"),
+                            child: const Text("Cancel"),
                             onPressed: () {
                               setStates(() {
                                 showColorPicker = false;
@@ -227,9 +228,9 @@ class _TileGridState extends State<TileGrid> with Debug {
                         Expanded(
                           flex: 6,
                           child: Padding(
-                            padding: EdgeInsets.only(left: 10),
+                            padding: const EdgeInsets.only(left: 10),
                             child: EspmuiElevatedButton(
-                              child: Text("Set Color"),
+                              child: const Text("Set Color"),
                               onPressed: () {
                                 setStates(() {
                                   if (null != colorPickerColor) colorPickerCallback!(colorPickerColor!);
@@ -365,32 +366,34 @@ class _TileGridState extends State<TileGrid> with Debug {
             bool valuePresent = false;
             var items = <DropdownMenuItem<String>>[];
             DeviceList().forEach((_, device) {
-              if (device.tileStreams.length < 1) return;
+              if (device.tileStreams.isEmpty) return;
               device.tileStreams.forEach((name, stream) {
                 String itemValue = '${device.id};$name';
                 if (itemValue == value) valuePresent = true;
                 items.add(DropdownMenuItem(
                   value: itemValue,
-                  child: Text("${device.name.length > 0 ? device.name : 'unnamed device'} ${stream.label}"),
+                  child: Text("${device.name.isNotEmpty ? device.name : 'unnamed device'} ${stream.label}"),
                 ));
               });
             });
-            if (items.length < 1)
+            if (items.isEmpty) {
               items.add(
                 DropdownMenuItem(
                   value: value,
-                  child: Text("No valid sources"),
+                  child: const Text("No valid sources"),
                 ),
               );
+            }
             items.sort((a, b) => a.child.toString().compareTo(b.child.toString()));
-            if (!valuePresent)
+            if (!valuePresent) {
               items.insert(
                 0,
-                DropdownMenuItem(
+                const DropdownMenuItem(
                   value: "",
                   child: Text("Select Source"),
                 ),
               );
+            }
 
             var sourceDropdown = EspmuiDropdownWidget(
               value: valuePresent ? value : "",
@@ -398,7 +401,7 @@ class _TileGridState extends State<TileGrid> with Debug {
               onChanged: (value) {
                 logD("New source $value");
                 var chunks = value?.split(";");
-                if (chunks == null || chunks.length < 2 || chunks[0].length < 1 || chunks[1].length < 1) {
+                if (chunks == null || chunks.length < 2 || chunks[0].isEmpty || chunks[1].isEmpty) {
                   logD("Wrong chunks: $chunks");
                   return;
                 }
@@ -487,21 +490,21 @@ class _TileGridState extends State<TileGrid> with Debug {
             bool valuePresent = false;
             var items = <DropdownMenuItem<String>>[];
             DeviceList().forEach((_, device) {
-              if (device.tileActions.length < 1) return;
+              if (device.tileActions.isEmpty) return;
               device.tileActions.forEach((name, action) {
                 String itemValue = "${device.id};$name";
                 //logD("${device.name ?? 'unnamed device'} ${action.label} $itemValue");
                 if (itemValue == tile.tap) valuePresent = true;
                 items.add(DropdownMenuItem(
                   value: itemValue,
-                  child: Text("${device.name.length > 0 ? device.name : 'unnamed device'} ${action.label}"),
+                  child: Text("${device.name.isNotEmpty ? device.name : 'unnamed device'} ${action.label}"),
                 ));
               });
             });
             items.sort((a, b) => a.child.toString().compareTo(b.child.toString()));
             items.insert(
               0,
-              DropdownMenuItem(
+              const DropdownMenuItem(
                 value: "",
                 child: Text("No Tap Action"),
               ),
@@ -573,11 +576,11 @@ class _TileGridState extends State<TileGrid> with Debug {
                   return LongPressDraggable<Tile>(
                     data: tiles[index],
                     feedback: Opacity(
+                      opacity: .5,
                       child: Material(
                         color: Colors.transparent,
                         child: _tiles[index],
                       ),
-                      opacity: .5,
                     ),
                     child: Hero(
                       placeholderBuilder: (_, __, child) => child,
@@ -606,10 +609,11 @@ class _TileGridState extends State<TileGrid> with Debug {
                                     builder: (context) {
                                       return PopScope(
                                         onPopInvokedWithResult: (didPop, result) async {
-                                          if (didPop)
+                                          if (didPop) {
                                             setState(() {
                                               showColorPicker = false;
                                             });
+                                          }
                                         },
                                         child: Center(
                                           child: AlertDialog(
@@ -624,7 +628,7 @@ class _TileGridState extends State<TileGrid> with Debug {
                                             ),
                                             actions: [
                                               EspmuiElevatedButton(
-                                                child: Text("Delete Tile"),
+                                                child: const Text("Delete Tile"),
                                                 onPressed: () {
                                                   logD("delete tile $index");
                                                   setState(() {
@@ -636,8 +640,8 @@ class _TileGridState extends State<TileGrid> with Debug {
                                                 },
                                               ),
                                               EspmuiElevatedButton(
-                                                child: Text("Close"),
                                                 onPressed: Navigator.of(context).pop,
+                                                child: const Text("Close"),
                                               ),
                                             ],
                                             actionsAlignment: MainAxisAlignment.spaceBetween,

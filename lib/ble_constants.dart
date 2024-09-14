@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 class BleConstants {
   static const CYCLING_POWER_SERVICE_UUID = "00001818-0000-1000-8000-00805f9b34fb";
   static const CYCLING_POWER_MEASUREMENT_CHAR_UUID = "00002a63-0000-1000-8000-00805f9b34fb";

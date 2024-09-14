@@ -15,7 +15,7 @@ import 'debug.dart';
 class DeviceList with Debug {
   static final DeviceList _instance = DeviceList._construct();
   static int _instances = 0;
-  Map<String, Device> _items = {};
+  final Map<String, Device> _items = {};
   Map<String, Device> get devices => _items;
   final _controller = StreamController<Map<String, Device>>.broadcast();
   Stream<Map<String, Device>> get stream => _controller.stream;
@@ -34,7 +34,7 @@ class DeviceList with Debug {
     //_controller
   }
 
-  Map<String, Device> where(bool filter(String k, Device v)) => Map.from(_items)..removeWhere((k, v) => !filter(k, v));
+  Map<String, Device> where(bool Function(String k, Device v) filter) => Map.from(_items)..removeWhere((k, v) => !filter(k, v));
 
   Future<void> load({bool reload = false}) async {
     if (_loaded && !reload) return;

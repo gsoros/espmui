@@ -27,7 +27,7 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
   HallCharacteristic? get hallChar => characteristic("hall") as HallCharacteristic?;
   TemperatureCharacteristic? get tempChar => characteristic("temp") as TemperatureCharacteristic?;
 
-  ESPM(String id, String name) : super(id, name) {
+  ESPM(super.id, super.name) {
     deviceWithApiConstruct(
       characteristic: EspmApiCharacteristic(this),
       handler: handleApiMessageSuccess,
@@ -80,7 +80,7 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
         label: "Tare",
         action: (_, __) async {
           var resultCode = await api.requestResultCode("tare=0");
-          snackbar("Tare " + (resultCode == ApiResult.success ? "success" : "failed"));
+          snackbar("Tare ${resultCode == ApiResult.success ? "success" : "failed"}");
         },
       ),
     });
@@ -99,18 +99,20 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
 
     if ("wse" == message.commandStr) {
       weightServiceMode.value = message.valueAsInt ?? ESPMWeightServiceMode.UNKNOWN;
-      if (ESPMWeightServiceMode.OFF < weightServiceMode.value)
+      if (ESPMWeightServiceMode.OFF < weightServiceMode.value) {
         await weightScaleChar?.subscribe();
-      else
+      } else {
         await weightScaleChar?.unsubscribe();
+      }
       return true;
     }
     if ("hc" == message.commandStr) {
       hallEnabled.value = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
-      if (message.valueAsBool ?? false)
+      if (message.valueAsBool ?? false) {
         await hallChar?.subscribe();
-      else
+      } else {
         await hallChar?.unsubscribe();
+      }
       return true;
     }
 
@@ -118,6 +120,7 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
     return false;
   }
 
+  @override
   Future<void> dispose() async {
     logD("$name dispose");
     await apiDispose();
@@ -125,6 +128,7 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
     super.dispose();
   }
 
+  @override
   Future<void> onConnected() async {
     logD("_onConnected()");
     await requestMtu(defaultMtu);
@@ -132,6 +136,7 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
     _requestInit();
   }
 
+  @override
   Future<void> onDisconnected() async {
     _resetInit();
     await apiOnDisconnected();
@@ -156,7 +161,7 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
         minDelayMs: 10000,
         maxAttempts: 3,
       );
-      await Future.delayed(Duration(milliseconds: 250));
+      await Future.delayed(const Duration(milliseconds: 250));
     });
   }
 
@@ -192,10 +197,11 @@ class ESPMSettings with Debug {
   ESPM device;
 
   ESPMSettings(this.device, {TC? tc}) {
-    if (null != tc && tc.espm == device)
+    if (null != tc && tc.espm == device) {
       this.tc = tc;
-    else
+    } else {
       this.tc = TC(device);
+    }
   }
 
   double? cranklength;
@@ -327,6 +333,7 @@ class ESPMSettings with Debug {
       autoTareDelayMs.hashCode ^
       tc.hashCode;
 
+  @override
   String toString() {
     return "${describeIdentity(this)} ("
         "crankLength: $cranklength, "

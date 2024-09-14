@@ -30,7 +30,7 @@ class Tile extends StatelessWidget with Debug {
   final int history;
 
   Tile({
-    Key? key,
+    super.key,
     this.color = Colors.black54,
     this.textColor = Colors.white,
     this.width = 5,
@@ -40,7 +40,7 @@ class Tile extends StatelessWidget with Debug {
     this.tap = "",
     this.history = 0,
     this.showDeviceName = true,
-  }) : super(key: key);
+  });
 
   Tile.from(
     Tile other, {
@@ -84,7 +84,7 @@ class Tile extends StatelessWidget with Debug {
       key: key ?? this.key,
       color: color ?? this.color,
       textColor: textColor ?? this.textColor,
-      colSpan: colSpan ?? this.width,
+      colSpan: colSpan ?? width,
       height: height ?? this.height,
       device: device ?? this.device,
       stream: stream ?? this.stream,
@@ -94,7 +94,7 @@ class Tile extends StatelessWidget with Debug {
     );
   }
 
-  Tile.fromJson(Map<String, dynamic> json)
+  Tile.fromJson(Map<String, dynamic> json, {super.key})
       : color = Color(json['color']),
         textColor = Color(json['textColor']),
         width = json['colSpan'] ?? 3,
@@ -132,7 +132,7 @@ class Tile extends StatelessWidget with Debug {
         stream: stream?.stream,
         initialData: stream?.initialData != null ? stream?.initialData!() : null,
         builder: (_, snapshot) {
-          if (!snapshot.hasData || (null == snapshot.data) || ('Text("")' == snapshot.data.toString())) return Empty();
+          if (!snapshot.hasData || (null == snapshot.data) || ('Text("")' == snapshot.data.toString())) return const Empty();
           //logD('snapshot.data: ' + snapshot.data.toString());
           return snapshot.data!;
         },
@@ -146,16 +146,16 @@ class Tile extends StatelessWidget with Debug {
         builder: (_, snapshot) {
           //logD("Tile build getValueIfConnected ${device?.name} ${stream?.label} ${snapshot.data}");
           if (!snapshot.hasData || snapshot.data == null || snapshot.data == DeviceConnectionState.connected) return getValue();
-          if (snapshot.data == DeviceConnectionState.disconnected) return Empty();
-          return CircularProgressIndicator();
+          if (snapshot.data == DeviceConnectionState.disconnected) return const Empty();
+          return const CircularProgressIndicator();
         },
       );
     }
 
     Widget background() {
-      if (0 == history) return Empty();
+      if (0 == history) return const Empty();
       History? charHistory = DeviceList().byIdentifier(this.device)?.tileStreams[this.stream]?.history;
-      if (null == charHistory) return Empty();
+      if (null == charHistory) return const Empty();
       return StreamBuilder<Widget>(
         stream: stream?.stream,
         initialData: stream?.initialData != null ? stream?.initialData!() : null,
@@ -174,11 +174,11 @@ class Tile extends StatelessWidget with Debug {
     }
 
     String label = stream?.label ?? '';
-    if (showDeviceName) label += ' ' + (device?.name ?? 'No source');
+    if (showDeviceName) label += ' ${device?.name ?? 'No source'}';
 
     var rows = <Widget>[];
     int dataRowFlex = null == stream?.units ? 6 : 5;
-    if (0 < label.length) {
+    if (label.isNotEmpty) {
       dataRowFlex--;
       rows.add(
         // label row
@@ -331,7 +331,7 @@ class TileList with Debug {
     if (delayed) {
       dev.log(_saveTimer == null ? '$runtimeType new save timer' : '$runtimeType updating save timer');
       _saveTimer?.cancel();
-      _saveTimer = Timer(Duration(seconds: 1), () {
+      _saveTimer = Timer(const Duration(seconds: 1), () {
         save(false);
       });
       return;
@@ -342,16 +342,16 @@ class TileList with Debug {
 
   void _fromJsonStringList(List<String> json) {
     tiles.clear();
-    json.forEach((tileString) {
+    for (var tileString in json) {
       tiles.add(Tile.fromJson(jsonDecode(tileString)));
-    });
+    }
   }
 
   List<String> toJsonStringList() {
     List<String> tileString = [];
-    tiles.forEach((tile) {
+    for (var tile in tiles) {
       tileString.add(jsonEncode(tile.toJson()));
-    });
+    }
     return tileString;
   }
 

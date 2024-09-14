@@ -1,3 +1,5 @@
+// ignore_for_file: overridden_fields
+
 import 'dart:convert';
 
 import 'dart:typed_data';
@@ -109,7 +111,7 @@ abstract class BleCharacteristic<T> with Debug {
     Characteristic? char,
   }) async {
     await _init();
-    if (char == null) char = _characteristic;
+    char ??= _characteristic;
     if (char == null) {
       bleError(debugTag, "write() characteristic is null");
       return Future.value(null);
@@ -188,12 +190,13 @@ abstract class BleCharacteristic<T> with Debug {
     await _init();
     if (_subscription == null) return;
     logD("unsubscribe $runtimeType");
-    if (sendBeforeUnsubscribe)
+    if (sendBeforeUnsubscribe) {
       util.streamSendIfNotClosed(
         _controller,
         beforeUnsubscribeValue,
         allowNull: true,
       );
+    }
     await _subscription?.cancel();
     _subscription = null;
   }
@@ -233,10 +236,12 @@ abstract class BleCharacteristic<T> with Debug {
 }
 
 class BatteryCharacteristic extends BleCharacteristic<int> {
+  @override
   final serviceUUID = BleConstants.BATTERY_SERVICE_UUID;
+  @override
   final charUUID = BleConstants.BATTERY_LEVEL_CHAR_UUID;
 
-  BatteryCharacteristic(Device device) : super(device) {
+  BatteryCharacteristic(super.device) {
     histories['charge'] = History<int>(maxEntries: 3600, maxAge: 3600);
   }
 
@@ -252,9 +257,11 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
 
   @override
   Uint8List toUint8List(int value) {
-    if (value < 0)
+    if (value < 0) {
       bleError(debugTag, "toUint8List() negative value");
-    else if (255 < value) bleError(debugTag, "toUint8List() $value clipped");
+    } else if (255 < value) {
+      bleError(debugTag, "toUint8List() $value clipped");
+    }
     return Uint8List.fromList([value]);
   }
 
@@ -270,7 +277,9 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
 }
 
 class PowerCharacteristic extends BleCharacteristic<Uint8List> {
+  @override
   final serviceUUID = BleConstants.CYCLING_POWER_SERVICE_UUID;
+  @override
   final charUUID = BleConstants.CYCLING_POWER_MEASUREMENT_CHAR_UUID;
 
   int revolutions = 0;
@@ -286,9 +295,9 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
   Stream<int> get cadenceStream => _cadenceController.stream;
   Timer? _timer;
 
-  PowerCharacteristic(Device device) : super(device) {
+  PowerCharacteristic(super.device) {
     _cadenceController.onListen = () {
-      _timer = Timer.periodic(Duration(seconds: 2), (timer) {
+      _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
         int now = DateTime.now().millisecondsSinceEpoch;
         int cutoff = now - 4000;
         if (lastCrankEventTime < cutoff && //
@@ -385,17 +394,18 @@ class PowerCharacteristic extends BleCharacteristic<Uint8List> {
 }
 
 abstract class ApiCharacteristic extends BleCharacteristic<String> {
+  @override
   final String serviceUUID;
   final String txCharUUID;
   final String rxCharUUID;
   Characteristic? _rxChar;
 
   ApiCharacteristic(
-    Device device, {
+    super.device, {
     this.serviceUUID = "",
     this.txCharUUID = BleConstants.API_TXCHAR_UUID,
     this.rxCharUUID = BleConstants.API_RXCHAR_UUID,
-  }) : super(device);
+  });
 
   @override
   String fromUint8List(Uint8List list) => String.fromCharCodes(list);
@@ -408,7 +418,9 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
     } catch (e) {
       logE("error: failed to ascii encode '$value': $e");
       List<int> valid = [];
-      for (int code in value.codeUnits) if (code < 256) valid.add(code);
+      for (int code in value.codeUnits) {
+        if (code < 256) valid.add(code);
+      }
       list = Uint8List.fromList(valid);
     }
     return list;
@@ -470,13 +482,15 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
 }
 
 class EspmApiCharacteristic extends ApiCharacteristic {
+  @override
   ESPM get device => super.device as ESPM;
-  EspmApiCharacteristic(Device device) : super(device, serviceUUID: BleConstants.ESPM_API_SERVICE_UUID);
+  EspmApiCharacteristic(super.device) : super(serviceUUID: BleConstants.ESPM_API_SERVICE_UUID);
 }
 
 class EspccApiCharacteristic extends ApiCharacteristic {
+  @override
   ESPCC get device => super.device as ESPCC;
-  EspccApiCharacteristic(Device device) : super(device, serviceUUID: BleConstants.ESPCC_API_SERVICE_UUID);
+  EspccApiCharacteristic(super.device) : super(serviceUUID: BleConstants.ESPCC_API_SERVICE_UUID);
 
   @override
   Future<String?> onNotify(String value) async {
@@ -492,7 +506,7 @@ class EspccApiCharacteristic extends ApiCharacteristic {
     final reg = RegExp('(^$success;$rec=get:([0-9a-zA-Z]{8}):([0-9]+);*)(.+)');
     RegExpMatch? match = reg.firstMatch(value);
     String? noBinary = match?.group(1);
-    if (null != noBinary && 0 < noBinary.length) {
+    if (null != noBinary && noBinary.isNotEmpty) {
       // logD("$tag found match: '$noBinary'");
       Uint8List? valueAsList;
       if (null != device.mtu && 0 < device.mtu! && null != lastRawValue && lastRawValue!.length < device.mtu! - 2) {
@@ -503,7 +517,7 @@ class EspccApiCharacteristic extends ApiCharacteristic {
         //logD("$tag $noBinary was re-read, mtu: ${device.mtu}, "
         //    "lastRawValue.length: ${lastRawValue?.length}");
       }
-      if (null == valueAsList || 0 == valueAsList.length) {
+      if (null == valueAsList || valueAsList.isEmpty) {
         logD("$tag could not get valueAsList");
         return super.onNotify(noBinary);
       }
@@ -515,7 +529,7 @@ class EspccApiCharacteristic extends ApiCharacteristic {
         return super.onNotify(noBinary);
       }
       String? offsetStr = match?.group(3);
-      if (null == offsetStr || offsetStr.length < 1) {
+      if (null == offsetStr || offsetStr.isEmpty) {
         logD("$tag could not get offsetStr");
         return super.onNotify(noBinary);
       }
@@ -552,21 +566,22 @@ class EspccApiCharacteristic extends ApiCharacteristic {
 }
 
 class HomeAutoApiCharacteristic extends ApiCharacteristic {
+  @override
   HomeAuto get device => super.device as HomeAuto;
-  HomeAutoApiCharacteristic(Device device) : super(device, serviceUUID: BleConstants.HOMEAUTO_API_SERVICE_UUID);
+  HomeAutoApiCharacteristic(super.device) : super(serviceUUID: BleConstants.HOMEAUTO_API_SERVICE_UUID);
 }
 
 class ApiLogCharacteristic extends BleCharacteristic<String> {
+  @override
   final String serviceUUID;
+  @override
   String charUUID = "";
 
   ApiLogCharacteristic(
-    Device device,
+    super.device,
     this.serviceUUID, {
-    String charUUID = BleConstants.API_LOGCHAR_UUID,
-  }) : super(device) {
-    this.charUUID = charUUID;
-  }
+    this.charUUID = BleConstants.API_LOGCHAR_UUID,
+  });
 
   @override
   String fromUint8List(Uint8List list) => String.fromCharCodes(list);
@@ -594,7 +609,7 @@ class ApiLogCharacteristic extends BleCharacteristic<String> {
       return value;
     }
     String deviceName = "unnamedDevice";
-    if (0 < device.name.length) deviceName = util.Path().sanitize(device.name);
+    if (device.name.isNotEmpty) deviceName = util.Path().sanitize(device.name);
     path = "$path/$deviceName/log/$fileName";
     File f = File(path);
     if (!await f.exists()) {
@@ -616,10 +631,12 @@ class ApiLogCharacteristic extends BleCharacteristic<String> {
 }
 
 class WeightScaleCharacteristic extends BleCharacteristic<double?> {
+  @override
   final serviceUUID = BleConstants.WEIGHT_SCALE_SERVICE_UUID;
+  @override
   final charUUID = BleConstants.WEIGHT_MEASUREMENT_CHAR_UUID;
 
-  WeightScaleCharacteristic(Device device) : super(device) {
+  WeightScaleCharacteristic(super.device) {
     histories['measurement'] = History<double>(maxEntries: 360, maxAge: 60, absolute: true);
     super.sendBeforeUnsubscribe = true;
   }
@@ -643,10 +660,12 @@ class WeightScaleCharacteristic extends BleCharacteristic<double?> {
 }
 
 class HallCharacteristic extends BleCharacteristic<int> {
+  @override
   final serviceUUID = BleConstants.ESPM_API_SERVICE_UUID;
+  @override
   final charUUID = BleConstants.ESPM_HALL_CHAR_UUID;
 
-  HallCharacteristic(Device device) : super(device);
+  HallCharacteristic(super.device);
 
   @override
   int fromUint8List(Uint8List list) {
@@ -659,10 +678,12 @@ class HallCharacteristic extends BleCharacteristic<int> {
 }
 
 class HeartRateCharacteristic extends BleCharacteristic<int?> {
+  @override
   final serviceUUID = BleConstants.HEART_RATE_SERVICE_UUID;
+  @override
   final charUUID = BleConstants.HEART_RATE_MEASUREMENT_CHAR_UUID;
 
-  HeartRateCharacteristic(Device device) : super(device) {
+  HeartRateCharacteristic(super.device) {
     histories['measurement'] = History<int>(maxEntries: 120, maxAge: 120);
     super.sendBeforeUnsubscribe = true;
   }
@@ -702,9 +723,11 @@ class HeartRateCharacteristic extends BleCharacteristic<int?> {
       logD('fromUint8List() not enough bytes in $list');
       return heartRate;
     }
-    if (byteCount == 1)
+    if (byteCount == 1) {
       heartRate = byteData.getUint8(1);
-    else if (byteCount == 2) heartRate = byteData.getUint16(1, Endian.little);
+    } else if (byteCount == 2) {
+      heartRate = byteData.getUint16(1, Endian.little);
+    }
     //logD("got list: $list byteCount: $byteCount hr: $heartRate');
     return heartRate;
   }
@@ -714,10 +737,12 @@ class HeartRateCharacteristic extends BleCharacteristic<int?> {
 }
 
 class TemperatureCharacteristic extends BleCharacteristic<double?> {
+  @override
   final serviceUUID = BleConstants.ENVIRONMENTAL_SENSING_SERVICE_UUID;
+  @override
   final charUUID = BleConstants.TEMPERATURE_CHAR_UUID;
 
-  TemperatureCharacteristic(Device device) : super(device) {
+  TemperatureCharacteristic(super.device) {
     histories['measurement'] = History<double>(maxEntries: 360, maxAge: 60);
     super.sendBeforeUnsubscribe = true;
   }
@@ -747,7 +772,7 @@ class TemperatureCharacteristic extends BleCharacteristic<double?> {
 }
 
 class CharacteristicList with Debug {
-  Map<String, CharacteristicListItem> _items = {};
+  final Map<String, CharacteristicListItem> _items = {};
 
   BleCharacteristic? get(String name) {
     return _items.containsKey(name) ? _items[name]!.characteristic : null;
@@ -767,13 +792,20 @@ class CharacteristicList with Debug {
       _items.forEach((String name, CharacteristicListItem item) => f(name, item.characteristic));
 
   Future<void> forEachListItem(Future<void> Function(String, CharacteristicListItem) f) async {
-    for (MapEntry e in _items.entries) await f(e.key, e.value);
+    for (MapEntry e in _items.entries) {
+      await f(e.key, e.value);
+    }
   }
 
   BleCharacteristic? byUuid(Uuid serviceUuid, Uuid charUuid) {
     BleCharacteristic? ret;
+    logD('service: $serviceUuid char: $charUuid');
     forEachCharacteristic((name, char) {
-      if (Uuid.parse(char?.serviceUUID ?? '') == serviceUuid && Uuid.parse(char?.charUUID ?? '') == charUuid) {
+      if (char != null &&
+          char.serviceUUID.isNotEmpty &&
+          char.charUUID.isNotEmpty &&
+          Uuid.parse(char.serviceUUID) == serviceUuid &&
+          Uuid.parse(char.charUUID) == charUuid) {
         ret = char;
         return;
       }

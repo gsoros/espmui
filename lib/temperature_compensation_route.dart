@@ -18,7 +18,7 @@ import 'debug.dart';
 class TCRoute extends StatefulWidget with Debug {
   final ESPM espm;
 
-  TCRoute(this.espm, {Key? key}) : super(key: key) {
+  TCRoute(this.espm, {super.key}) {
     logD("construct");
     espm.settings.value.tc.readFromDevice();
   }
@@ -56,6 +56,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
     lastMaxX = maxX;
   }
 
+  @override
   void dispose() {
     temperatureSubscription?.cancel();
     temperatureSubscription = null;
@@ -70,10 +71,11 @@ class _TCRouteState extends State<TCRoute> with Debug {
     if (null == weight || weight == lastWeight) return;
     lastWeight = weight;
     if (null == value) return;
-    if (tc.isCollecting)
+    if (tc.isCollecting) {
       tc.addCollected(value, weight!);
-    else
+    } else {
       espm.settings.notifyListeners();
+    }
     //logD("onTempChange $value ${tc.collectedSize()}");
   }
 
@@ -87,10 +89,11 @@ class _TCRouteState extends State<TCRoute> with Debug {
     var tc = espm.settings.value.tc;
     if (null == temperature || temperature == lastTemperature) return;
     lastTemperature = temperature;
-    if (tc.isCollecting)
+    if (tc.isCollecting) {
       tc.addCollected(temperature!, value);
-    else
+    } else {
       espm.settings.notifyListeners();
+    }
     //logD("onWeightChange $value ${tc.collectedSize()}");
   }
 
@@ -174,7 +177,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
                 // espm.settings.value.tc.status("waiting for init to complete"); // cannot call status() from build
                 int attempts = 0;
                 await Future.doWhile(() async {
-                  await Future.delayed(Duration(milliseconds: 300));
+                  await Future.delayed(const Duration(milliseconds: 300));
                   //logD("attempt #$attempts checking if tc command is available...");
                   if (null != espm.api.commandCode("tc", logOnError: false)) return false;
                   attempts++;
@@ -188,7 +191,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
           ),
         ),
         body: Container(
-          margin: EdgeInsets.all(6),
+          margin: const EdgeInsets.all(6),
           child: Stack(
             children: [
               chart(),
@@ -208,7 +211,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
       valueListenable: espm.settings.value.tc.statusMessage,
       builder: (_, String m, __) {
         //logD(m);
-        return Text(m, style: TextStyle(color: Colors.white38));
+        return Text(m, style: const TextStyle(color: Colors.white38));
       },
     );
   }
@@ -219,12 +222,13 @@ class _TCRouteState extends State<TCRoute> with Debug {
       _fabVisible = true;
     });
     _fabTimer?.cancel();
-    _fabTimer = Timer(Duration(seconds: 3), () {
+    _fabTimer = Timer(const Duration(seconds: 3), () {
       logD("hideFab");
-      if (mounted)
+      if (mounted) {
         setState(() {
           _fabVisible = false;
         });
+      }
     });
   }
 
@@ -251,12 +255,12 @@ class _TCRouteState extends State<TCRoute> with Debug {
           ),
         );
       },
-      child: Icon(
+      backgroundColor: Colors.red,
+      heroTag: "fab",
+      child: const Icon(
         Icons.settings,
         color: Colors.white,
       ),
-      backgroundColor: Colors.red,
-      heroTag: "fab",
     );
   }
 
@@ -270,7 +274,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Expanded(
+            const Expanded(
               flex: 2,
               child: Text(" "),
             ),
@@ -279,7 +283,6 @@ class _TCRouteState extends State<TCRoute> with Debug {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 3),
                 child: EspmuiElevatedButton(
-                  child: Text(tc.isReading ? "Reading" : "Read"),
                   onPressed: tc.isReading || tc.isCollecting
                       ? null
                       : () async {
@@ -288,7 +291,8 @@ class _TCRouteState extends State<TCRoute> with Debug {
                         },
                   backgroundColorEnabled: Colors.blue.shade900,
                   backgroundColorDisabled: disabledBg,
-                  padding: EdgeInsets.all(0),
+                  padding: const EdgeInsets.all(0),
+                  child: Text(tc.isReading ? "Reading" : "Read"),
                 ),
               ),
             ),
@@ -297,7 +301,6 @@ class _TCRouteState extends State<TCRoute> with Debug {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(0, 3, 0, 3),
                 child: EspmuiElevatedButton(
-                  child: Text(tc.isCollecting ? "Stop" : "Collect"),
                   onPressed: tc.isCollecting
                       ? () {
                           tc.stopCollecting();
@@ -309,7 +312,8 @@ class _TCRouteState extends State<TCRoute> with Debug {
                             },
                   backgroundColorEnabled: tc.isCollecting ? Colors.red : Colors.green.shade900,
                   backgroundColorDisabled: disabledBg,
-                  padding: EdgeInsets.all(0),
+                  padding: const EdgeInsets.all(0),
+                  child: Text(tc.isCollecting ? "Stop" : "Collect"),
                 ),
               ),
             ),
@@ -318,8 +322,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(0, 3, 0, 3),
                 child: EspmuiElevatedButton(
-                  child: Text("Clear"),
-                  onPressed: 0 < tc.collected.length && !tc.isCollecting
+                  onPressed: tc.collected.isNotEmpty && !tc.isCollecting
                       ? () {
                           tc.collected.clear();
                           espm.settings.notifyListeners();
@@ -327,7 +330,8 @@ class _TCRouteState extends State<TCRoute> with Debug {
                       : null,
                   backgroundColorEnabled: Colors.purple.shade900,
                   backgroundColorDisabled: disabledBg,
-                  padding: EdgeInsets.all(0),
+                  padding: const EdgeInsets.all(0),
+                  child: const Text("Clear"),
                 ),
               ),
             ),
@@ -336,18 +340,18 @@ class _TCRouteState extends State<TCRoute> with Debug {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(0, 3, 0, 0),
                 child: EspmuiElevatedButton(
-                  child: Text("Write"),
                   onPressed: !tc.isCollecting && !tc.isWriting && 1 < tc.suggested.length
                       ? () async {
                           if (await tc.writeToDevice()) tc.readFromDevice();
                         }
                       : null,
                   backgroundColorDisabled: disabledBg,
-                  padding: EdgeInsets.all(0),
+                  padding: const EdgeInsets.all(0),
+                  child: const Text("Write"),
                 ),
               ),
             ),
-            Expanded(
+            const Expanded(
               flex: 1,
               child: Text(" "),
             ),
@@ -360,7 +364,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
   List<FlSpot> savedSpots(TC tc) {
     var spots = List<FlSpot>.empty(growable: true);
     int key = 0;
-    tc.values.forEach((value) {
+    for (var value in tc.values) {
       // if (0 == value) {
       //   if (0 < spots.length && spots.last != FlSpot.nullSpot) spots.add(FlSpot.nullSpot);
       // } else
@@ -369,19 +373,19 @@ class _TCRouteState extends State<TCRoute> with Debug {
         tc.valueToWeight(value),
       ));
       key++;
-    });
+    }
     return spots;
   }
 
   List<FlSpot> collectedSpots(TC tc) {
     var spots = List<FlSpot>.empty(growable: true);
-    tc.collected.forEach((value) {
-      if (value.length < 2) return;
+    for (var value in tc.collected) {
+      if (value.length < 2) continue;
       spots.add(FlSpot(
         value[0],
         value[1],
       ));
-    });
+    }
     return spots;
   }
 
@@ -418,7 +422,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
 
     if [handleBuiltInTouches] is true, [LineChart] shows a tooltip popup on top of the spots if touch occurs (or you can show it manually using, [LineChartData.showingTooltipIndicators]) and also it shows an indicator (contains a thicker line and larger dot on the targeted spot), You can define how this indicator looks like through [getTouchedSpotIndicator] callback, You can customize this tooltip using [touchTooltipData], indicator lines starts from position controlled by [getTouchLineStart] and ends at position controlled by [getTouchLineEnd]. If you need to have a distance threshold for handling touches, use [touchSpotThreshold].
     */
-    return LineTouchData(
+    return const LineTouchData(
       enabled: false,
       // handleBuiltInTouches: false,
       // longPressDuration: Duration(milliseconds: 800),
@@ -438,24 +442,24 @@ class _TCRouteState extends State<TCRoute> with Debug {
         isCurved: false,
         barWidth: 2,
         color: Colors.blue.shade500,
-        dotData: FlDotData(show: false),
+        dotData: const FlDotData(show: false),
       ),
       LineChartBarData(
         spots: collectedSpots(tc),
         isCurved: true,
         barWidth: 2,
         color: Colors.green.shade700,
-        dotData: FlDotData(show: false),
+        dotData: const FlDotData(show: false),
       ),
     ];
     var suggested = suggestedSpots(tc);
-    if (0 < suggested.length) {
+    if (suggested.isNotEmpty) {
       data.add(LineChartBarData(
         spots: suggested,
         isCurved: false,
         //barWidth: 5,
         color: Colors.purple.shade500,
-        dotData: FlDotData(show: true),
+        dotData: const FlDotData(show: true),
       ));
     }
     if (null != temperature && null != weight) {
@@ -464,7 +468,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
         isCurved: false,
         //barWidth: 5,
         color: Colors.yellow,
-        dotData: FlDotData(show: true),
+        dotData: const FlDotData(show: true),
       ));
     }
     return data;
@@ -492,18 +496,18 @@ class _TCRouteState extends State<TCRoute> with Debug {
       builder: (context, ESPMSettings settings, widget) {
         var tc = settings.tc;
         //logD("chart builder minX: $minX, maxX: $maxX");
-        if (tc.size < 1) return Text("No chart data");
+        if (tc.size < 1) return const Text("No chart data");
         setDataRange(tc);
         setVisibleRange();
         return LineChart(
           LineChartData(
-              clipData: FlClipData.none(),
+              clipData: const FlClipData.none(),
               minX: minX,
               maxX: maxX,
               lineTouchData: touchData(tc),
               lineBarsData: chartData(tc),
               borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
+              titlesData: const FlTitlesData(
                   show: true,
                   topTitles: AxisTitles(
                     axisNameWidget: Text("Temperature (˚C)"),
