@@ -105,7 +105,7 @@ class ESPCCSyncer with Debug {
       _running = false;
       return;
     }
-    if (!await device.connected) {
+    if (!device.connected) {
       logD("$tag not connected");
       _queue.add(ef);
       _running = false;

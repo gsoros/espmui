@@ -4,7 +4,8 @@ import 'dart:async';
 
 //import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+// import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+//import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 //import 'package:mutex/mutex.dart';
 import 'package:flutter/material.dart';
 
@@ -26,7 +27,7 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
   HallCharacteristic? get hallChar => characteristic("hall") as HallCharacteristic?;
   TemperatureCharacteristic? get tempChar => characteristic("temp") as TemperatureCharacteristic?;
 
-  ESPM(Peripheral peripheral) : super(peripheral) {
+  ESPM(String id, String name) : super(id, name) {
     deviceWithApiConstruct(
       characteristic: EspmApiCharacteristic(this),
       handler: handleApiMessageSuccess,

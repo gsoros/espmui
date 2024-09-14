@@ -34,7 +34,7 @@ class Notifications with Debug {
       );
 
       // Android 13+
-      _plugin.resolvePlatformSpecificImplementation<AFLNP>()?.requestPermission();
+      _plugin.resolvePlatformSpecificImplementation<AFLNP>()?.requestNotificationsPermission();
 
       _initDone = true;
     });

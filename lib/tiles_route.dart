@@ -367,11 +367,11 @@ class _TileGridState extends State<TileGrid> with Debug {
             DeviceList().forEach((_, device) {
               if (device.tileStreams.length < 1) return;
               device.tileStreams.forEach((name, stream) {
-                String itemValue = "${device.peripheral?.identifier};$name";
+                String itemValue = '${device.id};$name';
                 if (itemValue == value) valuePresent = true;
                 items.add(DropdownMenuItem(
                   value: itemValue,
-                  child: Text("${device.name ?? 'unnamed device'} ${stream.label}"),
+                  child: Text("${device.name.length > 0 ? device.name : 'unnamed device'} ${stream.label}"),
                 ));
               });
             });
@@ -489,12 +489,12 @@ class _TileGridState extends State<TileGrid> with Debug {
             DeviceList().forEach((_, device) {
               if (device.tileActions.length < 1) return;
               device.tileActions.forEach((name, action) {
-                String itemValue = "${device.peripheral?.identifier};$name";
+                String itemValue = "${device.id};$name";
                 //logD("${device.name ?? 'unnamed device'} ${action.label} $itemValue");
                 if (itemValue == tile.tap) valuePresent = true;
                 items.add(DropdownMenuItem(
                   value: itemValue,
-                  child: Text("${device.name ?? 'unnamed device'} ${action.label}"),
+                  child: Text("${device.name.length > 0 ? device.name : 'unnamed device'} ${action.label}"),
                 ));
               });
             });
@@ -556,13 +556,12 @@ class _TileGridState extends State<TileGrid> with Debug {
             },
             itemBuilder: (context, index) {
               return DragTarget<Tile>(
-                onAccept: (tile) {
+                onAcceptWithDetails: (tile) {
                   _tiles.save();
                 },
-                onWillAccept: (tile) {
-                  if (tile == null) return false;
-                  if (tiles[index] == tile) return false;
-                  _moveTile(tile, index);
+                onWillAcceptWithDetails: (details) {
+                  if (tiles[index] == details.data) return false;
+                  _moveTile(details.data, index);
                   return true;
                 },
                 onLeave: (tile) {},
@@ -606,7 +605,7 @@ class _TileGridState extends State<TileGrid> with Debug {
                                   HeroDialogRoute(
                                     builder: (context) {
                                       return PopScope(
-                                        onPopInvoked: (didPop) async {
+                                        onPopInvokedWithResult: (didPop, result) async {
                                           if (didPop)
                                             setState(() {
                                               showColorPicker = false;

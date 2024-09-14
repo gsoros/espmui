@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+// import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 
 import 'ble.dart';
 import 'ble_constants.dart';
@@ -18,7 +19,7 @@ class Scanner with Debug {
   }
 
   /// ScanResult
-  StreamSubscription<ScanResult>? _scanResultSubscription;
+  StreamSubscription<DiscoveredDevice>? _scanResultSubscription;
 
   /// Scanning
   bool scanning = false;
@@ -27,9 +28,9 @@ class Scanner with Debug {
   Stream<bool> get scanningStream => _scanningController.stream;
 
   var devices = DeviceList();
-  final _resultController = StreamController<ScanResult>.broadcast();
-  StreamSubscription<ScanResult>? _resultSubscription;
-  Stream<ScanResult> get resultStream => _resultController.stream;
+  final _resultController = StreamController<DiscoveredDevice>.broadcast();
+  StreamSubscription<DiscoveredDevice>? _resultSubscription;
+  Stream<DiscoveredDevice> get resultStream => _resultController.stream;
 
   BLE get ble => BLE();
 
@@ -74,8 +75,8 @@ class Scanner with Debug {
       logD("startScan() already scanning");
       return;
     }
-    if (await ble.currentState() != BluetoothState.POWERED_ON) {
-      bleError(runtimeType.toString(), "startScan() adapter not powered on, state is: " + (await ble.currentState()).toString());
+    if (await ble.currentStatus() != BleStatus.ready) {
+      bleError(runtimeType.toString(), "startScan() adapter not ready, state is: " + (await ble.currentStatus()).toString());
       return;
     }
     if (_stopTimer != null) _stopTimer!.cancel();
@@ -86,27 +87,27 @@ class Scanner with Debug {
       },
     );
     streamSendIfNotClosed(_scanningController, true);
-    var manager = await (ble.manager);
     logD("starting scan");
-    _scanResultSubscription = manager
-        .startPeripheralScan(
-          uuids: [
-            BleConstants.ESPM_API_SERVICE_UUID,
-            BleConstants.ESPCC_API_SERVICE_UUID,
-            BleConstants.HOMEAUTO_API_SERVICE_UUID,
-            BleConstants.CYCLING_POWER_SERVICE_UUID,
-            BleConstants.HEART_RATE_SERVICE_UUID,
-          ],
-        )
-        .asBroadcastStream()
+    _scanResultSubscription = (await ble.manager).scanForDevices(
+      withServices: [
+        Uuid.parse(BleConstants.ESPM_API_SERVICE_UUID),
+        Uuid.parse(BleConstants.ESPCC_API_SERVICE_UUID),
+        Uuid.parse(BleConstants.HOMEAUTO_API_SERVICE_UUID),
+        Uuid.parse(BleConstants.CYCLING_POWER_SERVICE_UUID),
+        Uuid.parse(BleConstants.HEART_RATE_SERVICE_UUID),
+      ],
+    )
+        //.asBroadcastStream()
         .listen(
-          (result) {
-            // devices.addFromScanResult(result);
-            logD("Device found: ${result.advertisementData.localName} ${result.peripheral.identifier}");
-            streamSendIfNotClosed(_resultController, result);
-          },
-          onError: (e) => bleError(runtimeType.toString(), "scanResultSubscription", e),
-        );
+      (result) {
+        // devices.addFromScanResult(result);
+        logD("Device found: ${result.name} ${result.id}");
+        streamSendIfNotClosed(_resultController, result);
+      },
+      onError: (e) => bleError(runtimeType.toString(), "scanResultSubscription", e),
+      onDone: () => streamSendIfNotClosed(_scanningController, false),
+      cancelOnError: false,
+    );
   }
 
   Future<void> stopScan() async {
@@ -116,8 +117,6 @@ class Scanner with Debug {
       _stopTimer = null;
     }
     await _scanResultSubscription?.cancel();
-    var manager = await (ble.manager);
-    await manager.stopPeripheralScan();
     streamSendIfNotClosed(_scanningController, false);
   }
 }

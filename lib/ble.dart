@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+// import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:mutex/mutex.dart';
 
@@ -14,8 +15,7 @@ import 'device.dart';
 /// singleton class
 class BLE with Debug {
   static final BLE _instance = BLE._construct();
-  bool _createClientRequested = false;
-  bool _createClientCompleted = false;
+  final _manager = FlutterReactiveBle();
   bool _initDone = false;
   final _exclusiveAccess = Mutex();
 
@@ -24,32 +24,21 @@ class BLE with Debug {
     return _instance;
   }
 
-  // state
-  StreamSubscription<BluetoothState>? stateSubscription;
-  final stateController = StreamController<BluetoothState>.broadcast();
-  Stream<BluetoothState> get stateStream => stateController.stream;
-  BluetoothState _currentState = BluetoothState.UNKNOWN;
-  bool _currentStateInitialized = false;
+  // status
+  StreamSubscription<BleStatus>? statusSubscription;
+  final statusStreamController = StreamController<BleStatus>.broadcast();
+  Stream<BleStatus> get statusStream => statusStreamController.stream;
+  BleStatus _currentStatus = BleStatus.unknown;
 
-  Future<BluetoothState> currentState() async {
-    await _init();
-    if (!_currentStateInitialized) {
-      _currentState = await (await manager).bluetoothState();
-      streamSendIfNotClosed(stateController, _currentState);
-      _currentStateInitialized = true;
-    }
-    return Future.value(_currentState);
+  Future<BleStatus> currentStatus() async {
+    _currentStatus = (await manager).status;
+    return Future.value(_currentStatus);
   }
 
-  BluetoothState currentStateSync() {
-    _checkClient();
-    return _currentState;
-  }
-
-  Future<BleManager> get manager async {
+  Future<FlutterReactiveBle> get manager async {
     //logD("get manager");
     await _init();
-    return BleManager();
+    return _manager;
   }
 
   BLE._construct() {
@@ -64,8 +53,6 @@ class BLE with Debug {
       if (_initDone) return;
       //logD("_init() calling _checkPermissions()");
       await _checkPermissions();
-      //logD("_init() calling _checkClient()");
-      await _checkClient();
       //logD("_init() calling _checkAdapter()");
       await _checkAdapter();
       _initDone = true;
@@ -75,9 +62,9 @@ class BLE with Debug {
 
   Future<void> dispose() async {
     logD("dispose()");
-    await stateController.close();
-    await stateSubscription?.cancel();
-    await (await manager).destroyClient();
+    await statusStreamController.close();
+    await statusSubscription?.cancel();
+    await (await manager).deinitialize();
     _initDone = false;
   }
 
@@ -94,65 +81,61 @@ class BLE with Debug {
       return Future.error(Exception("$runtimeType Location permission not granted"));
     }
     if (!await Permission.bluetooth.request().isGranted) {
-      bleError(debugTag, "No blootueth permission");
-      return Future.error(Exception("$runtimeType Bluetooth permission not granted"));
+      logD('No bluetooth (<= Android 10) permission');
+      if (!await Permission.bluetoothScan.request().isGranted) {
+        bleError(debugTag, "No blootueth scan permission");
+        return Future.error(Exception("$runtimeType Bluetooth scan permission not granted"));
+      }
+      if (!await Permission.bluetoothConnect.request().isGranted) {
+        bleError(debugTag, "No blootueth connect permission");
+        return Future.error(Exception("$runtimeType Bluetooth connect permission not granted"));
+      }
     }
+    /*
+    if (!await Permission.bluetoothScan.request().isGranted) {
+      bleError(debugTag, "No blootueth scan permission");
+      return Future.error(Exception("$runtimeType Bluetooth scan permission not granted"));
+    }
+    if (!await Permission.bluetoothConnect.request().isGranted) {
+      bleError(debugTag, "No blootueth connect permission");
+      return Future.error(Exception("$runtimeType Bluetooth connect permission not granted"));
+    }
+    */
     logD("Checking permissions done");
   }
 
-  Future<void> _checkClient() async {
-    //logD("_checkClient() start");
-    if (!_createClientCompleted) {
-      while (!await BleManager().isClientCreated()) {
-        // make sure createClient() is called only once
-        if (!_createClientRequested) {
-          _createClientRequested = true;
-          logD("_checkClient() waiting for createClient");
-          await BleManager().createClient();
-          logD("_checkClient() createClient done");
-          /*
-          await Future.delayed(Duration(milliseconds: 500));
-          // cycling radio
-          logD("_checkClient() disabling radio");
-          // don't await, the future never completes
-          BleManager().disableRadio();
-          await Future.delayed(Duration(milliseconds: 500));
-          logD("_checkClient() enabling radio");
-          await BleManager().enableRadio();
-          logD("_checkClient() enabled radio");
-          */
-        }
-        await Future.delayed(Duration(milliseconds: 500));
-      }
-      _createClientCompleted = true;
-    }
-    //logD("_checkClient() end");
-    //return Future.value(null);
+  Future<void> _checkAdapter() async {
+    logD('_checkAdaper()');
+
+    logD('await statusSubscription?.cancel();');
+    await statusSubscription?.cancel();
+    logD('statusSubscription = _manager...');
+    statusSubscription = _manager.statusStream.listen(
+      (status) {
+        frbOnAdapterStatusUpdate(status);
+      },
+      onError: (e) => bleError(debugTag, "statusSubscription", e),
+    );
+    logD('frbOnAdapterStatusUpdate(_manager.status);');
+    frbOnAdapterStatusUpdate(_manager.status);
+    logD('_checkAdaper() done');
+    return Future.value(null);
   }
 
-  Future<void> _checkAdapter() async {
-    logD("_checkAdaper()");
-    await stateSubscription?.cancel();
-    stateSubscription = BleManager()
-        .observeBluetoothState()
-        .handleError(
-          (e) => bleError(debugTag, "observeBluetoothState()", e),
-        )
-        .listen(
-      (state) async {
-        logD("" + state.toString());
-        _currentState = state;
-        _currentStateInitialized = true;
-        streamSendIfNotClosed(stateController, state);
-        if (state == BluetoothState.POWERED_ON) {
-          // Probably not a good idea to automatically scan, as of Android 7,
-          // starting and stopping scans more than 5 times in a window of
-          // 30 seconds will temporarily disable scanning
-          //logD("Adapter powered on, starting scan");
-          //startScan();
-        } else {
-          bleError(debugTag, "Adapter not powered on");
-          /*
+  /// flutter_reactive_ble adapter status update
+  void frbOnAdapterStatusUpdate(BleStatus status) {
+    logD('status: $status');
+    _currentStatus = status;
+    statusStreamController.sink.add(status);
+    if (status == BleStatus.ready) {
+      // Probably not a good idea to automatically scan, as of Android 7,
+      // starting and stopping scans more than 5 times in a window of
+      // 30 seconds will temporarily disable scanning
+      //logD("Adapter powered on, starting scan");
+      //startScan();
+    } else {
+      bleError(debugTag, "Adapter not ready");
+      /*
           if (Platform.isAndroid) {
             await bleManager.cancelTransaction("autoEnableBT");
             await bleManager
@@ -160,31 +143,14 @@ class BLE with Debug {
                 .catchError((e) => bleError(debugTag, "enableRadio()", e));
           }
           */
-        }
-      },
-      onError: (e) => bleError(debugTag, "stateSubscription", e),
-    );
-    return Future.value(null);
-  }
-
-  Future<void> discover(Peripheral peripheral) async {
-    await _exclusiveAccess.protect(() async {
-      logD("discover($peripheral)");
-      await peripheral.discoverAllServicesAndCharacteristics().catchError((e) {
-        bleError(debugTag, "discoverAllServicesAndCharacteristics()", e);
-      });
-    });
+    }
   }
 
   Future<int?> requestMtu(Device device, int mtuRequest) async {
-    String tag = "(${device.peripheral?.name}, $mtuRequest)";
+    String tag = "(${device.name}, $mtuRequest)";
     //logD("$tag");
-    if (null == device.peripheral) {
-      logD("$tag peripheral is null");
-      return null;
-    }
     return await _exclusiveAccess.protect<int>(() async {
-      int result = await device.peripheral!.requestMtu(mtuRequest).catchError((e) {
+      int result = await (await manager).requestMtu(deviceId: device.id, mtu: mtuRequest).catchError((e) {
         bleError(debugTag, tag, e);
         return 0;
       }).then((newMtu) {
@@ -197,7 +163,8 @@ class BLE with Debug {
   }
 
   Future<void> enableRadio() async {
-    (await manager).enableRadio();
+    logD('not available on FRB');
+    // (await manager).enableRadio();
   }
 
   Mutex get mutex => _exclusiveAccess;
@@ -206,6 +173,7 @@ class BLE with Debug {
 /// https://github.com/dotintent/FlutterBleLib/blob/develop/lib/error/ble_error.dart
 void bleError(String tag, String message, [dynamic error]) {
   String info = "";
+  /*
   if (error != null) {
     String errorString = error.toString();
     int opening = errorString.indexOf(" (");
@@ -269,54 +237,56 @@ void bleError(String tag, String message, [dynamic error]) {
       info += " {" + nonNull.join(", ") + "}";
     }
   }
-  print("$tag Error: $message$info");
+  */
+  print("$tag Error: $message$info $error");
 }
 
 class BleAdapterCheck extends StatelessWidget with Debug {
-  final Widget ifEnabled;
-  final Widget Function(BluetoothState? state)? ifDisabled;
+  final Widget ifReady;
+  final Widget Function(BleStatus? status)? ifNotReady;
 
   /// Displays [ifEnabled] or [ifDisabled] depending on the current
   /// state of the bluetooth adapter.
-  BleAdapterCheck(this.ifEnabled, {this.ifDisabled});
+  BleAdapterCheck(this.ifReady, {this.ifNotReady});
 
   @override
   Widget build(BuildContext context) {
     BLE ble = BLE();
-    return StreamBuilder<BluetoothState>(
-      stream: ble.stateStream,
-      initialData: ble.currentStateSync(),
-      builder: (BuildContext context, AsyncSnapshot<BluetoothState> snapshot) {
-        return (snapshot.data == BluetoothState.POWERED_ON) ? ifEnabled : ifDisabled!(snapshot.data);
+    return StreamBuilder<BleStatus>(
+      stream: ble.statusStream,
+      initialData: ble._currentStatus,
+      builder: (BuildContext context, AsyncSnapshot<BleStatus> snapshot) {
+        if (snapshot.data == BleStatus.ready) return ifReady;
+        return null != ifNotReady ? ifNotReady!(snapshot.data) : Text('Not ready');
       },
     );
   }
 }
 
-class BleDisabled extends StatelessWidget with Debug {
-  final BluetoothState? state;
-  const BleDisabled(this.state);
+class BleNotReady extends StatelessWidget with Debug {
+  final BleStatus? status;
+  const BleNotReady(this.status);
 
   @override
   Widget build(BuildContext context) {
     String message = "";
-    switch (state) {
-      case BluetoothState.POWERED_OFF:
+    switch (status) {
+      case BleStatus.poweredOff:
         message = "Enable to scan and connect";
         break;
-      case BluetoothState.POWERED_ON:
-        message = "powered on";
+      case BleStatus.ready:
+        message = "ready";
         break;
-      case BluetoothState.RESETTING:
-        message = "resetting";
+      case BleStatus.locationServicesDisabled:
+        message = "Location Services Disabled";
         break;
-      case BluetoothState.UNAUTHORIZED:
+      case BleStatus.unauthorized:
         message = "unauthorized";
         break;
-      case BluetoothState.UNSUPPORTED:
+      case BleStatus.unsupported:
         message = "unsupported";
         break;
-      case BluetoothState.UNKNOWN:
+      case BleStatus.unknown:
       default:
         message = "unknown state";
         break;
@@ -351,10 +321,10 @@ class BleDisabled extends StatelessWidget with Debug {
             crossAxisAlignment: CrossAxisAlignment.end, // Align right
             children: [
               EspmuiElevatedButton(
-                child: Text("Enable"),
+                child: Text("Press me"),
                 onPressed: () {
                   logD("Radio enable button pressed");
-                  BLE().enableRadio();
+                  //BLE().enableRadio();
                 },
               ),
             ],

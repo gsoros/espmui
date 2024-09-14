@@ -3,7 +3,8 @@ import 'dart:async';
 //import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+// import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 
 import 'package:page_transition/page_transition.dart';
 
@@ -18,19 +19,19 @@ import 'temperature_compensation_route.dart';
 import 'util.dart';
 import 'debug.dart';
 
-class DeviceConnectionState extends StatelessWidget {
+class DeviceConnState extends StatelessWidget {
   final Device device;
   final void Function()? onConnected;
 
-  DeviceConnectionState(this.device, {this.onConnected});
+  DeviceConnState(this.device, {this.onConnected});
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<PeripheralConnectionState?>(
+    return StreamBuilder<DeviceConnectionState?>(
       stream: device.stateStream,
       initialData: null,
-      builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
-        if (PeripheralConnectionState.connected == snapshot.data && null != onConnected) onConnected!();
+      builder: (BuildContext context, AsyncSnapshot<DeviceConnectionState?> snapshot) {
+        if (DeviceConnectionState.connected == snapshot.data && null != onConnected) onConnected!();
         String connState = snapshot.hasData ? snapshot.data.toString() : "....";
         //logD("Device status: connState=$connState");
         return Text(
@@ -87,7 +88,7 @@ class DeviceAppBarTitle extends StatelessWidget {
               maxLines: 1,
               textInputAction: TextInputAction.send,
               decoration: const InputDecoration(border: OutlineInputBorder()),
-              controller: TextEditingController()..text = device.name ?? "",
+              controller: TextEditingController()..text = device.name,
               onSubmitted: (text) async {
                 Navigator.of(context).pop();
                 await apiDeviceName(text);
@@ -100,7 +101,7 @@ class DeviceAppBarTitle extends StatelessWidget {
 
     Widget deviceName() {
       return Text(
-        prefix + (device.name ?? "unknown"),
+        prefix + (device.name.length > 0 ? device.name : 'unknown'),
         style: Theme.of(context).textTheme.titleLarge,
         maxLines: 1,
         overflow: TextOverflow.clip,
@@ -123,7 +124,7 @@ class DeviceAppBarTitle extends StatelessWidget {
                           ? TextButton(
                               style: ButtonStyle(
                                 alignment: Alignment.bottomLeft,
-                                padding: MaterialStateProperty.all<EdgeInsets>(const EdgeInsets.all(0)),
+                                padding: WidgetStateProperty.all<EdgeInsets>(const EdgeInsets.all(0)),
                               ),
                               onPressed: () {},
                               onLongPress: (device is ESPM) ? editDeviceName : null,
@@ -135,7 +136,7 @@ class DeviceAppBarTitle extends StatelessWidget {
                 ]),
                 Row(
                   children: [
-                    DeviceConnectionState(device, onConnected: onConnected),
+                    DeviceConnState(device, onConnected: onConnected),
                   ],
                 ),
               ],
@@ -158,20 +159,20 @@ class ConnectButton extends StatelessWidget with Debug {
   @override
   Widget build(BuildContext context) {
     //logD("initialState: ${device.lastConnectionState}");
-    return StreamBuilder<PeripheralConnectionState?>(
+    return StreamBuilder<DeviceConnectionState?>(
       stream: device.stateStream,
       initialData: device.lastConnectionState,
-      builder: (BuildContext context, AsyncSnapshot<PeripheralConnectionState?> snapshot) {
+      builder: (BuildContext context, AsyncSnapshot<DeviceConnectionState?> snapshot) {
         //logD("$snapshot");
         var action;
         var label = "Connect";
-        if (snapshot.data == PeripheralConnectionState.connected) {
+        if (snapshot.data == DeviceConnectionState.connected) {
           action = device.disconnect;
           label = "Disconnect";
-        } else if (snapshot.data == PeripheralConnectionState.connecting) {
+        } else if (snapshot.data == DeviceConnectionState.connecting) {
           action = device.disconnect;
           label = "Cancel";
-        } else if (snapshot.data == PeripheralConnectionState.disconnecting)
+        } else if (snapshot.data == DeviceConnectionState.disconnecting)
           label = "Disonnecting";
         else //if (snapshot.data == PeripheralConnectionState.disconnected)
           action = device.connect;
@@ -363,7 +364,7 @@ class EspmWeightScaleWidget extends StatelessWidget with Debug {
               Flexible(
                 fit: FlexFit.loose,
                 child: Align(
-                  child: device.lastConnectionState == PeripheralConnectionState.connected
+                  child: device.connected
                       ? mode == ESPMWeightServiceMode.UNKNOWN
                           ? CircularProgressIndicator()
                           : strainOutput
@@ -2587,10 +2588,10 @@ class ConnectionStateIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (state == PeripheralConnectionState.connected) return Icon(Icons.link, size: size, color: connectedColor);
-    if (state == PeripheralConnectionState.connecting) return Icon(Icons.search, size: size, color: connectingColor);
-    if (state == PeripheralConnectionState.disconnected) return Icon(Icons.link_off, size: size, color: disconnectedColor);
-    if (state == PeripheralConnectionState.disconnecting) return Icon(Icons.cut, size: size, color: disconnecingColor);
+    if (state == DeviceConnectionState.connected) return Icon(Icons.link, size: size, color: connectedColor);
+    if (state == DeviceConnectionState.connecting) return Icon(Icons.search, size: size, color: connectingColor);
+    if (state == DeviceConnectionState.disconnected) return Icon(Icons.link_off, size: size, color: disconnectedColor);
+    if (state == DeviceConnectionState.disconnecting) return Icon(Icons.cut, size: size, color: disconnecingColor);
     return Empty();
   }
 }

@@ -13,10 +13,12 @@ void main() {
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 class EspmUiApp extends StatelessWidget {
+  const EspmUiApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = const Color(0xff202020);
-    final primaryColor = Colors.red;
+    const backgroundColor = Color(0xff202020);
+    const primaryColor = Colors.red;
     return MaterialApp(
       title: 'ESPMUI',
       theme: ThemeData(

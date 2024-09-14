@@ -3,7 +3,8 @@ import 'dart:async';
 
 import 'package:espmui/device_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+// import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+//import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:page_transition/page_transition.dart';
 
 import 'ble.dart';
@@ -50,7 +51,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
       appBar: AppBar(
         title: BleAdapterCheck(
           _appBarTitle(),
-          ifDisabled: (state) => BleDisabled(state),
+          ifNotReady: (state) => BleNotReady(state),
         ),
       ),
       body: Container(
@@ -130,7 +131,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
           sorted.sort((a, b) {
             // if (a.autoConnect.value == b.autoConnect.value) return a.name?.compareTo(b.name ?? "") ?? -1;
             // return a.autoConnect.value ? 1 : -1;
-            return a.name?.compareTo(b.name ?? "") ?? -1;
+            return a.name.compareTo(b.name);
           });
           sorted.forEach(
             (device) {
@@ -178,7 +179,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
                     children: [
                       Icon(device.iconData),
                       Text(
-                        device.name ?? "Unnamed device",
+                        device.name.length > 0 ? device.name : 'Unnamed device',
                         style: TextStyle(fontSize: 18),
                       ),
                       Expanded(
@@ -229,7 +230,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
               onPressed: () {
                 openDevice(device);
               },
-              child: Icon(Icons.arrow_forward),
+              child: const Icon(Icons.arrow_forward),
             ),
           ],
         ),
@@ -239,7 +240,7 @@ class DeviceListRouteState extends State<DeviceListRoute> with Debug {
 
   void openDevice(Device device) {
     if (scanner.scanning) scanner.stopScan();
-    if (PeripheralConnectionState.connected != device.lastConnectionState) device.connect();
+    if (!device.connected) device.connect();
     Navigator.push(
       context,
       PageTransition(

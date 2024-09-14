@@ -9,7 +9,8 @@ import 'package:espmui/api.dart';
 //import 'package:flutter/material.dart';
 
 import 'package:espmui/debug.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+// import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 //import 'package:mutex/mutex.dart';
 
 import 'util.dart' as util;
@@ -24,13 +25,21 @@ abstract class BleCharacteristic<T> with Debug {
   Device device;
   final serviceUUID = "";
   final charUUID = "";
-  //CharacteristicWithValue? _characteristicWithValue;
-  Characteristic? _characteristic;
-  Stream<Uint8List>? _rawStream;
-  StreamSubscription<Uint8List>? _subscription;
+  Stream<List<int>>? _rawStream;
+  StreamSubscription<List<int>>? _subscription;
   final _controller = StreamController<T>.broadcast();
   T? lastValue;
-  Uint8List? lastRawValue;
+  List<int>? lastRawValue;
+
+  // The reactive_ble char object
+  Characteristic? _characteristic;
+  set characteristic(Characteristic? c) => _characteristic = c;
+
+  QualifiedCharacteristic get qualifiedCharacteristic => QualifiedCharacteristic(
+        characteristicId: Uuid.parse(charUUID),
+        serviceId: Uuid.parse(serviceUUID),
+        deviceId: device.id,
+      );
 
   /// whether to send [beforeUnsubscribeValue] before unsubscribing
   bool sendBeforeUnsubscribe = false;
@@ -47,7 +56,7 @@ abstract class BleCharacteristic<T> with Debug {
   Stream<T> get defaultStream => _controller.stream;
 
   BleCharacteristic(this.device) {
-    logD("construct ${device.peripheral?.identifier}");
+    logD("construct ${device.id}");
     //lastValue = fromUint8List(Uint8List.fromList([]));
   }
 
@@ -79,11 +88,13 @@ abstract class BleCharacteristic<T> with Debug {
     Uint8List? value;
     bool error = false;
     await _exclusiveAccess.protect(() async {
-      value = await _characteristic?.read().catchError((e) {
-        bleError(debugTag, tag, e);
-        error = true;
-        return Uint8List.fromList([]);
-      });
+      List<int> vals = await _characteristic?.read().catchError((e) {
+            bleError(debugTag, tag, e);
+            error = true;
+            return Uint8List.fromList([]);
+          }) ??
+          [];
+      value = Uint8List.fromList(vals);
     });
     if (null != value && !error) {
       lastRawValue = value;
@@ -95,7 +106,6 @@ abstract class BleCharacteristic<T> with Debug {
   Future<void> write(
     T value, {
     bool withResponse = false,
-    String? transactionId,
     Characteristic? char,
   }) async {
     await _init();
@@ -118,8 +128,7 @@ abstract class BleCharacteristic<T> with Debug {
       char
           .write(
         toUint8List(value),
-        withResponse,
-        transactionId: transactionId,
+        withResponse: withResponse,
       )
           .catchError((e) {
         bleError(debugTag, "write($value)", e);
@@ -134,6 +143,7 @@ abstract class BleCharacteristic<T> with Debug {
       return;
     }
     await _init();
+
     if (_characteristic == null) {
       bleError(debugTag, "subscribe() characteristic is null");
       return;
@@ -142,7 +152,7 @@ abstract class BleCharacteristic<T> with Debug {
       bleError(debugTag, "characteristic neither indicatable nor notifiable");
       return;
     }
-    _rawStream = _characteristic?.monitor().handleError((e) {
+    _rawStream = _characteristic?.subscribe().handleError((e) {
       bleError(debugTag, "_rawStream", e);
     }); //.asBroadcastStream();
     if (_rawStream == null) {
@@ -153,7 +163,7 @@ abstract class BleCharacteristic<T> with Debug {
       _subscription = _rawStream?.listen(
         (value) async {
           lastRawValue = value;
-          lastValue = await onNotify(fromUint8List(value));
+          lastValue = await onNotify(fromUint8List(Uint8List.fromList(value)));
           //logD("$lastValue");
           util.streamSendIfNotClosed(_controller, lastValue);
           _appendToHistory();
@@ -190,18 +200,11 @@ abstract class BleCharacteristic<T> with Debug {
 
   Future<void> _init() async {
     if (_characteristic != null) return; // already init'd
-    if (null == device.peripheral) {
-      logD("_init(): peripheral is null");
-      return;
-    }
-    if (!(await device.peripheral!.isConnected())) return;
+    if (!device.connected) return;
     try {
-      //_characteristic = await _peripheral.readCharacteristic(serviceUUID, characteristicUUID);
-      List<Characteristic> chars = [];
       await _exclusiveAccess.protect(() async {
-        chars = await device.peripheral!.characteristics(serviceUUID);
+        _characteristic = await device.frbCharacteristic(Uuid.parse(serviceUUID), Uuid.parse(charUUID));
       });
-      _characteristic = chars.firstWhere((char) => char.uuid == charUUID);
     } catch (e) {
       bleError(debugTag, "_init() readCharacteristic()", e);
       _characteristic = null;
@@ -415,13 +418,11 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
   Future<void> write(
     String value, {
     bool withResponse = false,
-    String? transactionId,
     Characteristic? char,
   }) async {
     return super.write(
       value,
       withResponse: withResponse,
-      transactionId: transactionId,
       char: _rxChar,
     );
   }
@@ -430,21 +431,19 @@ abstract class ApiCharacteristic extends BleCharacteristic<String> {
   Future<void> _init() async {
     //await super._init();
     if (_rxChar != null || _characteristic != null) return; // already init'd
-    if (null == device.peripheral) {
-      logD("_init(): peripheral is null");
-      return;
-    }
-    if (!(await device.peripheral!.isConnected())) return;
+    if (!(device.connected)) return;
     try {
       List<Characteristic> chars = [];
       await _exclusiveAccess.protect(() async {
-        chars = await device.peripheral!.characteristics(serviceUUID);
+        chars = await device.frbCharacteristics(Uuid.parse(serviceUUID));
       });
-      if (chars.where((char) => char.uuid == rxCharUUID).isNotEmpty) {
-        _rxChar = chars.firstWhere((char) => char.uuid == rxCharUUID);
+      Uuid rxUuid = Uuid.parse(rxCharUUID);
+      if (chars.where((char) => char.id == rxUuid).isNotEmpty) {
+        _rxChar = chars.firstWhere((char) => char.id == rxUuid);
       }
-      if (chars.where((char) => char.uuid == txCharUUID).isNotEmpty) {
-        _characteristic = chars.firstWhere((char) => char.uuid == txCharUUID);
+      Uuid txUuid = Uuid.parse(txCharUUID);
+      if (chars.where((char) => char.id == txUuid).isNotEmpty) {
+        _characteristic = chars.firstWhere((char) => char.id == txUuid);
       }
     } catch (e) {
       bleError(debugTag, "_init() characteristics()", e);
@@ -497,7 +496,7 @@ class EspccApiCharacteristic extends ApiCharacteristic {
       // logD("$tag found match: '$noBinary'");
       Uint8List? valueAsList;
       if (null != device.mtu && 0 < device.mtu! && null != lastRawValue && lastRawValue!.length < device.mtu! - 2) {
-        valueAsList = lastRawValue;
+        valueAsList = lastRawValue != null ? Uint8List.fromList(lastRawValue!) : null;
         //logD("$tag $noBinary ready");
       } else {
         valueAsList = await readAsUint8List();
@@ -595,7 +594,7 @@ class ApiLogCharacteristic extends BleCharacteristic<String> {
       return value;
     }
     String deviceName = "unnamedDevice";
-    if (device.name != null && 0 < device.name!.length) deviceName = util.Path().sanitize(device.name!);
+    if (0 < device.name.length) deviceName = util.Path().sanitize(device.name);
     path = "$path/$deviceName/log/$fileName";
     File f = File(path);
     if (!await f.exists()) {
@@ -769,6 +768,17 @@ class CharacteristicList with Debug {
 
   Future<void> forEachListItem(Future<void> Function(String, CharacteristicListItem) f) async {
     for (MapEntry e in _items.entries) await f(e.key, e.value);
+  }
+
+  BleCharacteristic? byUuid(Uuid serviceUuid, Uuid charUuid) {
+    BleCharacteristic? ret;
+    forEachCharacteristic((name, char) {
+      if (Uuid.parse(char?.serviceUUID ?? '') == serviceUuid && Uuid.parse(char?.charUUID ?? '') == charUuid) {
+        ret = char;
+        return;
+      }
+    });
+    return ret;
   }
 }
 

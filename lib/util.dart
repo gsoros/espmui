@@ -113,12 +113,12 @@ class EspmuiElevatedButton extends StatelessWidget {
       onPressed: onPressed,
       child: child,
       style: ButtonStyle(
-        padding: MaterialStateProperty.all<EdgeInsetsGeometry?>(padding),
-        backgroundColor: MaterialStateProperty.resolveWith((state) {
-          return state.contains(MaterialState.disabled) ? backgroundColorDisabled : backgroundColorEnabled;
+        padding: WidgetStateProperty.all<EdgeInsetsGeometry?>(padding),
+        backgroundColor: WidgetStateProperty.resolveWith((state) {
+          return state.contains(WidgetState.disabled) ? backgroundColorDisabled : backgroundColorEnabled;
         }),
-        foregroundColor: MaterialStateProperty.resolveWith((state) {
-          return state.contains(MaterialState.disabled) ? foregroundColorDisabled : foregroundColorEnabled;
+        foregroundColor: WidgetStateProperty.resolveWith((state) {
+          return state.contains(WidgetState.disabled) ? foregroundColorDisabled : foregroundColorEnabled;
         }),
       ),
     );
@@ -161,6 +161,8 @@ double map(double x, double inMin, double inMax, double outMin, double outMax) {
 
 class Empty extends StatelessWidget {
   const Empty();
+
+  @override
   Widget build(BuildContext context) => const SizedBox.square(dimension: 1);
 }
 
@@ -224,6 +226,6 @@ class Path with Debug {
 
 extension StringExtension on String {
   String capitalize() {
-    return "${this[0].toUpperCase()}${this.substring(1).toLowerCase()}";
+    return "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
   }
 }

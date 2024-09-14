@@ -57,7 +57,6 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
     //logD("_checkCorrectType() $device");
     if (await device.isCorrectType()) return;
     var newDevice = await device.copyToCorrectType();
-    device.peripheral = null;
     device.dispose();
     device = newDevice;
     DeviceList().addOrUpdate(device);
@@ -79,7 +78,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
         appBar: AppBar(
           title: BleAdapterCheck(
             DeviceAppBarTitle(device),
-            ifDisabled: (state) => BleDisabled(state),
+            ifNotReady: (state) => BleNotReady(state),
           ),
         ),
         body: Container(
@@ -96,7 +95,7 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
       //logD("_deviceStreamTiles: name: $name, label: ${stream.label}");
       if (ESPM == device.runtimeType && "scale" == name) return; // TODO
       Tile tile = Tile(
-        device: device.identifier,
+        device: device.id,
         stream: name,
         color: Colors.black,
         showDeviceName: false,

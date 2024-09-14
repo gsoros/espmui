@@ -12,11 +12,11 @@ class DebugBorder extends StatelessWidget {
   final Color color;
   final double width;
   const DebugBorder({
-    Key? key,
+    super.key,
     required this.child,
     this.color = Colors.yellow,
     this.width = 1,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +32,7 @@ class DebugBorder extends StatelessWidget {
   }
 }
 
-class Debug {
+mixin Debug {
   String get debugTag => !kDebugMode ? "$runtimeType(${identityHashCode(this)})" : "";
 
   static void log(String s, {Level level = Level.FINE}) {

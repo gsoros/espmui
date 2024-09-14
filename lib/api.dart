@@ -257,7 +257,7 @@ class Api with Debug {
 
   /// format: resultCode[:resultStr];commandCode[:commandStr][=[value]]
   void _onNotify(String reply) {
-    String tag = device.name ?? "unknown device";
+    String tag = device.name.isNotEmpty ? device.name : 'unknown device';
     //logD("$tag $reply");
     int resultEnd = reply.indexOf(";");
     if (resultEnd < 1) {
@@ -352,7 +352,7 @@ class Api with Debug {
 
   /// returns true if the message does not need any further handling
   Future<bool> handleApiMessageSuccess(ApiMessage message) async {
-    String tag = "${device.name}";
+    String tag = device.name;
     //logD("$tag Api.handleApiMessageSuccess() $message");
 
     if ("init" == message.commandStr) {

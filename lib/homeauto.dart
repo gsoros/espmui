@@ -6,7 +6,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+// import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+//import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 //import 'package:sprintf/sprintf.dart';
 //import 'package:listenable_stream/listenable_stream.dart';
 // import 'package:intl/intl.dart';
@@ -55,7 +56,7 @@ class HomeAuto extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeer
   @override
   int get largeMtu => 512;
 
-  HomeAuto(Peripheral peripheral) : super(peripheral) {
+  HomeAuto(String id, String name) : super(id, name) {
     settings = AlwaysNotifier<HomeAutoSettings>(
       HomeAutoSettings(
         switchesTileStreamController,

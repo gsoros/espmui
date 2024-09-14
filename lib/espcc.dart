@@ -5,7 +5,8 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+// import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+//import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:sprintf/sprintf.dart';
 import 'package:listenable_stream/listenable_stream.dart';
 import 'package:intl/intl.dart';
@@ -34,7 +35,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
   @override
   int get largeMtu => 512;
 
-  ESPCC(Peripheral peripheral) : super(peripheral) {
+  ESPCC(String id, String name) : super(id, name) {
     deviceWithApiConstruct(
       characteristic: EspccApiCharacteristic(this),
       handler: handleApiMessageSuccess,
@@ -269,7 +270,7 @@ class ESPCCFile with Debug {
     String? path = Platform.isAndroid ? await Path().external : await Path().documents;
     if (null == path) return null;
     String deviceName = "unnamedDevice";
-    if (device.name != null && 0 < device.name!.length) deviceName = device.name!;
+    if (0 < device.name.length) deviceName = device.name;
     return "$path/${Path().sanitize(deviceName)}/rec/${Path().sanitize(name)}";
   }
 

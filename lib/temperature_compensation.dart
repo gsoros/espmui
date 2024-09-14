@@ -169,7 +169,7 @@ class TC with Debug {
     for (var task in tasks) {
       var msg = task["msg"];
       if (null != msg) status(msg.capitalize());
-      if (!await espm.connected) {
+      if (!espm.connected) {
         status("Device disconnected");
         success = false;
         break;
@@ -293,7 +293,7 @@ class TC with Debug {
     for (var task in tasks) {
       var msg = task["msg"];
       if (null != msg) status(msg.capitalize());
-      if (!await espm.connected) {
+      if (!espm.connected) {
         status("Device disconnected");
         success = false;
         break;

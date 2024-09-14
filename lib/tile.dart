@@ -4,7 +4,8 @@ import 'dart:convert';
 import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+// import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 
 import 'preferences.dart';
 import 'device.dart';
@@ -139,13 +140,13 @@ class Tile extends StatelessWidget with Debug {
     }
 
     Widget getValueIfConnected() {
-      return StreamBuilder<PeripheralConnectionState>(
+      return StreamBuilder<DeviceConnectionState>(
         stream: device?.stateStream,
         initialData: device?.lastConnectionState,
         builder: (_, snapshot) {
           //logD("Tile build getValueIfConnected ${device?.name} ${stream?.label} ${snapshot.data}");
-          if (!snapshot.hasData || snapshot.data == null || snapshot.data == PeripheralConnectionState.connected) return getValue();
-          if (snapshot.data == PeripheralConnectionState.disconnected) return Empty();
+          if (!snapshot.hasData || snapshot.data == null || snapshot.data == DeviceConnectionState.connected) return getValue();
+          if (snapshot.data == DeviceConnectionState.disconnected) return Empty();
           return CircularProgressIndicator();
         },
       );

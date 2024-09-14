@@ -184,7 +184,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
                 espm.settings.value.tc.readFromDevice();
               },
             ),
-            ifDisabled: (state) => BleDisabled(state),
+            ifNotReady: (state) => BleNotReady(state),
           ),
         ),
         body: Container(
@@ -393,7 +393,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
     return spots;
   }
 
-  LineTouchData? touchData(TC tc) {
+  LineTouchData touchData(TC tc) {
     /*
     LineTouchData LineTouchData({
       bool? enabled,

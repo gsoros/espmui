@@ -3,7 +3,8 @@ import 'dart:developer' as dev;
 
 import 'package:espmui/util.dart';
 import 'package:mutex/mutex.dart';
-import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+// import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 
 import 'device.dart';
 import 'preferences.dart';
@@ -61,18 +62,17 @@ class DeviceList with Debug {
   /// otherwise adds new item.
   /// Returns the new or updated [Device] or null on error.
   Device? addOrUpdate(Device device) {
-    if (null == device.peripheral) return null;
-    var id = device.peripheral!.identifier;
+    var id = device.id;
     _items.update(
       id,
       (existing) {
-        dev.log("$runtimeType addOrUpdate Warning: updating ${device.peripheral!.name}, calling dispose() on old device");
+        dev.log("$runtimeType addOrUpdate Warning: updating ${device.name}, calling dispose() on old device");
         existing.dispose();
         existing = device;
         return existing;
       },
       ifAbsent: () {
-        logD("addOrUpdate adding ${device.peripheral!.name}");
+        logD("addOrUpdate adding ${device.name}");
         return device;
       },
     );
@@ -81,14 +81,14 @@ class DeviceList with Debug {
     return item;
   }
 
-  /// Adds a [Device] from a [ScanResult]
+  /// Adds a [Device] from a [DiscoveredDevice]
   ///
   /// If a [Device] with the same identifier already exists, updates [lastScanRssi]
   /// and returns the existing item, otherwise adds new item.
   /// Returns the new or updated [Device] or null on error.
-  Device? addFromScanResult(ScanResult result) {
+  Device? addFromScanResult(DiscoveredDevice result) {
     _items.update(
-      result.peripheral.identifier,
+      result.id,
       (existing) {
         //logD("addFromScanResult already exists: ${existing.peripheral.name}");
         existing.lastScanRssi = result.rssi;
@@ -98,12 +98,12 @@ class DeviceList with Debug {
       },
       ifAbsent: () {
         Device device = Device.fromScanResult(result);
-        logD("addFromScanResult adding ${device.peripheral!.name}");
+        logD("addFromScanResult adding ${device.name}");
         return device;
       },
     );
-    var item = byIdentifier(result.peripheral.identifier);
-    if (null != item) streamSendIfNotClosed(_controller, {result.peripheral.identifier: item});
+    var item = byIdentifier(result.id);
+    if (null != item) streamSendIfNotClosed(_controller, {result.id: item});
     return item;
   }
 
