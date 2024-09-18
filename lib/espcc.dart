@@ -58,12 +58,12 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
           String action = "start";
           String succ = "Started";
           String fail = "Error starting";
-          int expect = ESPCCRecordingState.RECORDING;
-          if (ESPCCRecordingState.NOT_RECORDING < settings.value.recording) {
+          int expect = ESPCCRecordingState.rsRecoreding;
+          if (ESPCCRecordingState.rsNotRecording < settings.value.recording) {
             action = "end";
             succ = "Stopped";
             fail = "Error stopping";
-            expect = ESPCCRecordingState.NOT_RECORDING;
+            expect = ESPCCRecordingState.rsNotRecording;
           }
           var state = await api.request<int>("rec=$action");
           snackbar("${state == expect ? succ : fail} recording");
@@ -92,6 +92,39 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
       if ("files:" == val.substring(0, min(6, val.length))) {
         List<String> names = val.substring(6).split(";");
         logD("$tag rec:files received names=$names");
+        Future.forEach(names, (name) async {
+          if (16 < name.length) {
+            logD("$tag rec:files name too long: $name");
+            return;
+          }
+          if (name.length <= 2) {
+            logD("$tag rec:files name too short: $name");
+            return;
+          }
+          ESPCCFile f = files.value.files.firstWhere(
+            (file) => file.name == name,
+            orElse: () {
+              var file = syncer.getFromQueue(name: name);
+              if (file == null) {
+                file = ESPCCFile(name, this, remoteExists: ExtendedBool.eTrue);
+                file.updateLocalStatus();
+              }
+              files.value.files.add(file);
+              files.notifyListeners();
+              return file;
+            },
+          );
+          if (f.remoteSize < 0) {
+            logD("requesting info on ${f.name}");
+            api.requestResultCode(
+              "rec=info:${f.name}",
+              expectValue: "info:${f.name}",
+              maxAttempts: 2,
+            );
+            await Future.delayed(const Duration(milliseconds: 500));
+          }
+        });
+/*        
         names.forEach((name) async {
           if (16 < name.length) {
             logD("$tag rec:files name too long: $name");
@@ -119,8 +152,9 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
             await Future.delayed(const Duration(milliseconds: 500));
           }
         });
+*/
         for (ESPCCFile f in files.value.files) {
-          if (f.localExists == ExtendedBool.Unknown) {
+          if (f.localExists == ExtendedBool.eUnknown) {
             await f.updateLocalStatus();
             files.notifyListeners();
           }
@@ -128,7 +162,7 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
       } else if ("info:" == val.substring(0, min(5, val.length))) {
         List<String> tokens = val.substring(5).split(";");
         logD("$tag got info: $tokens");
-        var f = ESPCCFile(tokens[0], this, remoteExists: ExtendedBool.True);
+        var f = ESPCCFile(tokens[0], this, remoteExists: ExtendedBool.eTrue);
         if (8 <= f.name.length) {
           tokens.removeAt(0);
           for (var token in tokens) {
@@ -214,17 +248,17 @@ class ESPCC extends Device with DeviceWithApi, DeviceWithWifi, DeviceWithPeers {
   }
 
   Future<void> refreshFileList() async {
-    if (files.value.syncing == ExtendedBool.True) {
+    if (files.value.syncing == ExtendedBool.eTrue) {
       logD("refreshFileList() already refreshing");
       return;
     }
-    files.value.syncing = ExtendedBool.True;
+    files.value.syncing = ExtendedBool.eTrue;
     files.notifyListeners();
     await api.requestResultCode("rec=files", expectValue: "files:");
     for (ESPCCFile f in files.value.files) {
       f.updateLocalStatus();
     }
-    files.value.syncing = ExtendedBool.False;
+    files.value.syncing = ExtendedBool.eFalse;
     files.notifyListeners();
   }
 
@@ -252,8 +286,8 @@ class ESPCCFile with Debug {
       this.localSize = -1,
       this.distance = -1,
       this.altGain = -1,
-      this.remoteExists = ExtendedBool.Unknown,
-      this.localExists = ExtendedBool.Unknown});
+      this.remoteExists = ExtendedBool.eUnknown,
+      this.localExists = ExtendedBool.eUnknown});
 
   Future<void> updateLocalStatus() async {
     String? p = await path;
@@ -261,11 +295,11 @@ class ESPCCFile with Debug {
     final file = File(p);
     if (await file.exists()) {
       //logD("updateLocalStatus() local file $p exists");
-      localExists = ExtendedBool.True;
+      localExists = ExtendedBool.eTrue;
       localSize = await file.length();
     } else {
       logD("updateLocalStatus() local file $p does not exist");
-      localExists = ExtendedBool.False;
+      localExists = ExtendedBool.eFalse;
       localSize = -1;
     }
   }
@@ -321,13 +355,13 @@ class ESPCCFile with Debug {
           mode: FileMode.append,
           flush: true,
         );
-      } else if (null != byteData && byteData.isNotEmpty)
+      } else if (null != byteData && byteData.isNotEmpty) {
         f = await f.writeAsBytes(
           byteData.toList(growable: false),
           mode: FileMode.append,
           flush: true,
         );
-      else {
+      } else {
         logD("$tag need either data or byteData");
         return 0;
       }
@@ -626,15 +660,15 @@ class ESPCCSettings with Debug {
   Map<int, int> touchRead = {};
   bool touchEnabled = true;
   bool otaMode = false;
-  int recording = ESPCCRecordingState.UNKNOWN;
+  int recording = ESPCCRecordingState.rsUnknown;
   Map<String, TextEditingController> peerPasskeyEditingControllers = {};
   int vescBattNumSeries = -1;
   double vescBattCapacityWh = -1;
   int vescMaxPower = -1;
   double vescMinCurrent = -1;
   double vescMaxCurrent = -1;
-  ExtendedBool vescRampUp = ExtendedBool.Unknown;
-  ExtendedBool vescRampDown = ExtendedBool.Unknown;
+  ExtendedBool vescRampUp = ExtendedBool.eUnknown;
+  ExtendedBool vescRampDown = ExtendedBool.eUnknown;
   double vescRampMinCurrentDiff = -1;
   int vescRampNumSteps = -1;
   int vescRampTime = -1;
@@ -694,7 +728,7 @@ class ESPCCSettings with Debug {
       int? i = message.valueAsInt;
       String? s = message.valueAsString;
       if (null != i && null != s && 1 == s.length && int.tryParse(s) == i) {
-        recording = (ESPCCRecordingState.MIN < i && i < ESPCCRecordingState.MAX) ? i : ESPCCRecordingState.UNKNOWN;
+        recording = (ESPCCRecordingState.rsMin < i && i < ESPCCRecordingState.rsMax) ? i : ESPCCRecordingState.rsUnknown;
         //logD("$tag received rec=${message.value}, parsed recording=${ESPCCRecordingState.getString(recording)}");
         return true;
       }
@@ -830,18 +864,18 @@ class ESPCCSettings with Debug {
 }
 
 class ESPCCRecordingState {
-  static const int MIN = -2;
-  static const int UNKNOWN = -1;
-  static const int NOT_RECORDING = 0;
-  static const int RECORDING = 1;
-  static const int PAUSED = 2; // TODO
-  static const int MAX = 3;
+  static const int rsMin = -2;
+  static const int rsUnknown = -1;
+  static const int rsNotRecording = 0;
+  static const int rsRecoreding = 1;
+  static const int rsPaused = 2; // TODO
+  static const int rsMax = 3;
 
   static String getString(int value) {
-    if (value <= MIN || MAX <= value) return "invalid";
-    if (value == NOT_RECORDING) return "stopped";
-    if (value == RECORDING) return "recording";
-    if (value == PAUSED) return "paused";
+    if (value <= rsMin || rsMax <= value) return "invalid";
+    if (value == rsNotRecording) return "stopped";
+    if (value == rsRecoreding) return "recording";
+    if (value == rsPaused) return "paused";
     return "...";
   }
 }
@@ -1062,7 +1096,7 @@ class ESPCCDataPointFlags {
 
 class ESPCCFileList {
   List<ESPCCFile> files = [];
-  var syncing = ExtendedBool.Unknown;
+  var syncing = ExtendedBool.eUnknown;
 
   bool has(String name) {
     bool exists = false;

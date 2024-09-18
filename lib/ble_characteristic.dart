@@ -271,7 +271,7 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
     bool wasCharging = device.isCharging.asBool;
     await super.unsubscribe();
     if (!wasSubscribed) return;
-    device.isCharging = util.ExtendedBool.Unknown;
+    device.isCharging = util.ExtendedBool.eUnknown;
     if (wasCharging) device.notifyCharging();
   }
 }

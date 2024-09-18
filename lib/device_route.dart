@@ -26,6 +26,7 @@ class DeviceRoute extends StatefulWidget with Debug {
   }
 
   @override
+  // ignore: no_logic_in_create_state
   DeviceRouteState createState() {
     logD("createState()");
     if (device is ESPM) return ESPMRouteState(device as ESPM);
@@ -60,7 +61,12 @@ class DeviceRouteState extends State<DeviceRoute> with Debug {
     device.dispose();
     device = newDevice;
     DeviceList().addOrUpdate(device);
+    if (!context.mounted) {
+      logD('_checkCorrectType() context not mounted for $device');
+      return;
+    }
     logD("_checkCorrectType() reloading DeviceRoute($device)");
+    // ignore: use_build_context_synchronously
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => DeviceRoute(device)));
   }
 

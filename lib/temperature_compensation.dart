@@ -19,7 +19,7 @@ class TC with Debug {
 
   TC(this.espm);
 
-  ExtendedBool _enabled = ExtendedBool.Unknown;
+  ExtendedBool _enabled = ExtendedBool.eUnknown;
   ExtendedBool get enabled => _enabled;
   set enabled(ExtendedBool value) {
     _enabled = value;
@@ -327,11 +327,11 @@ class TC with Debug {
       return true;
     }
     if (m.value == "enabled:0") {
-      enabled = ExtendedBool.False;
+      enabled = ExtendedBool.eFalse;
       return true;
     }
     if (m.value == "enabled:1") {
-      enabled = ExtendedBool.True;
+      enabled = ExtendedBool.eTrue;
       return true;
     }
     if (m.value!.contains("table;")) {
@@ -451,7 +451,7 @@ class TC with Debug {
     status("${value ? "Starting" : "Stopped"} collecting");
   }
 
-  ExtendedBool prevEnabled = ExtendedBool.Unknown;
+  ExtendedBool prevEnabled = ExtendedBool.eUnknown;
   void startCollecting() async {
     if (isCollecting) return;
     isCollecting = true;

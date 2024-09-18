@@ -57,23 +57,31 @@ class DeviceAppBarTitle extends StatelessWidget {
       if (device is! ESPM && device is! ESPCC) return;
 
       Future<bool> apiDeviceName(String name) async {
-        BuildContext? co = context.mounted ? context : null;
+        var co = context.mounted ? context : null;
         var api = (ESPM == await device.correctType()) ? (device as ESPM).api : (device as ESPCC).api;
+        // ignore: use_build_context_synchronously
         snackbar("Sending new device name: $name", co);
         String? value = await api.request<String>("hostName=$name");
         if (value != name) {
+          // ignore: use_build_context_synchronously
           snackbar("Error renaming device", co);
           return false;
         }
-        snackbar("Success setting new hostname on device: $value", context);
+        // ignore: use_build_context_synchronously
+        snackbar("Success setting new hostname on device: $value", co);
+        // ignore: use_build_context_synchronously
         snackbar("Sending reboot command", co);
         await api.request<bool>("reboot=2000"); // reboot in 2s
+        // ignore: use_build_context_synchronously
         snackbar("Disconnecting", co);
         await device.disconnect();
+        // ignore: use_build_context_synchronously
         snackbar("Waiting for device to boot", co);
         await Future.delayed(const Duration(milliseconds: 4000));
+        // ignore: use_build_context_synchronously
         snackbar("Connecting to device", co);
         await device.connect();
+        // ignore: use_build_context_synchronously
         snackbar("Success", co);
         return true;
       }
@@ -248,32 +256,38 @@ class EspmWeightScaleWidget extends StatelessWidget with Debug {
   Widget build(BuildContext context) {
     void calibrate() async {
       Future<void> apiCalibrate(String knownMassStr) async {
+        var co = context.mounted ? context : null;
         var api = device.api;
-        snackbar("Sending calibration value: $knownMassStr", context);
+        snackbar("Sending calibration value: $knownMassStr", co);
         String? value = await api.request<String>("cs=$knownMassStr");
         var errorMsg = "Error calibrating device";
         if (value == null) {
-          snackbar(errorMsg, context);
+          // ignore: use_build_context_synchronously
+          snackbar(errorMsg, co);
           return;
         }
         var parsedValue = double.tryParse(value);
         if (parsedValue == null) {
-          snackbar(errorMsg, context);
+          // ignore: use_build_context_synchronously
+          snackbar(errorMsg, co);
           return;
         }
         var parsedKnownMass = double.tryParse(knownMassStr);
         if (parsedKnownMass == null) {
-          snackbar(errorMsg, context);
+          // ignore: use_build_context_synchronously
+          snackbar(errorMsg, co);
           return;
         }
         if (parsedValue < parsedKnownMass * .999 || parsedValue > parsedKnownMass * 1.001) {
-          snackbar(errorMsg, context);
+          // ignore: use_build_context_synchronously
+          snackbar(errorMsg, co);
           return;
         }
-        snackbar("Success calibrating device", context);
+        // ignore: use_build_context_synchronously
+        snackbar("Success calibrating device", co);
       }
 
-      Widget autoTareWarning = device.settings.value.autoTare == ExtendedBool.True ? const Text("Warning: AutoTare is enabled") : const Empty();
+      Widget autoTareWarning = device.settings.value.autoTare == ExtendedBool.eTrue ? const Text("Warning: AutoTare is enabled") : const Empty();
 
       await showDialog(
         context: context,
@@ -307,25 +321,25 @@ class EspmWeightScaleWidget extends StatelessWidget with Debug {
     }
 
     void toggle(int mode) async {
-      device.weightServiceMode.value = ESPMWeightServiceMode.UNKNOWN;
+      device.weightServiceMode.value = ESPMWeightServiceMode.wsmUnknown;
       bool enable = mode < 1;
       bool success = false;
       int? reply = await device.api.request<int>(
         "wse=${enable ? //
-            ESPMWeightServiceMode.WHEN_NO_CRANK.toString() : ESPMWeightServiceMode.OFF.toString()}",
+            ESPMWeightServiceMode.wsmWhenNoCrank.toString() : ESPMWeightServiceMode.wsmOff.toString()}",
       );
-      if (ESPMWeightServiceMode.ON == reply || ESPMWeightServiceMode.WHEN_NO_CRANK == reply) {
+      if (ESPMWeightServiceMode.wsmOn == reply || ESPMWeightServiceMode.wsmWhenNoCrank == reply) {
         if (enable) success = true;
         await device.weightScaleChar?.subscribe();
-      } else if (ESPMWeightServiceMode.OFF == reply) {
+      } else if (ESPMWeightServiceMode.wsmOff == reply) {
         if (!enable) success = true;
         await device.characteristic("weightScale")?.unsubscribe();
       } else {
-        device.weightServiceMode.value = ESPMWeightServiceMode.UNKNOWN;
+        device.weightServiceMode.value = ESPMWeightServiceMode.wsmUnknown;
       }
       snackbar(
         "Weight service ${enable ? "en" : "dis"}able${success ? "d" : " failed"}",
-        context,
+        context.mounted ? context : null,
       );
     }
 
@@ -345,10 +359,10 @@ class EspmWeightScaleWidget extends StatelessWidget with Debug {
 
         return InkWell(
           onTap: () {
-            if (ESPMWeightServiceMode.OFF < mode) tare();
+            if (ESPMWeightServiceMode.wsmOff < mode) tare();
           },
           onLongPress: () {
-            if (ESPMWeightServiceMode.OFF < mode) calibrate();
+            if (ESPMWeightServiceMode.wsmOff < mode) calibrate();
           },
           onDoubleTap: () {
             toggle(mode);
@@ -359,7 +373,7 @@ class EspmWeightScaleWidget extends StatelessWidget with Debug {
               fit: FlexFit.loose,
               child: Align(
                 child: device.connected
-                    ? mode == ESPMWeightServiceMode.UNKNOWN
+                    ? mode == ESPMWeightServiceMode.wsmUnknown
                         ? const CircularProgressIndicator()
                         : strainOutput
                     : strainOutput,
@@ -391,10 +405,10 @@ class EspmHallStreamListenerWidget extends StatelessWidget {
       stream: device.hallChar?.defaultStream,
       initialData: device.hallChar?.lastValue,
       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
-        String value = snapshot.hasData && enabled != ExtendedBool.False ? (snapshot.data! > 0 ? snapshot.data!.toString() : '--') : "--";
+        String value = snapshot.hasData && enabled != ExtendedBool.eFalse ? (snapshot.data! > 0 ? snapshot.data!.toString() : '--') : "--";
         const styleEnabled = TextStyle(fontSize: 30);
         const styleDisabled = TextStyle(fontSize: 30, color: Colors.white12);
-        return Text(value, style: (enabled == ExtendedBool.True) ? styleEnabled : styleDisabled);
+        return Text(value, style: (enabled == ExtendedBool.eTrue) ? styleEnabled : styleDisabled);
       },
     );
   }
@@ -418,7 +432,7 @@ class EspmHallSensorWidget extends StatelessWidget {
             scrollable: true,
             title: const Text("Hall Sensor Settings"),
             content: Column(children: [
-              EspmHallStreamListenerWidget(device, ExtendedBool.True),
+              EspmHallStreamListenerWidget(device, ExtendedBool.eTrue),
               Row(children: [
                 ApiSettingInputWidget(
                   name: "Offset",
@@ -453,8 +467,8 @@ class EspmHallSensorWidget extends StatelessWidget {
     }
 
     void toggle(enabled) async {
-      device.hallEnabled.value = ExtendedBool.Waiting;
-      bool enable = enabled == ExtendedBool.True ? false : true;
+      device.hallEnabled.value = ExtendedBool.eWaiting;
+      bool enable = enabled == ExtendedBool.eTrue ? false : true;
       bool? reply = await device.api.request<bool>("hc=${enable ? "true" : "false"}");
       bool success = reply == enable;
       if (success) {
@@ -464,7 +478,7 @@ class EspmHallSensorWidget extends StatelessWidget {
           await device.hallChar?.unsubscribe();
         }
       } else {
-        device.hallEnabled.value = ExtendedBool.Unknown;
+        device.hallEnabled.value = ExtendedBool.eUnknown;
       }
       snackbar(
         "Hall readings ${enable ? "en" : "dis"}able${success ? "d" : " failed"}",
@@ -477,17 +491,17 @@ class EspmHallSensorWidget extends StatelessWidget {
       builder: (_, enabled, __) {
         return InkWell(
           onLongPress: () {
-            if (enabled == ExtendedBool.True) settings();
+            if (enabled == ExtendedBool.eTrue) settings();
           },
           onDoubleTap: () {
-            if (enabled == ExtendedBool.True || enabled == ExtendedBool.False || enabled == ExtendedBool.Unknown) toggle(enabled);
+            if (enabled == ExtendedBool.eTrue || enabled == ExtendedBool.eFalse || enabled == ExtendedBool.eUnknown) toggle(enabled);
           },
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text("Hall"),
             Flexible(
               fit: FlexFit.loose,
               child: Align(
-                child: (enabled == ExtendedBool.Waiting) ? const CircularProgressIndicator() : EspmHallStreamListenerWidget(device, enabled),
+                child: (enabled == ExtendedBool.eWaiting) ? const CircularProgressIndicator() : EspmHallStreamListenerWidget(device, enabled),
               ),
             ),
             const Text(" "),
@@ -788,10 +802,10 @@ class SettingSwitchWidget extends StatelessWidget with Debug {
 
   @override
   Widget build(BuildContext context) {
-    var toggler = value == ExtendedBool.Waiting
+    var toggler = value == ExtendedBool.eWaiting
         ? const CircularProgressIndicator()
         : Switch(
-            value: value == ExtendedBool.True ? true : false,
+            value: value == ExtendedBool.eTrue ? true : false,
             activeColor: Colors.red,
             onChanged: enabled
                 ? (bool state) async {
@@ -832,10 +846,10 @@ class ApiSettingSwitchWidget extends StatelessWidget with Debug {
   @override
   Widget build(BuildContext context) {
     // TODO use SettingSwitch
-    var onOff = value == ExtendedBool.Waiting
+    var onOff = value == ExtendedBool.eWaiting
         ? const CircularProgressIndicator()
         : Switch(
-            value: value == ExtendedBool.True ? true : false,
+            value: value == ExtendedBool.eTrue ? true : false,
             activeColor: Colors.red,
             onChanged: (bool enabled) async {
               if (null == commandCode) return;
@@ -1002,7 +1016,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             commandCode: device.api.commandCode("rs", logOnError: false),
             value: settings.reverseStrain,
             onChanged: () {
-              device.settings.value.reverseStrain = ExtendedBool.Waiting;
+              device.settings.value.reverseStrain = ExtendedBool.eWaiting;
               device.settings.notifyListeners();
             },
           ),
@@ -1012,7 +1026,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             commandCode: device.api.commandCode("dp", logOnError: false),
             value: settings.doublePower,
             onChanged: () {
-              device.settings.value.doublePower = ExtendedBool.Waiting;
+              device.settings.value.doublePower = ExtendedBool.eWaiting;
               device.settings.notifyListeners();
             },
           ),
@@ -1104,7 +1118,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
         }
 
         int? tcCode = device.api.commandCode("tc", logOnError: false);
-        if (null != tcCode && ExtendedBool.Unknown != settings.tc.enabled) {
+        if (null != tcCode && ExtendedBool.eUnknown != settings.tc.enabled) {
           widgets.add(
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1129,7 +1143,7 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                     commandCode: device.api.commandCode("tc", logOnError: false),
                     value: settings.tc.enabled,
                     onChanged: () {
-                      device.settings.value.tc.enabled = ExtendedBool.Waiting;
+                      device.settings.value.tc.enabled = ExtendedBool.eWaiting;
                       device.settings.notifyListeners();
                     },
                   ),
@@ -1146,12 +1160,12 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
             commandCode: device.api.commandCode("at", logOnError: false),
             value: settings.autoTare,
             onChanged: () {
-              device.settings.value.autoTare = ExtendedBool.Waiting;
+              device.settings.value.autoTare = ExtendedBool.eWaiting;
               device.settings.notifyListeners();
             },
           ),
         );
-        if (ExtendedBool.True == settings.autoTare) {
+        if (ExtendedBool.eTrue == settings.autoTare) {
           widgets.add(
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Flexible(
@@ -1374,9 +1388,9 @@ class EspccSyncWidget extends StatelessWidget with Debug {
           bool isDownloading = device.syncer.isDownloading(f);
           bool isDownloadable = !isQueued &&
               !isDownloading &&
-              f.remoteExists == ExtendedBool.True &&
+              f.remoteExists == ExtendedBool.eTrue &&
               0 < f.remoteSize &&
-              f.localExists != ExtendedBool.Unknown &&
+              f.localExists != ExtendedBool.eUnknown &&
               f.localSize < f.remoteSize;
           int downloadedPercent = map(
             0 <= f.localSize ? f.localSize.toDouble() : 0,
@@ -1496,14 +1510,14 @@ class EspccSyncWidget extends StatelessWidget with Debug {
           );
           items.add(item);
         }
-        if (filelist.syncing == ExtendedBool.True) items.add(const Text("Syncing..."));
+        if (filelist.syncing == ExtendedBool.eTrue) items.add(const Text("Syncing..."));
         if (items.isEmpty) items.add(const Text("No files"));
         return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: items +
                 [
                   EspmuiElevatedButton(
-                    onPressed: filelist.syncing == ExtendedBool.True
+                    onPressed: filelist.syncing == ExtendedBool.eTrue
                         ? null
                         : () {
                             device.refreshFileList();
@@ -1557,7 +1571,7 @@ class PeersListWidget extends StatelessWidget with Debug {
 
   @override
   Widget build(BuildContext context) {
-    var list = const Column(children: []);
+    var list = List<Widget>.empty(growable: true);
     for (var peer in peers) {
       // addr,addrType,deviceType,deviceName
       var parts = peer.split(",");
@@ -1633,7 +1647,7 @@ class PeersListWidget extends StatelessWidget with Debug {
                 (device as DeviceWithApi).api.sendCommand("peers");
               },
             );
-      list.children.add(
+      list.add(
         Card(
           color: Colors.black12,
           child: Padding(
@@ -1654,7 +1668,7 @@ class PeersListWidget extends StatelessWidget with Debug {
         ),
       );
     }
-    return list;
+    return Column(children: list);
   }
 }
 
@@ -2260,7 +2274,7 @@ class SwitchesSettingsWidget extends StatelessWidget with Debug {
 class HomeAutoSettingsWidget extends StatelessWidget with Debug {
   final HomeAuto device;
   final String? focus;
-  var open = <String>[];
+  final List<String> open;
 
   HomeAutoSettingsWidget(this.device, {super.key, this.focus, this.open = const []}) {
     logD("construct focus: $focus, open: $open");
@@ -2440,12 +2454,12 @@ class ApiWifiSettingsWidget extends StatelessWidget {
             commandCode: api.commandCode("w", logOnError: false),
             value: settings.enabled,
             onChanged: () {
-              wifiSettings.value.enabled = ExtendedBool.Waiting;
+              wifiSettings.value.enabled = ExtendedBool.eWaiting;
               wifiSettings.notifyListeners();
             },
           ),
         ];
-        if (settings.enabled == ExtendedBool.True) {
+        if (settings.enabled == ExtendedBool.eTrue) {
           widgets.add(
             ApiSettingSwitchWidget(
               api: api,
@@ -2453,12 +2467,12 @@ class ApiWifiSettingsWidget extends StatelessWidget {
               commandCode: api.commandCode("wa"),
               value: settings.apEnabled,
               onChanged: () {
-                wifiSettings.value.apEnabled = ExtendedBool.Waiting;
+                wifiSettings.value.apEnabled = ExtendedBool.eWaiting;
                 wifiSettings.notifyListeners();
               },
             ),
           );
-          if (settings.apEnabled == ExtendedBool.True) {
+          if (settings.apEnabled == ExtendedBool.eTrue) {
             widgets.add(
               Row(children: [
                 Flexible(
@@ -2468,7 +2482,7 @@ class ApiWifiSettingsWidget extends StatelessWidget {
                       name: "SSID",
                       commandCode: api.commandCode("was"),
                       value: settings.apSSID,
-                      enabled: settings.apEnabled == ExtendedBool.True ? true : false,
+                      enabled: settings.apEnabled == ExtendedBool.eTrue ? true : false,
                     )),
                 const Empty(),
                 Flexible(
@@ -2479,13 +2493,13 @@ class ApiWifiSettingsWidget extends StatelessWidget {
                       commandCode: api.commandCode("wap"),
                       value: "",
                       isPassword: true,
-                      enabled: settings.apEnabled == ExtendedBool.True ? true : false,
+                      enabled: settings.apEnabled == ExtendedBool.eTrue ? true : false,
                     )),
               ]),
             );
           }
         }
-        if (settings.enabled == ExtendedBool.True) {
+        if (settings.enabled == ExtendedBool.eTrue) {
           widgets.add(
             ApiSettingSwitchWidget(
               api: api,
@@ -2493,12 +2507,12 @@ class ApiWifiSettingsWidget extends StatelessWidget {
               commandCode: api.commandCode("ws"),
               value: settings.staEnabled,
               onChanged: () {
-                wifiSettings.value.staEnabled = ExtendedBool.Waiting;
+                wifiSettings.value.staEnabled = ExtendedBool.eWaiting;
                 wifiSettings.notifyListeners();
               },
             ),
           );
-          if (settings.staEnabled == ExtendedBool.True) {
+          if (settings.staEnabled == ExtendedBool.eTrue) {
             widgets.add(
               Row(children: [
                 Flexible(
@@ -2508,7 +2522,7 @@ class ApiWifiSettingsWidget extends StatelessWidget {
                       name: "SSID",
                       commandCode: api.commandCode("wss"),
                       value: settings.staSSID,
-                      enabled: settings.staEnabled == ExtendedBool.True ? true : false,
+                      enabled: settings.staEnabled == ExtendedBool.eTrue ? true : false,
                     )),
                 const Empty(),
                 Flexible(
@@ -2519,7 +2533,7 @@ class ApiWifiSettingsWidget extends StatelessWidget {
                       commandCode: api.commandCode("wsp"),
                       value: "",
                       isPassword: true,
-                      enabled: settings.staEnabled == ExtendedBool.True ? true : false,
+                      enabled: settings.staEnabled == ExtendedBool.eTrue ? true : false,
                     )),
               ]),
             );

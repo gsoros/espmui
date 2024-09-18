@@ -139,7 +139,7 @@ class TileGrid extends StatefulWidget with Debug {
 
   @override
   TileGridState createState() {
-    logD('createState()');
+    //logD('createState()');
     return TileGridState();
   }
 }
@@ -592,68 +592,65 @@ class TileGridState extends State<TileGrid> with Debug {
                         ),
                         elevation: 3,
                         color: Colors.transparent, // debug
-                        child: Container(
-                          //padding: const EdgeInsets.all(2),
-                          child: Material(
-                            child: InkWell(
-                              child: tiles[index],
-                              onTap: () {
-                                logD("tile $index tap");
-                                onTap(tiles[index]);
-                              },
-                              onDoubleTap: () {
-                                logD("tile $index doubleTap");
-                                Navigator.push(
-                                  context,
-                                  HeroDialogRoute(
-                                    builder: (context) {
-                                      return PopScope(
-                                        onPopInvokedWithResult: (didPop, result) async {
-                                          if (didPop) {
-                                            setState(() {
-                                              showColorPicker = false;
-                                            });
-                                          }
-                                        },
-                                        child: Center(
-                                          child: AlertDialog(
-                                            scrollable: true,
-                                            backgroundColor: Colors.black87,
-                                            content: Column(
-                                              children: [
-                                                sizeAndColor(index),
-                                                source(index),
-                                                tapAction(index),
-                                              ],
-                                            ),
-                                            actions: [
-                                              EspmuiElevatedButton(
-                                                child: const Text("Delete Tile"),
-                                                onPressed: () {
-                                                  logD("delete tile $index");
-                                                  setState(() {
-                                                    tiles.removeAt(index);
-                                                    _tiles.tiles = tiles;
-                                                    _tiles.save();
-                                                  });
-                                                  Navigator.of(context).pop();
-                                                },
-                                              ),
-                                              EspmuiElevatedButton(
-                                                onPressed: Navigator.of(context).pop,
-                                                child: const Text("Close"),
-                                              ),
+                        child: Material(
+                          child: InkWell(
+                            child: tiles[index],
+                            onTap: () {
+                              logD("tile $index tap");
+                              onTap(tiles[index]);
+                            },
+                            onDoubleTap: () {
+                              logD("tile $index doubleTap");
+                              Navigator.push(
+                                context,
+                                HeroDialogRoute(
+                                  builder: (context) {
+                                    return PopScope(
+                                      onPopInvokedWithResult: (didPop, result) async {
+                                        if (didPop) {
+                                          setState(() {
+                                            showColorPicker = false;
+                                          });
+                                        }
+                                      },
+                                      child: Center(
+                                        child: AlertDialog(
+                                          scrollable: true,
+                                          backgroundColor: Colors.black87,
+                                          content: Column(
+                                            children: [
+                                              sizeAndColor(index),
+                                              source(index),
+                                              tapAction(index),
                                             ],
-                                            actionsAlignment: MainAxisAlignment.spaceBetween,
-                                            buttonPadding: EdgeInsets.zero,
                                           ),
+                                          actions: [
+                                            EspmuiElevatedButton(
+                                              child: const Text("Delete Tile"),
+                                              onPressed: () {
+                                                logD("delete tile $index");
+                                                setState(() {
+                                                  tiles.removeAt(index);
+                                                  _tiles.tiles = tiles;
+                                                  _tiles.save();
+                                                });
+                                                Navigator.of(context).pop();
+                                              },
+                                            ),
+                                            EspmuiElevatedButton(
+                                              onPressed: Navigator.of(context).pop,
+                                              child: const Text("Close"),
+                                            ),
+                                          ],
+                                          actionsAlignment: MainAxisAlignment.spaceBetween,
+                                          buttonPadding: EdgeInsets.zero,
                                         ),
-                                      );
-                                    },
-                                  ),
-                                );
-                              },
-                            ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),

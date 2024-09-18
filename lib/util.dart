@@ -11,30 +11,30 @@ import 'package:path_provider/path_provider.dart';
 
 import 'debug.dart';
 
-/// bool plus Unknown and Waiting
+/// bool plus unknown and waiting
 enum ExtendedBool {
-  Unknown(0),
-  Waiting(1),
-  False(2),
-  True(3);
+  eUnknown(0),
+  eWaiting(1),
+  eFalse(2),
+  eTrue(3);
 
   final int value;
 
   const ExtendedBool(this.value);
 
   factory ExtendedBool.fromBool(bool? b) => (null == b)
-      ? Unknown
+      ? eUnknown
       : b
-          ? True
-          : False;
+          ? eTrue
+          : eFalse;
 
   factory ExtendedBool.fromString(String s) {
-    if (s.toLowerCase() == "true" || s == "1") return True;
-    if (s.toLowerCase() == "false" || s == "0") return False;
-    return Unknown;
+    if (s.toLowerCase() == "true" || s == "1") return eTrue;
+    if (s.toLowerCase() == "false" || s == "0") return eFalse;
+    return eUnknown;
   }
 
-  bool get asBool => value == True.value;
+  bool get asBool => value == eTrue.value;
 }
 
 /// A [ValueNotifier] that notifies listeners in the setter even when [value] is replaced

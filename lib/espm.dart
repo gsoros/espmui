@@ -19,8 +19,8 @@ import 'util.dart';
 import 'debug.dart';
 
 class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
-  final weightServiceMode = ValueNotifier<int>(ESPMWeightServiceMode.UNKNOWN);
-  final hallEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.Unknown);
+  final weightServiceMode = ValueNotifier<int>(ESPMWeightServiceMode.wsmUnknown);
+  final hallEnabled = ValueNotifier<ExtendedBool>(ExtendedBool.eUnknown);
   late final AlwaysNotifier<ESPMSettings> settings;
 
   WeightScaleCharacteristic? get weightScaleChar => characteristic("weightScale") as WeightScaleCharacteristic?;
@@ -98,8 +98,8 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
     }
 
     if ("wse" == message.commandStr) {
-      weightServiceMode.value = message.valueAsInt ?? ESPMWeightServiceMode.UNKNOWN;
-      if (ESPMWeightServiceMode.OFF < weightServiceMode.value) {
+      weightServiceMode.value = message.valueAsInt ?? ESPMWeightServiceMode.wsmUnknown;
+      if (ESPMWeightServiceMode.wsmOff < weightServiceMode.value) {
         await weightScaleChar?.subscribe();
       } else {
         await weightScaleChar?.unsubscribe();
@@ -107,7 +107,7 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
       return true;
     }
     if ("hc" == message.commandStr) {
-      hallEnabled.value = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      hallEnabled.value = message.valueAsBool == true ? ExtendedBool.eTrue : ExtendedBool.eFalse;
       if (message.valueAsBool ?? false) {
         await hallChar?.subscribe();
       } else {
@@ -151,7 +151,20 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
     if (!await ready()) return;
     await requestMtu(largeMtu);
     //logD("Requesting init ready to go");
-    weightServiceMode.value = ESPMWeightServiceMode.UNKNOWN;
+    weightServiceMode.value = ESPMWeightServiceMode.wsmUnknown;
+    Future.forEach([
+      'init',
+      //"wse=${ESPMWeightServiceMode.WHEN_NO_CRANK}",
+    ], (key) async {
+      await api.request<String>(
+        key,
+        minDelayMs: 10000,
+        maxAttempts: 3,
+      );
+      await Future.delayed(const Duration(milliseconds: 250));
+      return key;
+    });
+/*
     [
       "init",
       //"wse=${ESPMWeightServiceMode.WHEN_NO_CRANK}",
@@ -163,10 +176,11 @@ class ESPM extends PowerMeter with DeviceWithApi, DeviceWithWifi {
       );
       await Future.delayed(const Duration(milliseconds: 250));
     });
+*/
   }
 
   void _resetInit() {
-    weightServiceMode.value = ESPMWeightServiceMode.UNKNOWN;
+    weightServiceMode.value = ESPMWeightServiceMode.wsmUnknown;
     settings.value = ESPMSettings(this, tc: settings.value.tc); // preserve collected values
     //logD("_resetInit tc.isCollecting: ${settings.value.tc.isCollecting}");
     settings.notifyListeners();
@@ -205,14 +219,14 @@ class ESPMSettings with Debug {
   }
 
   double? cranklength;
-  var reverseStrain = ExtendedBool.Unknown;
-  var doublePower = ExtendedBool.Unknown;
+  var reverseStrain = ExtendedBool.eUnknown;
+  var doublePower = ExtendedBool.eUnknown;
   int? sleepDelay;
   int? motionDetectionMethod;
   int? strainThreshold;
   int? strainThresLow;
   int? negativeTorqueMethod;
-  var autoTare = ExtendedBool.Unknown;
+  var autoTare = ExtendedBool.eUnknown;
   int? autoTareDelayMs;
   int? autoTareRangeG;
   bool otaMode = false;
@@ -247,11 +261,11 @@ class ESPMSettings with Debug {
       return true;
     }
     if ("rs" == message.commandStr) {
-      reverseStrain = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      reverseStrain = message.valueAsBool == true ? ExtendedBool.eTrue : ExtendedBool.eFalse;
       return true;
     }
     if ("dp" == message.commandStr) {
-      doublePower = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      doublePower = message.valueAsBool == true ? ExtendedBool.eTrue : ExtendedBool.eFalse;
       return true;
     }
     if ("sd" == message.commandStr) {
@@ -275,7 +289,7 @@ class ESPMSettings with Debug {
       return true;
     }
     if ("at" == message.commandStr) {
-      autoTare = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      autoTare = message.valueAsBool == true ? ExtendedBool.eTrue : ExtendedBool.eFalse;
       return true;
     }
     if ("atd" == message.commandStr) {
@@ -352,14 +366,14 @@ class ESPMSettings with Debug {
 }
 
 class ESPMWeightServiceMode {
-  static const int UNKNOWN = -1;
+  static const int wsmUnknown = -1;
 
   /// weight scale measurement characteristic updates disabled
-  static const int OFF = 0;
+  static const int wsmOff = 0;
 
   /// weight scale measurement characteristic updates ensabled
-  static const int ON = 1;
+  static const int wsmOn = 1;
 
   /// weight scale measurement characteristic updates enabled while there are no crank events
-  static const int WHEN_NO_CRANK = 2;
+  static const int wsmWhenNoCrank = 2;
 }

@@ -82,14 +82,14 @@ class ESPCCSyncer with Debug {
       _running = false;
       return;
     }
-    if (ef.remoteExists != ExtendedBool.True || ef.remoteSize <= 0) {
+    if (ef.remoteExists != ExtendedBool.eTrue || ef.remoteSize <= 0) {
       logD("$tag invalid remote $ef");
       // ef is not placed back into the queue
       _running = false;
       return;
     }
     await ef.updateLocalStatus();
-    if (ef.localExists == ExtendedBool.Unknown) {
+    if (ef.localExists == ExtendedBool.eUnknown) {
       logD("$tag could not get local status for ${ef.name}");
       _queue.add(ef);
       _running = false;

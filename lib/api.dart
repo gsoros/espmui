@@ -434,11 +434,11 @@ class Api with Debug {
       if (null == chunks || chunks.length < 2) return true;
       if ("charging" == chunks[1]) {
         bool wasntCharging = !device.isCharging.asBool;
-        device.isCharging = ExtendedBool.True;
+        device.isCharging = ExtendedBool.eTrue;
         if (wasntCharging) device.notifyCharging();
       } else if ("discharging" == chunks[1]) {
         bool wasCharging = device.isCharging.asBool;
-        device.isCharging = ExtendedBool.False;
+        device.isCharging = ExtendedBool.eFalse;
         if (wasCharging) device.notifyCharging();
       }
       return true;
@@ -538,11 +538,11 @@ class Api with Debug {
   Future<void> isDone(ApiMessage message) async {
     await Future.doWhile(() async {
       if (message.isDone != true && message.resultCode == null) {
-        // logD("polling...");
+        //logD("polling...");
         await Future.delayed(Duration(milliseconds: queueDelayMs));
         return true;
       }
-      // logD("poll end");
+      //logD("poll end");
       return false;
     });
   }

@@ -82,13 +82,16 @@ class Device with Debug {
   Map<String, DeviceTileAction> tileActions = {};
 
   StreamSubscription<int>? _batteryLevelSubscription;
-  ExtendedBool isCharging = ExtendedBool.Unknown;
+  ExtendedBool isCharging = ExtendedBool.eUnknown;
 
   int get defaultMtu => 23;
   int get largeMtu => 512;
 
   Device(this.id, this.name) {
     logD("construct");
+    characteristics.addAll({
+      'battery': CharacteristicListItem(BatteryCharacteristic(this)),
+    });
     tileStreams.addAll({
       "battery": DeviceTileStream(
         label: "Battery",
@@ -178,6 +181,7 @@ class Device with Debug {
     stateSubscription ??= stateStream.listen(
       (state) async {
         logD("$name _stateSubscription state: $state");
+        lastConnectionState = state;
         if (state == DeviceConnectionState.connected) {
           await onConnected();
         } else if (state == DeviceConnectionState.disconnected) {
@@ -254,7 +258,7 @@ class Device with Debug {
 
     //streamSendIfNotClosed(stateController, newState);
 
-    isCharging = ExtendedBool.Unknown;
+    isCharging = ExtendedBool.eUnknown;
     Notifications().cancel(id.hashCode);
 
     logD("$tag autoConnect.value: ${autoConnect.value}");
@@ -289,17 +293,26 @@ class Device with Debug {
     //logD("connect() Connecting to $name(${peripheral!.identifier})");
     _connectionInitiated = true;
     _stateUpdateSubscription = (await BLE().manager)
+/* 
         .connectToAdvertisingDevice(
       id: id,
       withServices: [],
       prescanDuration: const Duration(seconds: 5),
       connectionTimeout: const Duration(seconds: 2),
     )
+*/
+        .connectToDevice(
+      id: id,
+      servicesWithCharacteristicsToDiscover: null,
+      connectionTimeout: const Duration(seconds: 2),
+    )
         .listen(
       (stateUpdate) async {
         logD("connection state update: $stateUpdate");
-        lastConnectionState = stateUpdate.connectionState;
-        streamSendIfNotClosed(stateController, lastConnectionState);
+        if (stateUpdate.failure != null) {
+          logD("Failure: ${stateUpdate.failure}");
+        }
+        streamSendIfNotClosed(stateController, stateUpdate.connectionState);
       },
       onError: (Object e, StackTrace t) => bleError(debugTag, "$name _stateSubscription $t", e),
     );
@@ -311,8 +324,8 @@ class Device with Debug {
     String subject = "$debugTag discoverCharacteristics()";
     //logD("$subject conn=${await connected}");
     if (!connected) {
-      logD("$name not connected");
-      return;
+      logD("$name not connected, $lastConnectionState");
+      //return;
     }
     if (_discovered) {
       logD("$name already discovered");
@@ -417,11 +430,13 @@ class Device with Debug {
   Future<void> disconnect() async {
     logD("disconnect() $name");
     if (!connected) {
-      logD("not connected");
-      return;
+      logD("not connected, $lastConnectionState");
+      //return;
     }
+    streamSendIfNotClosed(stateController, DeviceConnectionState.disconnecting);
     // Disconnecting the device is achieved by cancelling the stream subscription
     await _stateUpdateSubscription?.cancel();
+    streamSendIfNotClosed(stateController, DeviceConnectionState.disconnected);
   }
 
   BleCharacteristic? characteristic(String name) {
@@ -681,11 +696,11 @@ class HeartRateMonitor extends Device {
 }
 
 class WifiSettings with Debug {
-  var enabled = ExtendedBool.Unknown;
-  var apEnabled = ExtendedBool.Unknown;
+  var enabled = ExtendedBool.eUnknown;
+  var apEnabled = ExtendedBool.eUnknown;
   String? apSSID;
   String? apPassword;
-  var staEnabled = ExtendedBool.Unknown;
+  var staEnabled = ExtendedBool.eUnknown;
   String? staSSID;
   String? staPassword;
 
@@ -695,13 +710,13 @@ class WifiSettings with Debug {
 
     //////////////////////////////////////////////////// wifi
     if ("w" == message.commandStr) {
-      enabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      enabled = message.valueAsBool == true ? ExtendedBool.eTrue : ExtendedBool.eFalse;
       return true;
     }
 
     //////////////////////////////////////////////////// wifiAp
     if ("wa" == message.commandStr) {
-      apEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      apEnabled = message.valueAsBool == true ? ExtendedBool.eTrue : ExtendedBool.eFalse;
       return true;
     }
 
@@ -719,7 +734,7 @@ class WifiSettings with Debug {
 
     //////////////////////////////////////////////////// wifiSta
     if ("ws" == message.commandStr) {
-      staEnabled = message.valueAsBool == true ? ExtendedBool.True : ExtendedBool.False;
+      staEnabled = message.valueAsBool == true ? ExtendedBool.eTrue : ExtendedBool.eFalse;
       return true;
     }
 

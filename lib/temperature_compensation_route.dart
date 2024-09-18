@@ -24,11 +24,10 @@ class TCRoute extends StatefulWidget with Debug {
   }
 
   @override
-  State<TCRoute> createState() => _TCRouteState(espm);
+  State<TCRoute> createState() => _TCRouteState();
 }
 
 class _TCRouteState extends State<TCRoute> with Debug {
-  ESPM espm;
   late StreamSubscription<double?>? temperatureSubscription;
   late StreamSubscription<double?>? weightSubscription;
   double? temperature, weight, lastTemperature, lastWeight;
@@ -36,11 +35,11 @@ class _TCRouteState extends State<TCRoute> with Debug {
   Timer? _fabTimer;
   late double minX, maxX, dataMinX, dataMaxX, lastMinX, lastMaxX;
 
-  _TCRouteState(this.espm) {
-    temperatureSubscription = espm.tempChar?.defaultStream.listen((value) {
+  _TCRouteState() {
+    temperatureSubscription = widget.espm.tempChar?.defaultStream.listen((value) {
       onTempChange(value);
     });
-    weightSubscription = espm.weightScaleChar?.defaultStream.listen((value) {
+    weightSubscription = widget.espm.weightScaleChar?.defaultStream.listen((value) {
       onWeightChange(value);
     });
   }
@@ -49,7 +48,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
   void initState() {
     logD("initState");
     super.initState();
-    setDataRange(espm.settings.value.tc);
+    setDataRange(widget.espm.settings.value.tc);
     minX = dataMinX;
     maxX = dataMaxX;
     lastMinX = minX;
@@ -67,14 +66,14 @@ class _TCRouteState extends State<TCRoute> with Debug {
 
   void onTempChange(double? value) {
     temperature = value;
-    var tc = espm.settings.value.tc;
+    var tc = widget.espm.settings.value.tc;
     if (null == weight || weight == lastWeight) return;
     lastWeight = weight;
     if (null == value) return;
     if (tc.isCollecting) {
       tc.addCollected(value, weight!);
     } else {
-      espm.settings.notifyListeners();
+      widget.espm.settings.notifyListeners();
     }
     //logD("onTempChange $value ${tc.collectedSize()}");
   }
@@ -86,13 +85,13 @@ class _TCRouteState extends State<TCRoute> with Debug {
     }
     value = -value; // flip sign
     weight = value;
-    var tc = espm.settings.value.tc;
+    var tc = widget.espm.settings.value.tc;
     if (null == temperature || temperature == lastTemperature) return;
     lastTemperature = temperature;
     if (tc.isCollecting) {
       tc.addCollected(temperature!, value);
     } else {
-      espm.settings.notifyListeners();
+      widget.espm.settings.notifyListeners();
     }
     //logD("onWeightChange $value ${tc.collectedSize()}");
   }
@@ -170,21 +169,21 @@ class _TCRouteState extends State<TCRoute> with Debug {
         appBar: AppBar(
           title: BleAdapterCheck(
             DeviceAppBarTitle(
-              espm,
+              widget.espm,
               nameEditable: false,
               prefix: "TC ",
               onConnected: () async {
-                // espm.settings.value.tc.status("waiting for init to complete"); // cannot call status() from build
+                // widget.espm.settings.value.tc.status("waiting for init to complete"); // cannot call status() from build
                 int attempts = 0;
                 await Future.doWhile(() async {
                   await Future.delayed(const Duration(milliseconds: 300));
                   //logD("attempt #$attempts checking if tc command is available...");
-                  if (null != espm.api.commandCode("tc", logOnError: false)) return false;
+                  if (null != widget.espm.api.commandCode("tc", logOnError: false)) return false;
                   attempts++;
                   return attempts < 50;
                 });
-                logD("${espm.name} init done, calling readFromDevice()");
-                espm.settings.value.tc.readFromDevice();
+                logD("${widget.espm.name} init done, calling readFromDevice()");
+                widget.espm.settings.value.tc.readFromDevice();
               },
             ),
             ifNotReady: (state) => BleNotReady(state),
@@ -208,7 +207,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
 
   Widget status() {
     return ValueListenableBuilder(
-      valueListenable: espm.settings.value.tc.statusMessage,
+      valueListenable: widget.espm.settings.value.tc.statusMessage,
       builder: (_, String m, __) {
         //logD(m);
         return Text(m, style: const TextStyle(color: Colors.white38));
@@ -267,8 +266,8 @@ class _TCRouteState extends State<TCRoute> with Debug {
   Widget buttons() {
     const Color disabledBg = Colors.black54;
     return ValueListenableBuilder(
-      valueListenable: espm.settings,
-      builder: (context, ESPMSettings settings, widget) {
+      valueListenable: widget.espm.settings,
+      builder: (context, ESPMSettings settings, widget_) {
         var tc = settings.tc;
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -325,7 +324,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
                   onPressed: tc.collected.isNotEmpty && !tc.isCollecting
                       ? () {
                           tc.collected.clear();
-                          espm.settings.notifyListeners();
+                          widget.espm.settings.notifyListeners();
                         }
                       : null,
                   backgroundColorEnabled: Colors.purple.shade900,
@@ -492,7 +491,7 @@ class _TCRouteState extends State<TCRoute> with Debug {
   Widget chart() {
     return ValueListenableBuilder(
       // key: _key,
-      valueListenable: espm.settings,
+      valueListenable: widget.espm.settings,
       builder: (context, ESPMSettings settings, widget) {
         var tc = settings.tc;
         //logD("chart builder minX: $minX, maxX: $maxX");
