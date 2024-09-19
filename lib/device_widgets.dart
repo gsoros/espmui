@@ -348,7 +348,7 @@ class EspmWeightScaleWidget extends StatelessWidget with Debug {
       //debugLog('requestResultCode("tare=0"): $resultCode');
       snackbar(
         "Tare ${resultCode == ApiResult.success ? "success" : "failed"}",
-        context,
+        context.mounted ? context : null,
       );
     }
 
@@ -426,6 +426,7 @@ class EspmHallSensorWidget extends StatelessWidget {
       int? hallThresLow = await device.api.request<int>("htl");
 
       await showDialog(
+        // ignore: use_build_context_synchronously
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
@@ -482,7 +483,7 @@ class EspmHallSensorWidget extends StatelessWidget {
       }
       snackbar(
         "Hall readings ${enable ? "en" : "dis"}able${success ? "d" : " failed"}",
-        context,
+        context.mounted ? context : null,
       );
     }
 
@@ -778,7 +779,15 @@ class ApiSettingInputWidget extends SettingInputWidget {
               expectValue: expectValue,
               minDelayMs: 2000,
             );
-            if (name != null) snackbar("$name update${result == ApiResult.success ? "d" : " failed"}", context);
+            if (name != null) {
+              snackbar(
+                  "$name update${result == ApiResult.success ? "d" : " failed"}",
+                  context != null
+                      ? context.mounted
+                          ? context
+                          : null
+                      : null);
+            }
             //logD('api.requestResultCode("$command", expectValue="$expect"): $result');
           },
         );
@@ -859,7 +868,9 @@ class ApiSettingSwitchWidget extends StatelessWidget with Debug {
                 expectValue: null != commandArg ? "$commandArg:" : null,
                 minDelayMs: 2000,
               );
-              if (name != null) snackbar("$name ${enabled ? "en" : "dis"}able${result == ApiResult.success ? "d" : " failed"}", context);
+              if (name != null) {
+                snackbar("$name ${enabled ? "en" : "dis"}able${result == ApiResult.success ? "d" : " failed"}", context.mounted ? context : null);
+              }
               logD("api.requestResultCode($commandCode): $result");
             });
     return (name == null)
@@ -1207,9 +1218,9 @@ class EspmSettingsWidget extends StatelessWidget with Debug {
                         if (1 == code) {
                           device.settings.value.otaMode = true;
                           device.settings.notifyListeners();
-                          snackbar("OTA enabled", context);
+                          snackbar("OTA enabled", context.mounted ? context : null);
                         } else {
-                          snackbar("OTA failed", context);
+                          snackbar("OTA failed", context.mounted ? context : null);
                         }
                       },
                 child: const Row(children: [
@@ -1467,9 +1478,9 @@ class EspccSyncWidget extends StatelessWidget with Debug {
                   device.syncer.dequeue(f);
                   device.files.value.files.removeWhere((file) => file.name == f.name);
                   device.files.notifyListeners();
-                  snackbar("Deleted ${f.name}", context);
+                  snackbar("Deleted ${f.name}", context.mounted ? context : null);
                 } else {
-                  snackbar("Could not delete ${f.name}", context);
+                  snackbar("Could not delete ${f.name}", context.mounted ? context : null);
                 }
               }
             },
