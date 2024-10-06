@@ -463,18 +463,41 @@ class TileGridState extends State<TileGrid> with Debug {
                 _tiles.save();
                 snackbar("History: ${sliderToValue(value).round()} seconds", context);
               },
-              onChanged: (value) {
-                //logD("v: $value s2v(v): ${sliderToValue(value)} v2s(s2v(v)): ${valueToSlider(sliderToValue(value))}");
-                _tiles[index] = Tile.from(
-                  tile,
-                  history: sliderToValue(value).round(),
-                );
-              },
+              onChanged: tile.history < 0
+                  ? null
+                  : (value) {
+                      //logD("v: $value s2v(v): ${sliderToValue(value)} v2s(s2v(v)): ${valueToSlider(sliderToValue(value))}");
+                      _tiles[index] = Tile.from(
+                        tile,
+                        history: sliderToValue(value).round(),
+                      );
+                    },
             );
             return Column(
               children: [
                 sourceDropdown,
-                historySlider,
+                Row(
+                  children: [
+                    historySlider,
+                    Checkbox(
+                      value: tile.history < 0,
+                      onChanged: (value) {
+                        if (value == true) {
+                          _tiles[index] = Tile.from(
+                            tile,
+                            history: -1,
+                          );
+                          return;
+                        }
+                        _tiles[index] = Tile.from(
+                          tile,
+                          history: 0,
+                        );
+                      },
+                    ),
+                    Text('∞'),
+                  ],
+                ),
               ],
             );
           });
