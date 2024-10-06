@@ -495,7 +495,7 @@ class TileGridState extends State<TileGrid> with Debug {
                         );
                       },
                     ),
-                    Text('∞'),
+                    const Text('∞'),
                   ],
                 ),
               ],
