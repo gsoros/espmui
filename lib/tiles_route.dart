@@ -416,7 +416,7 @@ class TileGridState extends State<TileGrid> with Debug {
             History? charHistory = DeviceList().byIdentifier(tile.device)?.tileStreams[tile.stream]?.history;
             if (null == charHistory) return sourceDropdown;
             logD("this stream supports history");
-            double max = charHistory.maxAge.toDouble();
+            double max = (charHistory.maxAge < 0 ? 3600 : charHistory.maxAge).toDouble();
 
             /// Slider power curve
             /// https://stackoverflow.com/a/17102320/7195990

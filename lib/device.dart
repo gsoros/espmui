@@ -909,13 +909,16 @@ class DeviceTileAction {
 class History<T> with Debug {
   final _data = <int, T>{};
   final int maxEntries;
+
+  /// <0: no limit
   final int maxAge;
+
   final bool absolute;
 
   /// The oldest entries will be deleted when either
   /// - the number of entries exceeds [maxEntries]
   /// - or the age of the entry in seconds is greater than [maxAge].
-  History({required this.maxEntries, required this.maxAge, this.absolute = false});
+  History({this.maxEntries = 3600, this.maxAge = -1, this.absolute = false});
 
   /// Append a value to the history.
   /// - [timestamp]: milliseconds since Epoch
@@ -933,7 +936,7 @@ class History<T> with Debug {
         while (maxEntries < _data.length) {
           _data.remove(_data.entries.first.key);
         }
-      } else {
+      } else if (0 <= maxAge) {
         _data.removeWhere((time, _) => time < uts() - maxAge * 1000);
       }
     }

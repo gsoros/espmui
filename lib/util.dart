@@ -74,7 +74,7 @@ void streamSendIfNotClosed(
   }
   if (null == value) {
     if (!allowNull) {
-      Debug.log("not sending null to $stream (type: ${stream.sink.runtimeType})");
+      //Debug.log("not sending null to $stream (type: ${stream.sink.runtimeType})");
       return;
     }
     Debug.log("sending null to $stream (type: ${stream.sink.runtimeType})");

@@ -242,7 +242,7 @@ class BatteryCharacteristic extends BleCharacteristic<int> {
   final charUUID = BleConstants.BATTERY_LEVEL_CHAR_UUID;
 
   BatteryCharacteristic(super.device) {
-    histories['charge'] = History<int>(maxEntries: 3600, maxAge: 3600);
+    histories['charge'] = History<int>();
   }
 
   @override
